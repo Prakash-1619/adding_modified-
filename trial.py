@@ -31,6 +31,10 @@ st.markdown("""
         header, footer {
             visibility: hidden;
         }
+        /* Force show the sidebar toggle */
+        [data-testid="collapsedControl"] {
+            display: block !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
