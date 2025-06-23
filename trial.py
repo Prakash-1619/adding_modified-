@@ -10,24 +10,11 @@ import numpy as np
 
 # --- Page Config ---
 st.set_page_config(initial_sidebar_state="expanded",layout="wide")
-st.markdown("""
-    <style>
-        /* Keep original layout intact while adjusting padding */
-        .block-container {
-            padding-top: 2rem !important;
-            padding-bottom: 2rem !important;
-        }
-
-        /* Make sure the sidebar toggle is always visible */
-        [data-testid="collapsedControl"] {
-            display: block !important;
-        }
-
-        header, footer {
-            visibility: hidden;
-        }
-    </style>
-""", unsafe_allow_html=True)
+st.markdown(
+'<div style="padding-top: 2rem;"></div>'
+, unsafe_allow_html=
+True
+)
 
 st.sidebar.title("🔍 FlipOse-RE-Analytics")
 st.markdown("""
