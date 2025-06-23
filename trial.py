@@ -20,7 +20,7 @@ st.markdown("""
         /* Lower the sidebar toggle (arrow) */
         [data-testid="collapsedControl"] {
             position: fixed;
-            top: 50px;         /* Adjust this value to move the arrow down */
+            top: 500px;         /* Adjust this value to move the arrow down */
             left: 50px;         /* default left margin */
             z-index: 100;
         }
