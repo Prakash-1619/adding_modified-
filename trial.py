@@ -22,7 +22,7 @@ st.markdown("""
             position: fixed;
             top: 200px;         /* Adjust this value to move the arrow down */
             left: 50px;         /* default left margin */
-            z-index: 999;
+            z-index: 100;
         }
 
         /* Add some top padding to the main page */
