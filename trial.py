@@ -15,6 +15,23 @@ st.set_page_config(initial_sidebar_state="expanded",layout="wide")
 #, unsafe_allow_html=
 #True)
 
+st.markdown("""
+    <style>
+        /* Lower the sidebar toggle (arrow) */
+        [data-testid="collapsedControl"] {
+            position: fixed;
+            top: 100px;         /* Adjust this value to move the arrow down */
+            left: 16px;         /* default left margin */
+            z-index: 999;
+        }
+
+        /* Add some top padding to the main page */
+        .block-container {
+            padding-top: 2rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.sidebar.title("🔍 FlipOse-RE-Analytics")
 
 # --- File Paths ---
