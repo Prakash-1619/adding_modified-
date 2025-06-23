@@ -10,27 +10,12 @@ import numpy as np
 
 # --- Page Config ---
 st.set_page_config(initial_sidebar_state="expanded",layout="wide")
-#st.markdown(
-#'<div style="padding-top: 2rem;"></div>'
-#, unsafe_allow_html=
-#True)
+st.markdown(
+'<div style="padding-top: 2rem;"></div>'
+, unsafe_allow_html=
+True)
 
 st.sidebar.title("🔍 FlipOse-RE-Analytics")
-st.markdown("""
-    <style>
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-        }
-        header, footer {
-            visibility: hidden;
-        }
-        /* Force show the sidebar toggle */
-        [data-testid="collapsedControl"] {
-            display: block !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 # --- File Paths ---
 df_path = "target_df.csv"
