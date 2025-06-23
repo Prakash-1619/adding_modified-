@@ -27,7 +27,7 @@ st.markdown("""
 
         /* Add some top padding to the main page */
         .block-container {
-            padding-top: 0.1rem;
+            padding-top: 1rem;
         }
     </style>
 """, unsafe_allow_html=True)
