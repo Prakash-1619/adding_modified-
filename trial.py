@@ -9,7 +9,7 @@ import numpy as np
 
 
 # --- Page Config ---
-st.set_page_config(layout="wide")
+st.set_page_config(initial_sidebar_state="expanded",layout="wide")
 st.markdown("""
     <style>
         .block-container {
