@@ -954,11 +954,11 @@ elif page == "V2":
         with tab1:
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric(label="Number Of Columns", value = 46)
+                st.metric(label="Number Of Columns", value = 107)
             with col2:
-                st.metric(label="Total Records", value = "1,424,588")
+                st.metric(label="Total Records", value = "5,88,863")
             with col3:
-                st.metric(label="Start Date(Instance_date)", value="1966-01-18")
+                st.metric(label="Start Date(Instance_date)", value="2020-01-01)
             with col4:
                 st.metric(label="End Date(Instance_date)", value="2025-04-03")
             
@@ -968,8 +968,8 @@ elif page == "V2":
                 summary_df[col] = summary_df[col].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else x)
     
             summary_df.index = range(1, len(summary_df) + 1)
-            summary_df.rename(columns={'No_of_units': 'Num_of_Unique_values'}, inplace=True)
-            summary_df = summary_df.drop(columns = ["S.no", "Level"])
+            #summary_df.rename(columns={'No_of_units': 'Num_of_Unique_values'}, inplace=True)
+            #summary_df = summary_df.drop(columns = ["S.no", "Level"])
             st.dataframe(summary_df)
     
         with tab2:
