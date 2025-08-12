@@ -30,12 +30,9 @@ st.markdown("""
 ###
 
 # Sidebar navigation
-page = st.sidebar.radio("Navigate to:", ["Page 1", "Page 2"])
+page = st.sidebar.radio("Versions", ["V1", "V2"])
 
-if page == "Page 1":
-    st.title("🏠 Page 1 - Dashboard")
-    st.write("This is Page 1 content.")
-    
+if page == "V1":
     # Sidebar
     st.sidebar.title("🔍 FlipOse-RE-Analytics-V1")
     
@@ -897,9 +894,7 @@ if page == "Page 1":
             )
 
 
-elif page == "Page 2":
-    st.title("📊 Page 2 - Data Summary")
-    st.write("This is Page 2 content.")
+elif page == "V2":
     
     # Custom CSS (same style if you want consistency)
     st.markdown("""
