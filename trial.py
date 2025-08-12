@@ -35,25 +35,7 @@ st.sidebar.title("🔍 FlipOse-RE-Analytics")
 st.title("🏠 True_Estates-V1")
 ################################################################################################################################
 
-# Page config
-st.set_page_config(initial_sidebar_state="expanded", layout="wide", page_title="Data Summary")
 
-# Custom CSS (same style if you want consistency)
-st.markdown("""
-    <style>
-        [data-testid="collapsedControl"] {
-            position: fixed;
-            top: 500px;
-            left: 50px;
-            z-index: 100;
-        }
-        .block-container {
-            padding-top: 2.5rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-st.sidebar.title("🔍 FlipOse-RE-Analytics-V2")
 
 
 
@@ -912,6 +894,30 @@ if sidebar_option == "Geo Graphical Analysis":
             """,
             unsafe_allow_html=True
         )
+
+
+
+
+
+# Page config
+st.set_page_config(initial_sidebar_state="expanded", layout="wide", page_title="Data Summary")
+
+# Custom CSS (same style if you want consistency)
+st.markdown("""
+    <style>
+        [data-testid="collapsedControl"] {
+            position: fixed;
+            top: 500px;
+            left: 50px;
+            z-index: 100;
+        }
+        .block-container {
+            padding-top: 2.5rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.sidebar.title("🔍 FlipOse-RE-Analytics-V2")
     
 
 
