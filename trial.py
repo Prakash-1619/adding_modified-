@@ -8,31 +8,55 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 
-# --- Page Config ---
-st.set_page_config(initial_sidebar_state="expanded",layout="wide")
-#st.markdown(
-#'<div style="padding-top: 2rem;"></div>'
-#, unsafe_allow_html=
-#True)
+import streamlit as st
 
+# Page config
+st.set_page_config(initial_sidebar_state="expanded", layout="wide", page_title="FlipOse Home")
+
+# Custom CSS
 st.markdown("""
     <style>
-        /* Lower the sidebar toggle (arrow) */
         [data-testid="collapsedControl"] {
             position: fixed;
-            top: 500px;         /* Adjust this value to move the arrow down */
-            left: 50px;         /* default left margin */
+            top: 500px;
+            left: 50px;
             z-index: 100;
         }
-
-        /* Add some top padding to the main page */
         .block-container {
             padding-top: 2.5rem;
         }
     </style>
 """, unsafe_allow_html=True)
 
+# Sidebar
 st.sidebar.title("🔍 FlipOse-RE-Analytics")
+
+# Content
+st.title("🏠 True_Estates-V1")
+################################################################################################################################
+
+# Page config
+st.set_page_config(initial_sidebar_state="expanded", layout="wide", page_title="Data Summary")
+
+# Custom CSS (same style if you want consistency)
+st.markdown("""
+    <style>
+        [data-testid="collapsedControl"] {
+            position: fixed;
+            top: 500px;
+            left: 50px;
+            z-index: 100;
+        }
+        .block-container {
+            padding-top: 2.5rem;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+st.sidebar.title("🔍 FlipOse-RE-Analytics-V2")
+
+
+
 
 # --- File Paths ---
 df_path = "target_df.csv"
