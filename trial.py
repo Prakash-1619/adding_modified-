@@ -29,16 +29,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Sidebar
-st.sidebar.title("🔍 FlipOse-RE-Analytics")
+st.sidebar.title("🔍 FlipOse-RE-Analytics-V1")
 
-# Content
-st.title("🏠 True_Estates-V1")
 ################################################################################################################################
-
-
-
-
-
 
 # --- File Paths ---
 df_path = "target_df.csv"
@@ -900,7 +893,8 @@ if sidebar_option == "Geo Graphical Analysis":
 
 
 # Page config
-st.set_page_config(initial_sidebar_state="expanded", layout="wide", page_title="Data Summary")
+st.set_page_config(initial_sidebar_state="expanded", layout="wide"
+)
 
 # Custom CSS (same style if you want consistency)
 st.markdown("""
