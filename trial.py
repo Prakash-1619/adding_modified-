@@ -958,7 +958,7 @@ elif page == "V2":
             with col2:
                 st.metric(label="Total Records", value = "5,88,863")
             with col3:
-                st.metric(label="Start Date(Instance_date)", value="2020-01-01)
+                st.metric(label="Start Date(Instance_date)", value="2020-01-01")
             with col4:
                 st.metric(label="End Date(Instance_date)", value="2025-04-03")
             
