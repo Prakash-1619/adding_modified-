@@ -912,7 +912,73 @@ elif page == "V2":
     """, unsafe_allow_html=True)
     
     st.sidebar.title("🔍 FlipOse-RE-Analytics-V2")
-        
+    
+    def load_csv(file_path):
+        try:
+            return pd.read_csv(file_path)
+        except FileNotFoundError:
+            st.sidebar.error(f"File not found: {file_path}")
+            st.stop()
+    
+    def load_excel(file_path):
+        try:
+            return pd.read_excel(file_path)
+        except FileNotFoundError:
+            st.sidebar.error(f"File not found: {file_path}")
+            st.stop()
+    
+    # --- Load Main Dataset ---
+        # --- File Paths ---
+    #df_path = "target_df.csv"
+    #area_stats_path = "df_area_plot_stats.xlsx"
+    #cat_plot_path = "original_df_description_year.xlsx"
+    summary = "V2_data_summary.xlsx"
+    #sample = "sample_df.csv"
+    # --- Load Area Stats ---
+    #df_area_plot_stats = load_excel(area_stats_path)
+    
+    # --- Sidebar Navigation ---
+    sidebar_option = st.sidebar.radio("Choose View", [
+        "Data Summary",
+        "Pareto Analysis",
+        "Univariate Analysis",
+        "Bivariate Analysis",
+        "Geo Graphical Analysis",
+        "Price Prediction Model"
+    ])
+    
+    # --- View 1: Data Summary ---
+    if sidebar_option == "Data Summary":
+        st.subheader("📄 Micro_Data_combined")
+        tab1, tab2 = st.tabs(["Summary","Notes"])
+        with tab1:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric(label="Number Of Columns", value = 46)
+            with col2:
+                st.metric(label="Total Records", value = "1,424,588")
+            with col3:
+                st.metric(label="Start Date(Instance_date)", value="1966-01-18")
+            with col4:
+                st.metric(label="End Date(Instance_date)", value="2025-04-03")
+            
+            summary_df = pd.read_excel(summary)
+            # Format all numeric columns with commas
+            for col in summary_df.select_dtypes(include='number').columns:
+                summary_df[col] = summary_df[col].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else x)
+    
+            summary_df.index = range(1, len(summary_df) + 1)
+            summary_df.rename(columns={'No_of_units': 'Num_of_Unique_values'}, inplace=True)
+            summary_df = summary_df.drop(columns = ["S.no", "Level"])
+            st.dataframe(summary_df)
+    
+        with tab2:
+            notes = "notes.xlsx"
+            notes_df = pd.read_excel(notes)
+            if 'nRecords' in notes_df.columns:
+                notes_df['nRecords'] = notes_df['nRecords'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
+                st.dataframe(notes_df)
+            
 
 
     
