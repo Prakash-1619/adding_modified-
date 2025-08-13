@@ -973,7 +973,7 @@ elif page == "V2":
             st.dataframe(summary_df)
     
         with tab2:
-            notes = "notes.xlsx"
+            notes = "V2_Notes.xlsx"
             notes_df = pd.read_excel(notes)
             if 'nRecords' in notes_df.columns:
                 notes_df['nRecords'] = notes_df['nRecords'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
