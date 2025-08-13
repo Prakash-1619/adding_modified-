@@ -1341,7 +1341,7 @@ elif page == "V2":
             fig_corr.update_xaxes(visible=False)
             fig_corr.update_yaxes(visible=False)
             fig_corr.update_layout(
-                title="Decision Tree (Zoom & Pan Enabled)",
+                title="Dython Nominal Associayions"
                 dragmode="pan"
             )
     
