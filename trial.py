@@ -978,6 +978,150 @@ elif page == "V2":
             if 'nRecords' in notes_df.columns:
                 notes_df['nRecords'] = notes_df['nRecords'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
                 st.dataframe(notes_df)
+
+     if sidebar_option == "Univariate Analysis":
+        
+            # Load Excel Sheets
+            try:
+                cat_plot_path = "V2-column_value_counts_with_avg_price.xlsx"
+                xls = pd.ExcelFile(cat_plot_path)
+                sheet_names = xls.sheet_names
+            except FileNotFoundError:
+                st.error(f"File not found: {cat_plot_path}")
+                st.stop()
+        
+            main_tabs = st.tabs([ "Dimensions","Metrics"])
+        
+            with main_tabs[0]:
+                # Select sheet before tabs
+                selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names)
+                df = pd.read_excel(xls, sheet_name=selected_sheet)
+                col1 = df.columns[0]  # Category column
+                #st.markdown("### 📊 Bar Plot (nRecords)")
+                if "nRecords" in df.columns:
+                    fig_bar = px.bar(df, x=col1, y="nRecords", title=f"nRecords by {col1}", color=col1)
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.warning("'nRecords' column not found.")
+            with main_tabs[1]:
+                # Dropdown for selecting the category column
+                cat_cols = ["meter_sale_price", "procedure_area"]
+                cat = st.selectbox("Select the metrics column:", cat_cols)
+        
+                # Create sub-tabs under the selected category
+                sub_tabs = st.tabs(["Table", "Histogram", "Boxplot"])
+        
+                # 1️⃣ TABLE TAB
+                with sub_tabs[0]:
+                    # Define mapping of category to list of files
+                    table_files = {
+                        "meter_sale_price": [
+                            "meter_sale_price_table_final.xlsx",
+                            "bin_df_manual.xlsx"
+                        ],
+                        "procedure_area": [
+                            "procedure_area_table_final.xlsx",
+                            "bin_df_Procedure_area_manual_xyz.xlsx"
+                        ]
+                    }
+        
+                    # Get the selected category (ensure 'cat' is assigned earlier in your code)
+                    selected_tables = table_files.get(cat)
+        
+                    if selected_tables:
+                        for table_file in selected_tables:
+                            try:
+                                df = pd.read_excel(table_file)
+        
+                                # Apply comma formatting ONLY to bin files
+                                if "bin_df" in table_file and "nRecords" in df.columns:
+                                    df['nRecords'] = df['nRecords'].apply(lambda x: f"{x:,}")
+        
+                                # Display the table
+                                #st.markdown(f"#### Displaying: `{table_file}`")
+                                st.dataframe(df, use_container_width=True)
+        
+                            except FileNotFoundError:
+                                st.error(f"File not found: {table_file}")
+                            except Exception as e:
+                                st.error(f"Error reading `{table_file}`: {e}")
+        
+        
+                # 2️⃣ HISTOGRAM TAB
+                with sub_tabs[1]:
+                    # Mapping for bar chart Excel files (inside tab for clarity)
+                    plot_bar = {
+                        "meter_sale_price": "bin_df_manual.xlsx",
+                        "procedure_area": "bin_df_Procedure_area_manual_xyz.xlsx"
+                    }
+        
+                    selected_bar = plot_bar.get(cat)
+                    if selected_bar:
+                        try:
+                            df_bar = pd.read_excel(selected_bar)
+                            #st.markdown(f"### Barchart for `{cat}`")
+                            fig = px.bar(
+                                df_bar,
+                                x= "bin_range",
+                                y="nRecords",
+                                #labels={"meter_sale_price": "meter_sale_price", "nRecords": "Number of Records"},
+                                title=f"Distribution of {cat.replace('_', ' ').title()}",
+                                text_auto=True)
+                            # Add black border and control bar width
+                            fig.update_traces(marker_line_color='black', marker_line_width=1)
+        
+                            # Optional: customize layout
+                            fig.update_layout(
+                                #xaxis_title="meter_sale_price",
+                                #yaxis_title="Number of Records",
+                                bargap=0,  # Adjust space between bars
+                                height=500
+                                )
+                            st.plotly_chart(fig, use_container_width=True)
+                        except FileNotFoundError:
+                            st.error(f"File not found: {selected_bar}")
+                        except Exception as e:
+                            st.error(f"Error creating bar chart: {e}")
+        
+                with sub_tabs[2]:
+                    # Mapping for boxplot HTML files
+                    plot_box = {
+                        "meter_sale_price": "meter_sale_price_with_boxplot.html",
+                        "procedure_area": "procedure_area_with_boxplot.html"
+                    }
+        
+                    # Mapping for corresponding PNG images
+                    plot_images = {
+                        "meter_sale_price": "boxplot_meter_sale_price_raw.png",
+                        "procedure_area": "boxplot_procedure_area_raw.png"
+                    }
+        
+                    selected_file = plot_box.get(cat)
+                    selected_image = plot_images.get(cat)
+        
+                    # Adjusting columns: 2 for image (col1), 3 for boxplot (col2)
+                    col1, col2 = st.columns([2, 3])
+        
+                    with col1:
+                        if selected_image:
+                            try:
+                                # Display image with automatic scaling to container width
+                                st.image(selected_image, use_container_width=True)
+                            except FileNotFoundError:
+                                st.error(f"Image not found: {selected_image}")
+                            except Exception as e:
+                                st.error(f"Error loading image: {e}")
+        
+                    with col2:
+                        if selected_file:
+                            try:
+                                with open(selected_file, "r") as file:
+                                    html_content = file.read()
+                                    components.html(html_content, height=500, width=800, scrolling=True)
+                            except FileNotFoundError:
+                                st.error(f"File not found: {selected_file}")
+                            except Exception as e:
+                                st.error(f"Error loading boxplot HTML: {e}")
             
 
 
