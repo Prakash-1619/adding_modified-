@@ -1196,7 +1196,7 @@ elif page == "V2":
         st.dataframe(df, use_container_width=True, key="nrecords_table")
 
  # Define file paths
-    EXCEL_PATH = "Over_all_output.xlsx"
+    metrics = "V2_Model_metrics.xlsx"
     model_perfomance =  "Model_performance.xlsx"
     html_lr = "predicted_vs_actual_linear.html"
     html_dt = "predicted_vs_actual_decision_tree.html"
@@ -1231,17 +1231,17 @@ elif page == "V2":
         
         # === Tab 1: Prediction Model Visuals ===
         with main_tabs[1]:
-            if os.path.exists(EXCEL_PATH):
-                xl = pd.ExcelFile(EXCEL_PATH)
+            if os.path.exists(metrics):
+                xl = pd.ExcelFile(metrics)
                 sheet_names = xl.sheet_names
     
             if len(sheet_names) >= 2:
                 first_sheet_name = sheet_names[0]  # Index 1 = second sheet
                 df = xl.parse(sheet_name=first_sheet_name)
                 df = df.round(2)
-                if 'nObservations' in df.columns:
-                    df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else x)
-                    if 'MAPE' in df.columns:
+                #if 'nObservations' in df.columns:
+                    #df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else x)
+                if 'MAPE' in df.columns:
                         df['MAPE'] = df['MAPE'].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else x)
                 df.index = range(1, len(df) + 1)
     
@@ -1257,7 +1257,7 @@ elif page == "V2":
             else:
                 st.warning(f"Comparison HTML not found at: {html_comparision}")
     
-            st.subheader("📊 Logistic Regression")
+            st.subheader("📊 Linear Regression")
             st.markdown("###Equation : Predicted_price = 0.40134 * Actual_price + 8966.97")
             if os.path.exists(html_lr):
                 with open(html_lr, "r", encoding="utf-8") as f:
@@ -1272,22 +1272,15 @@ elif page == "V2":
                     components.html(f.read(), height=400, scrolling=True)
             else:
                 st.warning(f"Decision Tree HTML not found at: {html_dt}")
-    
-            st.subheader("🚀 XGBoost")
-            st.markdown("###Equation : Predicted_price = 0.463650 * Actual_price + 8055.86")
-            if os.path.exists(html_xgb):
-                with open(html_xgb, "r", encoding="utf-8") as f:
-                    components.html(f.read(), height=400, scrolling=True)
-            else:
-                st.warning(f"XGBoost HTML not found at: {html_xgb}")
+
     
         # === Tab 3: Area & Sector Sheets ===
         with main_tabs[0]:
                 
-            Over_all, sector_tab,area_tab = st.tabs(["Over All","Sector wise","Area wise"])
+            Over_all,area_tab = st.tabs(["Over All","Area wise"])
             with Over_all:
-                abc = "Over_all_output.xlsx"
-                overall_sheets = pd.read_excel(abc, sheet_name=None)
+                abc_1 = "V2_Model_metrics.xlsx"
+                overall_sheets = pd.read_excel(abc_1, sheet_name=None)
                 if overall_sheets:
                     # Process each sheet
                     for sheet_name in overall_sheets:
@@ -1296,45 +1289,17 @@ elif page == "V2":
                         if 'MAPE' in df.columns:
                             df['MAPE'] = df['MAPE'].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else x)
                             # Format 'nObservations' with commas
-                            if 'nObservations' in df.columns:
-                                df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
+                            #if 'nObservations' in df.columns:
+                                #df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
                                 overall_sheets[sheet_name] = df  # Update in dictionary
                                 # Display each sheet in a tab
                     overall_tabs = st.tabs(list(overall_sheets.keys()))
                     for tab, (sheet_name, df) in zip(overall_tabs, overall_sheets.items()):
                         with tab:
                             st.dataframe(df, use_container_width=True)
-                
-               
-            with sector_tab:
-                pqr = "sector_name_Output.xlsx"
-    
-                # Read all sheets
-                sector_sheets = pd.read_excel(pqr, sheet_name=None)
-    
-                if sector_sheets:
-                    # Process each sheet
-                    for sheet_name in sector_sheets:
-                        df = sector_sheets[sheet_name]
-                
-                        # Format 'MAPE' as percentage string
-                        if 'MAPE' in df.columns:
-                            df['MAPE'] = df['MAPE'].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else x)
-    
-                        # Format 'nObservations' with commas
-                        if 'nObservations' in df.columns:
-                            df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
-    
-                        sector_sheets[sheet_name] = df  # Update in dictionary
-    
-                    # Display each sheet in a tab
-                    sector_tabs = st.tabs(list(sector_sheets.keys()))
-                    for tab, (sheet_name, df) in zip(sector_tabs, sector_sheets.items()):
-                        with tab:
-                            st.dataframe(df, use_container_width=True)
             
             with area_tab:
-                xyz = "Area_name_output.xlsx"
+                xyz = "V2_area_wise outputs.xlsx"
     
                 # Read all sheets
                 area_sheets = pd.read_excel(xyz, sheet_name=None)
