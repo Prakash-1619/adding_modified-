@@ -1272,7 +1272,7 @@ elif page == "V2":
             fig_corr.update_xaxes(visible=False)
             fig_corr.update_yaxes(visible=False)
             fig_corr.update_layout(
-                title="Dython Nominal Associayions"
+                title="Dython Nominal Associayions",
                 dragmode="pan"
             )
     
