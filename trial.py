@@ -1000,19 +1000,18 @@ elif page == "V2":
                 df = pd.read_excel(xls, sheet_name=selected_sheet)
                 col_x = df.columns[0]  # Category column
         
-                # Filter only for chart
-                #chart_df = df[df[col_x] != 0]
-        
                 if "nRecords" in df.columns:
-                    fig_bar = px.bar(df, x=col_x, y="nRecords",
-                                     title=f"nRecords by {col_x}",
-                                     color=col_x)
-                    st.plotly_chart(fig_bar, use_container_width=True, key="nrecords_chart")
+                    chart_df = df[df["nRecords"] != 0]  # filter out zero y-values
+                    if not chart_df.empty:
+                        fig_bar = px.bar(chart_df, x=col_x, y="nRecords",
+                                         title=f"nRecords by {col_x}",
+                                         color=col_x)
+                        st.plotly_chart(fig_bar, use_container_width=True, key="nrecords_chart")
+                    else:
+                        st.warning("No data available with non-zero nRecords.")
                 else:
                     st.warning("'nRecords' column not found.")
         
-                # Show original table (unfiltered)
-                #st.markdown("### 📄 Full Data Table")
                 st.dataframe(df, use_container_width=True, key="nrecords_table")
         
             # 2️⃣ SECOND TAB
@@ -1021,23 +1020,27 @@ elif page == "V2":
                 area_wise = pd.ExcelFile(cat_plot_path_1)
                 sheet_names_1 = area_wise.sheet_names
                 selected_sheet_custom_1 = st.selectbox("Select Area_name", sheet_names_1, key="custom_sheet")
-                df_custom_1 = pd.read_excel(xls, sheet_name=selected_sheet_custom_1)
+                df_custom_1 = pd.read_excel(area_wise, sheet_name=selected_sheet_custom_1)
         
                 col_x_1 = df_custom_1.columns[0]  # X-axis
                 y_axis_col = st.sidebar.selectbox(
                     "Select Area_name:",
-                    [col for col in df_custom_1.columns if col != col_x],
+                    [col for col in df_custom_1.columns if col != col_x_1],
                     key="custom_y_axis"
                 )
-                chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]
-                
+        
+                chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]  # filter out zero Y values
+        
                 if not chart_df_custom.empty:
-                    fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
-                                        title=f"{y_axis_col} by {col_x}",
-                                        color=col_x)
+                    fig_custom = px.bar(chart_df_custom, x=col_x_1, y=y_axis_col,
+                                        title=f"{y_axis_col} by {col_x_1}",
+                                        color=col_x_1)
                     st.plotly_chart(fig_custom, use_container_width=True)
                 else:
                     st.warning(f"No data available for {y_axis_col} with non-zero values.")
+        
+                st.dataframe(df_custom_1, use_container_width=True, key="custom_table")
+
 
 
 
