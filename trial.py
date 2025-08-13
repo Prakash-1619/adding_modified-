@@ -1205,8 +1205,7 @@ elif page == "V2":
                 else:
                     st.warning("No valid data found in the first two sheets.")
         
-            else:
-                st.warning(f"Metrics file not found at: {metrics}")
+        
 
 
 
