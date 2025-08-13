@@ -1247,7 +1247,7 @@ elif page == "V2":
                 
                         # Convert MAPE to percentage
                         if 'MAPE' in df.columns:
-                            df['MAPE'] = df['MAPE'].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else x)
+                            df['MAPE'] = df['MAPE'].apply(lambda x: f"{x :.2f}%" if pd.notnull(x) else x)
     
                         # Format nObservations with commas
                         if 'nObservations' in df.columns:
