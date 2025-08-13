@@ -1039,7 +1039,7 @@ elif page == "V2":
         
                 # Show full table (unfiltered)
                 #st.markdown("### 📄 Selected Columns Table")
-                st.dataframe(df_custom[[col_x, y_axis_col]],
+                st.dataframe(df_custom_1[[col_x, y_axis_col]],
                              use_container_width=True, key="custom_y_table")
 
 
