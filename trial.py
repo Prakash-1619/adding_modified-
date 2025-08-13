@@ -1377,8 +1377,6 @@ elif page == "V2":
     
             st.plotly_chart(fig_drop2, use_container_width=True, key="drop_tab_2")
 
-      -
-
     
 
     
