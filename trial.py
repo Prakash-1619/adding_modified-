@@ -991,54 +991,46 @@ elif page == "V2":
     
         main_tabs = st.tabs(["Dimensions", "Metrics"])
     
-        # ----------------- DIMENSIONS TAB -----------------
-with main_tabs[0]:  # DIMENSIONS
-    dim_tabs = st.tabs(["nRecords Chart & Table", "Area_wise Chart & Table"])
+        with main_tabs[0]:  # DIMENSIONS
+            dim_tabs = st.tabs(["nRecords Chart & Table", "Area_wise Chart & Table"])
+        
+            # 1️⃣ FIRST TAB
+            with dim_tabs[0]:
+                selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names, key="nrecords_sheet")
+                df = pd.read_excel(xls, sheet_name=selected_sheet)
+                col_x = df.columns[0]  # Category column
+        
+                if "nRecords" in df.columns:
+                    fig_bar = px.bar(df, x=col_x, y="nRecords",
+                                     title=f"nRecords by {col_x}",
+                                     color=col_x)
+                    st.plotly_chart(fig_bar, use_container_width=True, key="nrecords_chart")
+                else:
+                    st.warning("'nRecords' column not found.")
+        
+                #st.markdown("### 📄 Full Data Table")
+                st.dataframe(df, use_container_width=True, key="nrecords_table")
+        
+            # 2️⃣ SECOND TAB
+            with dim_tabs[1]:
+                selected_sheet_custom = st.selectbox("Select Column", sheet_names, key="custom_sheet")
+                df_custom = pd.read_excel(xls, sheet_name=selected_sheet_custom)
+        
+                col_x = df_custom.columns[0]  # X-axis
+                y_axis_col = st.sidebar.selectbox(
+                    "Select Area Name:",
+                    [col for col in df_custom.columns if col != col_x],
+                    key="custom_y_axis"
+                )
+        
+                fig_custom = px.bar(df_custom, x=col_x, y=y_axis_col,
+                                    title=f"{y_axis_col} by {col_x}",
+                                    color=col_x)
+                st.plotly_chart(fig_custom, use_container_width=True, key="custom_y_chart")
+        
+                #st.markdown("### 📄 Selected Columns Table")
+                st.dataframe(df_custom[[col_x, y_axis_col]], use_container_width=True, key="custom_y_table")
 
-    # 1️⃣ FIRST TAB
-    with dim_tabs[0]:
-        selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names)
-        df = pd.read_excel(xls, sheet_name=selected_sheet)
-        col_x = df.columns[0]  # Category column
-
-        # Show chart
-        if "nRecords" in df.columns:
-            fig_bar = px.bar(df, x=col_x, y="nRecords",
-                             title=f"nRecords by {col_x}",
-                             color=col_x)
-            st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.warning("'nRecords' column not found.")
-
-        # Show full table
-        st.markdown("### 📄 Full Data Table")
-        st.dataframe(df, use_container_width=True)
-
-        # 2️⃣ SECOND TAB
-        with dim_tabs[1]:
-            selected_sheet_custom = st.selectbox(
-                "Select Dimension column",
-                sheet_names,
-                key="custom_sheet"
-            )
-            df_custom = pd.read_excel(xls, sheet_name=selected_sheet_custom)
-    
-            col_x = df_custom.columns[0]  # X-axis category column
-            # Sidebar Y-axis selector
-            y_axis_col = st.sidebar.selectbox(
-                "Select Area_Name:",
-                [col for col in df_custom.columns if col != col_x]
-            )
-    
-            # Show chart
-            fig_custom = px.bar(df_custom, x=col_x, y=y_axis_col,
-                                title=f"{y_axis_col} by {col_x}",
-                                color=col_x)
-            st.plotly_chart(fig_custom, use_container_width=True)
-    
-            # Show only selected columns in the table
-            st.markdown("### 📄 Selected Columns Table")
-            st.dataframe(df_custom[[col_x, y_axis_col]], use_container_width=True)
 
     
         # ----------------- METRICS TAB -----------------
