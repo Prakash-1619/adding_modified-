@@ -1158,7 +1158,7 @@ elif page == "V2":
         df = pd.read_excel(xls, sheet_name=selected_sheet)
         col_x = df.columns[0]  # Category column
 
-        if "nRecords" in df.columns and "Avg_meter_sale_price" in df.columns:
+        if "nRecords" in df.columns and "Avg_Meter_Sale_Price" in df.columns:
             chart_df = df[(df["nRecords"] != 0) & (df["Avg_meter_sale_price"].notnull())]  # filter out zero y-values
             if not chart_df.empty:
                 # Create figure with secondary y-axis
