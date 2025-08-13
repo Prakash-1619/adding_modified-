@@ -1029,13 +1029,12 @@ elif page == "V2":
                     [col for col in df_custom.columns if col != col_x],
                     key="custom_y_axis"
                 )
-        
-                # Filter only for chart
-                chart_df_custom = df_custom[df_custom[col_x] != 0]
-        
+                chart_df_custom = df_custom[df_custom[y_axis_col] != 0]  # ⬅️ added filter
                 fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
-                                    title=f"{y_axis_col} by {col_x}",
-                                    color=col_x)
+                    title=f"{y_axis_col} by {col_x}",
+                    color=col_x)
+
+    
                 st.plotly_chart(fig_custom, use_container_width=True, key="custom_y_chart")
         
                 # Show full table (unfiltered)
