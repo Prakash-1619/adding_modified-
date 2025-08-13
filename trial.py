@@ -1013,8 +1013,11 @@ elif page == "V2":
         
             # 2️⃣ SECOND TAB
             with dim_tabs[1]:
-                selected_sheet_custom = st.selectbox("Select Column", sheet_names, key="custom_sheet")
-                df_custom = pd.read_excel(xls, sheet_name=selected_sheet_custom)
+                cat_plot_path_1 = "V2_area_wise_value_counts.xlsx"
+                area_wise = pd.ExcelFile(cat_plot_path_1)
+                sheet_names = area_wise.sheet_names
+                selected_sheet_custom_1 = st.selectbox("Select Column", sheet_names, key="custom_sheet")
+                df_custom = pd.read_excel(area_wise, sheet_name=selected_sheet_custom_1)
         
                 col_x = df_custom.columns[0]  # X-axis
                 y_axis_col = st.sidebar.selectbox(
