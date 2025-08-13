@@ -1328,25 +1328,41 @@ elif page == "V2":
     if sidebar_option == "Correlation":
         from PIL import Image
         
-        st.subtitle("Dython Associates (used for cat correlation")
-        
-        # Read PNG file
-        image = Image.open("Associations_correlation.png")
-        img_array = np.array(image)
-        
-        # Create Plotly figure for zoom/pan
-        fig = px.imshow(img_array)
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
-        fig.update_layout(
-            title="Decision Tree (Zoom & Pan Enabled)",
-            dragmode="pan"
-        )
-        
-        # Show in Streamlit
-        st.plotly_chart(fig, use_container_width=True)
+        correlation, Dropping_Features = st.tabs(["correlation", "Dropping_Features"])
 
-    
+        with  correlation:
+            # Read PNG file
+            image = Image.open("Associations_correlation.png")
+            img_array = np.array(image)
+            
+            # Create Plotly figure for zoom/pan
+            fig = px.imshow(img_array)
+            fig.update_xaxes(visible=False)
+            fig.update_yaxes(visible=False)
+            fig.update_layout(
+                title="Decision Tree (Zoom & Pan Enabled)",
+                dragmode="pan"
+            )
+            
+            # Show in Streamlit
+            st.plotly_chart(fig, use_container_width=True)
+
+        with Dropping_Features:
+                        # Read PNG file
+            image = Image.open("Associations_correlation.png")
+            img_array = np.array(image)
+            
+            # Create Plotly figure for zoom/pan
+            fig = px.imshow(img_array)
+            fig.update_xaxes(visible=False)
+            fig.update_yaxes(visible=False)
+            fig.update_layout(
+                title="Decision Tree (Zoom & Pan Enabled)",
+                dragmode="pan"
+            )
+            
+            # Show in Streamlit
+            st.plotly_chart(fig, use_container_width=True)
     
 
     
