@@ -1001,9 +1001,9 @@ elif page == "V2":
                 col_x = df.columns[0]  # Category column
         
                 # Filter only for chart
-                chart_df = df[df[col_x] != 0]
+                #chart_df = df[df[col_x] != 0]
         
-                if "nRecords" in chart_df.columns:
+                if "nRecords" in df.columns:
                     fig_bar = px.bar(chart_df, x=col_x, y="nRecords",
                                      title=f"nRecords by {col_x}",
                                      color=col_x)
@@ -1020,16 +1020,16 @@ elif page == "V2":
                 cat_plot_path_1 = "V2_area_wise_value_counts.xlsx"
                 area_wise = pd.ExcelFile(cat_plot_path_1)
                 sheet_names_1 = area_wise.sheet_names
-                selected_sheet_custom = st.selectbox("Select Area_name", sheet_names_1, key="custom_sheet")
-                df_custom = pd.read_excel(xls, sheet_name=selected_sheet_custom)
+                selected_sheet_custom_1 = st.selectbox("Select Area_name", sheet_names_1, key="custom_sheet")
+                df_custom_1 = pd.read_excel(xls, sheet_name=selected_sheet_custom_1)
         
-                col_x = df_custom.columns[0]  # X-axis
+                col_x_1 = df_custom_1.columns[0]  # X-axis
                 y_axis_col = st.sidebar.selectbox(
                     "Select Area_name:",
-                    [col for col in df_custom.columns if col != col_x],
+                    [col for col in df_custom_1.columns if col != col_x],
                     key="custom_y_axis"
                 )
-                chart_df_custom = df_custom[df_custom[y_axis_col] != 0]  # ⬅️ added filter
+                chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]  # ⬅️ added filter
                 fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
                     title=f"{y_axis_col} by {col_x}",
                     color=col_x)
