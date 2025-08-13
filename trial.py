@@ -1050,100 +1050,33 @@ elif page == "V2":
     
         # ----------------- METRICS TAB -----------------
         with main_tabs[1]:
-            cat_cols = ["meter_sale_price", "procedure_area"]
-            cat = st.selectbox("Select the metrics column:", cat_cols)
-    
-            sub_tabs = st.tabs(["Table", "Histogram", "Boxplot"])
-    
-            # TABLE TAB
-            with sub_tabs[0]:
-                table_files = {
-                    "meter_sale_price": [
-                        "meter_sale_price_table_final.xlsx",
-                        "bin_df_manual.xlsx"
-                    ],
-                    "procedure_area": [
-                        "procedure_area_table_final.xlsx",
-                        "bin_df_Procedure_area_manual_xyz.xlsx"
-                    ]
-                }
-    
-                selected_tables = table_files.get(cat)
-    
-                if selected_tables:
-                    for table_file in selected_tables:
-                        try:
-                            df = pd.read_excel(table_file)
-                            if "bin_df" in table_file and "nRecords" in df.columns:
-                                df['nRecords'] = df['nRecords'].apply(lambda x: f"{x:,}")
-                            st.dataframe(df, use_container_width=True)
-                        except FileNotFoundError:
-                            st.error(f"File not found: {table_file}")
-                        except Exception as e:
-                            st.error(f"Error reading `{table_file}`: {e}")
-    
-            # HISTOGRAM TAB
-            with sub_tabs[1]:
-                plot_bar = {
-                    "meter_sale_price": "bin_df_manual.xlsx",
-                    "procedure_area": "bin_df_Procedure_area_manual_xyz.xlsx"
-                }
-    
-                selected_bar = plot_bar.get(cat)
-                if selected_bar:
-                    try:
-                        df_bar = pd.read_excel(selected_bar)
-                        fig = px.bar(
-                            df_bar,
-                            x="bin_range",
-                            y="nRecords",
-                            title=f"Distribution of {cat.replace('_', ' ').title()}",
-                            text_auto=True
-                        )
-                        fig.update_traces(marker_line_color='black', marker_line_width=1)
-                        fig.update_layout(bargap=0, height=500)
-                        st.plotly_chart(fig, use_container_width=True)
-                    except FileNotFoundError:
-                        st.error(f"File not found: {selected_bar}")
-                    except Exception as e:
-                        st.error(f"Error creating bar chart: {e}")
-    
-            # BOXPLOT TAB
-            with sub_tabs[2]:
-                plot_box = {
-                    "meter_sale_price": "meter_sale_price_with_boxplot.html",
-                    "procedure_area": "procedure_area_with_boxplot.html"
-                }
-    
-                plot_images = {
-                    "meter_sale_price": "boxplot_meter_sale_price_raw.png",
-                    "procedure_area": "boxplot_procedure_area_raw.png"
-                }
-    
-                selected_file = plot_box.get(cat)
-                selected_image = plot_images.get(cat)
-    
-                col1, col2 = st.columns([2, 3])
-    
-                with col1:
-                    if selected_image:
-                        try:
-                            st.image(selected_image, use_container_width=True)
-                        except FileNotFoundError:
-                            st.error(f"Image not found: {selected_image}")
-                        except Exception as e:
-                            st.error(f"Error loading image: {e}")
-    
-                with col2:
-                    if selected_file:
-                        try:
-                            with open(selected_file, "r") as file:
-                                html_content = file.read()
-                                components.html(html_content, height=500, width=800, scrolling=True)
-                        except FileNotFoundError:
-                            st.error(f"File not found: {selected_file}")
-                        except Exception as e:
-                            st.error(f"Error loading boxplot HTML: {e}")
+                       import streamlit as st
+            import streamlit.components.v1 as components
+            
+            # Map display names to file paths
+            html_files = {
+                "Meter Sale Price ": "meter_sale_price_boxplot.html",
+                "Procedure Area ": "procedure_area_boxplot.html",
+                "Actual_worth": "actual_worth_boxplot.html",
+                "Unit balcony area": "unit_balcony_area_boxplot.html"
+            }
+            
+            # Dropdown for selection
+            selected_name = st.selectbox("Select a visualization:", list(html_files.keys()))
+            
+            # Get the corresponding HTML file path
+            selected_file = html_files[selected_name]
+            
+            # Display the HTML
+            try:
+                with open(selected_file, "r") as file:
+                    html_content = file.read()
+                    components.html(html_content, height=600, scrolling=True)
+            except FileNotFoundError:
+                st.error(f"File not found: {selected_file}")
+            except Exception as e:
+                st.error(f"Error loading HTML: {e}")
+
         # --- View 3: Bivariate Analysis  ---
     if sidebar_option == "Bivariate Analysis":
                 # Load Excel Sheets
