@@ -1161,49 +1161,50 @@ elif page == "V2":
         main_tabs = st.tabs(["📈 Model Performance Tables","📉 Prediction Model Visuals"])
         
         # === Tab 1: Prediction Model Visuals ===
-        
+                
         with main_tabs[1]:
-                area_sheet = "V2_area_wise outputs.xlsx"
-    
-                # Read all sheets
-                area_sheets = pd.read_excel(area_sheet, sheet_name=None)
-                sheet_names = area_sheets.sheet_names
+            area_sheet = "V2_area_wise outputs.xlsx"
         
-                combined_df = pd.DataFrame()
+            # Load Excel file as ExcelFile so we can parse by sheet name
+            xl = pd.ExcelFile(area_sheet)
+            sheet_names = xl.sheet_names
         
-                for sheet in sheet_names[:2]:  # Take only first 2 sheets
-                    df_temp = xl.parse(sheet_name=sheet)
-                    df_temp = df_temp.round(2)
+            combined_df = pd.DataFrame()
         
-                    if 'area_name_en' in df_temp.columns and 'R2' in df_temp.columns:
-                        df_temp['R2'] = pd.to_numeric(df_temp['R2'], errors='coerce')
-                        df_temp['Sheet'] = sheet  # Label for distinguishing lines
-                        combined_df = pd.concat([combined_df, df_temp[['area_name_en', 'R2', 'Sheet']]])
+            for sheet in sheet_names[:2]:  # Take only first 2 sheets
+                df_temp = xl.parse(sheet_name=sheet)
+                df_temp = df_temp.round(2)
         
-                if not combined_df.empty:
-                    # Sort for proper plotting
-                    combined_df = combined_df.sort_values(by='area_name_en')
+                if 'area_name_en' in df_temp.columns and 'R2' in df_temp.columns:
+                    df_temp['R2'] = pd.to_numeric(df_temp['R2'], errors='coerce')
+                    df_temp['Sheet'] = sheet  # Label for distinguishing lines
+                    combined_df = pd.concat([combined_df, df_temp[['area_name_en', 'R2', 'Sheet']]])
         
-                    # Plot both sheets on same line chart
-                    fig = px.line(
-                        combined_df,
-                        x='area_name_en',
-                        y='R2',
-                        color='Sheet',
-                        markers=True,
-                        title="R² Comparison by Area (Both Sheets)"
-                    )
-                    fig.update_layout(
-                        xaxis_title="Area Name",
-                        yaxis_title="R²",
-                        hovermode="x unified"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+            if not combined_df.empty:
+                # Sort for proper plotting
+                combined_df = combined_df.sort_values(by='area_name_en')
         
-                    # Show combined dataframe
-                    st.dataframe(combined_df, use_container_width=True)
-                else:
-                    st.warning("No valid data found in the first two sheets.")
+                # Plot both sheets on same line chart
+                fig = px.line(
+                    combined_df,
+                    x='area_name_en',
+                    y='R2',
+                    color='Sheet',
+                    markers=True,
+                    title="R² Comparison by Area (Both Sheets)"
+                )
+                fig.update_layout(
+                    xaxis_title="Area Name",
+                    yaxis_title="R²",
+                    hovermode="x unified"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+                # Show combined dataframe
+                st.dataframe(combined_df, use_container_width=True)
+            else:
+                st.warning("No valid data found in the first two sheets.")
+
         
         
 
