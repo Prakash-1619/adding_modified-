@@ -1029,18 +1029,16 @@ elif page == "V2":
                     [col for col in df_custom_1.columns if col != col_x],
                     key="custom_y_axis"
                 )
-                chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]  # ⬅️ added filter
-                fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
-                    title=f"{y_axis_col} by {col_x}",
-                    color=col_x)
+                chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]
+                
+                if not chart_df_custom.empty:
+                    fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
+                                        title=f"{y_axis_col} by {col_x}",
+                                        color=col_x)
+                    st.plotly_chart(fig_custom, use_container_width=True)
+                else:
+                    st.warning(f"No data available for {y_axis_col} with non-zero values.")
 
-    
-                st.plotly_chart(fig_custom, use_container_width=True, key="custom_y_chart")
-        
-                # Show full table (unfiltered)
-                #st.markdown("### 📄 Selected Columns Table")
-                st.dataframe(df_custom_1[[col_x, y_axis_col]],
-                             use_container_width=True, key="custom_y_table")
 
 
 
