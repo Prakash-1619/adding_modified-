@@ -1021,16 +1021,16 @@ elif page == "V2":
                 sheet_names_1 = area_wise.sheet_names
                 selected_sheet_custom_1 = st.selectbox("Select Area_name", sheet_names_1, key="custom_sheet")
                 df_custom_1 = pd.read_excel(area_wise, sheet_name=selected_sheet_custom_1)
-        
+            
                 col_x_1 = df_custom_1.columns[0]  # X-axis
                 y_axis_col = st.sidebar.selectbox(
                     "Select Area_name:",
                     [col for col in df_custom_1.columns if col != col_x_1],
                     key="custom_y_axis"
                 )
-        
+            
                 chart_df_custom = df_custom_1[df_custom_1[y_axis_col] != 0]  # filter out zero Y values
-        
+            
                 if not chart_df_custom.empty:
                     fig_custom = px.bar(chart_df_custom, x=col_x_1, y=y_axis_col,
                                         title=f"{y_axis_col} by {col_x_1}",
@@ -1038,8 +1038,10 @@ elif page == "V2":
                     st.plotly_chart(fig_custom, use_container_width=True)
                 else:
                     st.warning(f"No data available for {y_axis_col} with non-zero values.")
-        
-                st.dataframe(df_custom_1, use_container_width=True, key="custom_table")
+            
+                # Show only X and selected Y column (non-zero rows)
+                st.dataframe(chart_df_custom[[col_x_1, y_axis_col]], use_container_width=True, key="custom_table")
+
 
 
 
