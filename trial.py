@@ -1161,48 +1161,54 @@ elif page == "V2":
         main_tabs = st.tabs(["📈 Model Performance Tables","📉 Prediction Model Visuals"])
         
         # === Tab 1: Prediction Model Visuals ===
+        
         with main_tabs[1]:
-            if os.path.exists(metrics):
-                xl = pd.ExcelFile(metrics)
-                sheet_names = xl.sheet_names
+                area_sheet = "V2_area_wise outputs.xlsx"
     
-            if len(sheet_names) >= 2:
-                first_sheet_name = sheet_names[0]  # Index 1 = second sheet
-                df = xl.parse(sheet_name=first_sheet_name)
-                df = df.round(2)
-                #if 'nObservations' in df.columns:
-                    #df['nObservations'] = df['nObservations'].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else x)
-                if 'MAPE' in df.columns:
-                        df['MAPE'] = df['MAPE'].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else x)
-                df.index = range(1, len(df) + 1)
-    
-                st.subheader(f"📊 {first_sheet_name}")
-                st.dataframe(df, use_container_width=True)
+                # Read all sheets
+                area_sheets = pd.read_excel(area_sheet, sheet_name=None)
+                sheet_names = area_sheets.sheet_names
+        
+                combined_df = pd.DataFrame()
+        
+                for sheet in sheet_names[:2]:  # Take only first 2 sheets
+                    df_temp = xl.parse(sheet_name=sheet)
+                    df_temp = df_temp.round(2)
+        
+                    if 'area_name_en' in df_temp.columns and 'R2' in df_temp.columns:
+                        df_temp['R2'] = pd.to_numeric(df_temp['R2'], errors='coerce')
+                        df_temp['Sheet'] = sheet  # Label for distinguishing lines
+                        combined_df = pd.concat([combined_df, df_temp[['area_name_en', 'R2', 'Sheet']]])
+        
+                if not combined_df.empty:
+                    # Sort for proper plotting
+                    combined_df = combined_df.sort_values(by='area_name_en')
+        
+                    # Plot both sheets on same line chart
+                    fig = px.line(
+                        combined_df,
+                        x='area_name_en',
+                        y='R2',
+                        color='Sheet',
+                        markers=True,
+                        title="R² Comparison by Area (Both Sheets)"
+                    )
+                    fig.update_layout(
+                        xaxis_title="Area Name",
+                        yaxis_title="R²",
+                        hovermode="x unified"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        
+                    # Show combined dataframe
+                    st.dataframe(combined_df, use_container_width=True)
+                else:
+                    st.warning("No valid data found in the first two sheets.")
+        
             else:
-                st.warning("The Excel file has less than 2 sheets.")
-                
-            st.subheader("🔍 Overall Comparison Report")
-            if os.path.exists(html_comparision):
-                with open(html_comparision, "r", encoding="utf-8") as f:
-                    components.html(f.read(), height=300, scrolling=True)
-            else:
-                st.warning(f"Comparison HTML not found at: {html_comparision}")
-    
-            st.subheader("📊 Linear Regression")
-            st.markdown("###Equation : Predicted_price = 0.40134 * Actual_price + 8966.97")
-            if os.path.exists(html_lr):
-                with open(html_lr, "r", encoding="utf-8") as f:
-                    components.html(f.read(), height=400, scrolling=True)
-            else:
-                st.warning(f"Logistic Regression HTML not found at: {html_lr}")
-    
-            st.subheader("🌳 Decision Tree")
-            st.markdown("###Equation : Predicted_price = 0.465166 * Actual_price + 7993.22")
-            if os.path.exists(html_dt):
-                with open(html_dt, "r", encoding="utf-8") as f:
-                    components.html(f.read(), height=400, scrolling=True)
-            else:
-                st.warning(f"Decision Tree HTML not found at: {html_dt}")
+                st.warning(f"Metrics file not found at: {metrics}")
+
+
 
     
         # === Tab 3: Area & Sector Sheets ===
