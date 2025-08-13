@@ -1004,7 +1004,7 @@ elif page == "V2":
                 #chart_df = df[df[col_x] != 0]
         
                 if "nRecords" in df.columns:
-                    fig_bar = px.bar(chart_df, x=col_x, y="nRecords",
+                    fig_bar = px.bar(df, x=col_x, y="nRecords",
                                      title=f"nRecords by {col_x}",
                                      color=col_x)
                     st.plotly_chart(fig_bar, use_container_width=True, key="nrecords_chart")
