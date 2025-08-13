@@ -978,7 +978,6 @@ elif page == "V2":
             if 'nRecords' in notes_df.columns:
                 notes_df['nRecords'] = notes_df['nRecords'].apply(lambda x: f"{x:,}" if pd.notnull(x) else x)
                 st.dataframe(notes_df)
-    
     if sidebar_option == "Univariate Analysis":
         
         # Load Excel Sheets
@@ -994,17 +993,42 @@ elif page == "V2":
     
         # ----------------- DIMENSIONS TAB -----------------
         with main_tabs[0]:
-            selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names)
-            df = pd.read_excel(xls, sheet_name=selected_sheet)
-            col1 = df.columns[0]  # Category column
+            # Create 2 sub-tabs inside Dimensions
+            dim_tabs = st.tabs(["nRecords Chart", "Custom Y-axis Chart"])
     
-            if "nRecords" in df.columns:
-                fig_bar = px.bar(df, x=col1, y="nRecords",
-                                 title=f"nRecords by {col1}",
-                                 color=col1)
-                st.plotly_chart(fig_bar, use_container_width=True)
-            else:
-                st.warning("'nRecords' column not found.")
+            # 1️⃣ FIRST TAB - Existing nRecords plot
+            with dim_tabs[0]:
+                selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names)
+                df = pd.read_excel(xls, sheet_name=selected_sheet)
+                col1 = df.columns[0]  # Category column
+    
+                if "nRecords" in df.columns:
+                    fig_bar = px.bar(df, x=col1, y="nRecords",
+                                     title=f"nRecords by {col1}",
+                                     color=col1)
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.warning("'nRecords' column not found.")
+    
+            # 2️⃣ SECOND TAB - Custom Y-axis column selection
+            with dim_tabs[1]:
+                cat_plot_path_1 = "V2_area_wise_value_counts.xlsx"
+                area_wise_dist = pd.ExcelFile(cat_plot_path_1)
+                sheet_names = xls.sheet_names
+                selected_sheet_custom = st.selectbox("Select sheet for custom Y-axis", sheet_names, key="custom_sheet")
+                df_custom = pd.read_excel(area_wise_dist, sheet_name=selected_sheet_custom)
+    
+                col_x = df_custom.columns[0]  # X-axis category column
+                # Sidebar select for Y-axis
+                y_axis_col = st.sidebar.selectbox(
+                    "Select Y-axis column:",
+                    [col for col in df_custom.columns if col != col_x]
+                )
+    
+                fig_custom = px.bar(df_custom, x=col_x, y=y_axis_col,
+                                    title=f"{y_axis_col} by {col_x}",
+                                    color=col_x)
+                st.plotly_chart(fig_custom, use_container_width=True)
     
         # ----------------- METRICS TAB -----------------
         with main_tabs[1]:
@@ -1013,7 +1037,7 @@ elif page == "V2":
     
             sub_tabs = st.tabs(["Table", "Histogram", "Boxplot"])
     
-            # 1️⃣ TABLE TAB
+            # TABLE TAB
             with sub_tabs[0]:
                 table_files = {
                     "meter_sale_price": [
@@ -1032,19 +1056,15 @@ elif page == "V2":
                     for table_file in selected_tables:
                         try:
                             df = pd.read_excel(table_file)
-    
-                            # Apply comma formatting ONLY to bin files
                             if "bin_df" in table_file and "nRecords" in df.columns:
                                 df['nRecords'] = df['nRecords'].apply(lambda x: f"{x:,}")
-    
                             st.dataframe(df, use_container_width=True)
-    
                         except FileNotFoundError:
                             st.error(f"File not found: {table_file}")
                         except Exception as e:
                             st.error(f"Error reading `{table_file}`: {e}")
     
-            # 2️⃣ HISTOGRAM TAB
+            # HISTOGRAM TAB
             with sub_tabs[1]:
                 plot_bar = {
                     "meter_sale_price": "bin_df_manual.xlsx",
@@ -1065,13 +1085,12 @@ elif page == "V2":
                         fig.update_traces(marker_line_color='black', marker_line_width=1)
                         fig.update_layout(bargap=0, height=500)
                         st.plotly_chart(fig, use_container_width=True)
-    
                     except FileNotFoundError:
                         st.error(f"File not found: {selected_bar}")
                     except Exception as e:
                         st.error(f"Error creating bar chart: {e}")
     
-            # 3️⃣ BOXPLOT TAB
+            # BOXPLOT TAB
             with sub_tabs[2]:
                 plot_box = {
                     "meter_sale_price": "meter_sale_price_with_boxplot.html",
