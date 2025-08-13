@@ -1050,8 +1050,6 @@ elif page == "V2":
     
         # ----------------- METRICS TAB -----------------
         with main_tabs[1]:
-                       import streamlit as st
-            import streamlit.components.v1 as components
             
             # Map display names to file paths
             html_files = {
