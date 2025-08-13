@@ -1327,42 +1327,58 @@ elif page == "V2":
     # --- View 6: Geo Graphical Analysis ---
     if sidebar_option == "Correlation":
         from PIL import Image
-        
+        import plotly.express as px
+    
         correlation, Dropping_Features = st.tabs(["correlation", "Dropping_Features"])
-
-        with  correlation:
+    
+        with correlation:
             # Read PNG file
             image = Image.open("Associations_correlation.png")
             img_array = np.array(image)
-            
+    
             # Create Plotly figure for zoom/pan
-            fig = px.imshow(img_array)
-            fig.update_xaxes(visible=False)
-            fig.update_yaxes(visible=False)
-            fig.update_layout(
+            fig_corr = px.imshow(img_array)
+            fig_corr.update_xaxes(visible=False)
+            fig_corr.update_yaxes(visible=False)
+            fig_corr.update_layout(
                 title="Decision Tree (Zoom & Pan Enabled)",
                 dragmode="pan"
             )
-            
+    
             # Show in Streamlit
-            st.plotly_chart(fig, use_container_width=True)
-
+            st.plotly_chart(fig_corr, use_container_width=True, key="corr_tab")
+    
         with Dropping_Features:
-                        # Read PNG file
-            image = Image.open("Associations_correlation.png")
-            img_array = np.array(image)
-            
-            # Create Plotly figure for zoom/pan
-            fig = px.imshow(img_array)
-            fig.update_xaxes(visible=False)
-            fig.update_yaxes(visible=False)
-            fig.update_layout(
-                title="Decision Tree (Zoom & Pan Enabled)",
+            # First image
+            image_1 = Image.open("V2_high_correlated.png")
+            img_array_1 = np.array(image_1)
+    
+            fig_drop1 = px.imshow(img_array_1)
+            fig_drop1.update_xaxes(visible=False)
+            fig_drop1.update_yaxes(visible=False)
+            fig_drop1.update_layout(
+                title="High Correlated Features",
                 dragmode="pan"
             )
-            
-            # Show in Streamlit
-            st.plotly_chart(fig, use_container_width=True)
+    
+            st.plotly_chart(fig_drop1, use_container_width=True, key="drop_tab_1")
+    
+            # Second image
+            image_2 = Image.open("V2_drop_features.png")
+            img_array_2 = np.array(image_2)
+    
+            fig_drop2 = px.imshow(img_array_2)
+            fig_drop2.update_xaxes(visible=False)
+            fig_drop2.update_yaxes(visible=False)
+            fig_drop2.update_layout(
+                title="Dropped Features",
+                dragmode="pan"
+            )
+    
+            st.plotly_chart(fig_drop2, use_container_width=True, key="drop_tab_2")
+
+      -
+
     
 
     
