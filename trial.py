@@ -940,10 +940,10 @@ elif page == "V2":
     # --- Sidebar Navigation ---
     sidebar_option = st.sidebar.radio("Choose View", [
         "Data Summary",
-        "Pareto Analysis",
+        #"Pareto Analysis",
         "Univariate Analysis",
         "Bivariate Analysis",
-        "Geo Graphical Analysis",
+        "Correlation",
         "Price Prediction Model"
     ])
     
@@ -1323,6 +1323,29 @@ elif page == "V2":
                     for tab, (sheet_name, df) in zip(area_tabs, area_sheets.items()):
                         with tab:
                             st.dataframe(df, use_container_width=True)
+
+    # --- View 6: Geo Graphical Analysis ---
+    if sidebar_option == "Correlation":
+        from PIL import Image
+        
+        st.subtitle("Dython Associates (used for cat correlation")
+        
+        # Read PNG file
+        image = Image.open("Associations_correlation.png")
+        img_array = np.array(image)
+        
+        # Create Plotly figure for zoom/pan
+        fig = px.imshow(img_array)
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+        fig.update_layout(
+            title="Decision Tree (Zoom & Pan Enabled)",
+            dragmode="pan"
+        )
+        
+        # Show in Streamlit
+        st.plotly_chart(fig, use_container_width=True)
+
     
     
 
