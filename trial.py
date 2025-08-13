@@ -992,7 +992,7 @@ elif page == "V2":
         main_tabs = st.tabs(["Dimensions", "Metrics"])
     
         with main_tabs[0]:  # DIMENSIONS
-            dim_tabs = st.tabs(["nRecords Chart & Table", "Area_wise Chart & Table"])
+            dim_tabs = st.tabs(["nRecords Chart & Table", "Area-wise Chart & Table"])
         
             # 1️⃣ FIRST TAB
             with dim_tabs[0]:
@@ -1000,14 +1000,18 @@ elif page == "V2":
                 df = pd.read_excel(xls, sheet_name=selected_sheet)
                 col_x = df.columns[0]  # Category column
         
-                if "nRecords" in df.columns:
-                    fig_bar = px.bar(df, x=col_x, y="nRecords",
+                # Filter only for chart
+                chart_df = df[df[col_x] != 0]
+        
+                if "nRecords" in chart_df.columns:
+                    fig_bar = px.bar(chart_df, x=col_x, y="nRecords",
                                      title=f"nRecords by {col_x}",
                                      color=col_x)
                     st.plotly_chart(fig_bar, use_container_width=True, key="nrecords_chart")
                 else:
                     st.warning("'nRecords' column not found.")
         
+                # Show original table (unfiltered)
                 #st.markdown("### 📄 Full Data Table")
                 st.dataframe(df, use_container_width=True, key="nrecords_table")
         
@@ -1015,24 +1019,30 @@ elif page == "V2":
             with dim_tabs[1]:
                 cat_plot_path_1 = "V2_area_wise_value_counts.xlsx"
                 area_wise = pd.ExcelFile(cat_plot_path_1)
-                sheet_names = area_wise.sheet_names
-                selected_sheet_custom_1 = st.selectbox("Select Column", sheet_names, key="custom_sheet")
-                df_custom = pd.read_excel(area_wise, sheet_name=selected_sheet_custom_1)
+                sheet_names_1 = area_wise.sheet_names
+                selected_sheet_custom = st.selectbox("Select Area_name", sheet_names_1, key="custom_sheet")
+                df_custom = pd.read_excel(xls, sheet_name=selected_sheet_custom)
         
                 col_x = df_custom.columns[0]  # X-axis
                 y_axis_col = st.sidebar.selectbox(
-                    "Select Area Name:",
+                    "Select Area_name:",
                     [col for col in df_custom.columns if col != col_x],
                     key="custom_y_axis"
                 )
         
-                fig_custom = px.bar(df_custom, x=col_x, y=y_axis_col,
+                # Filter only for chart
+                chart_df_custom = df_custom[df_custom[col_x] != 0]
+        
+                fig_custom = px.bar(chart_df_custom, x=col_x, y=y_axis_col,
                                     title=f"{y_axis_col} by {col_x}",
                                     color=col_x)
                 st.plotly_chart(fig_custom, use_container_width=True, key="custom_y_chart")
         
+                # Show full table (unfiltered)
                 #st.markdown("### 📄 Selected Columns Table")
-                st.dataframe(df_custom[[col_x, y_axis_col]], use_container_width=True, key="custom_y_table")
+                st.dataframe(df_custom[[col_x, y_axis_col]],
+                             use_container_width=True, key="custom_y_table")
+
 
 
     
