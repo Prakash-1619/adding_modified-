@@ -1144,6 +1144,48 @@ elif page == "V2":
                             st.error(f"File not found: {selected_file}")
                         except Exception as e:
                             st.error(f"Error loading boxplot HTML: {e}")
+        # --- View 3: Bivariate Analysis  ---
+    if sidebar_option == "Bivariate Analysis":
+            selected_sheet = st.selectbox("Distribution of nRecords by", sheet_names, key="nrecords_sheet")
+            df = pd.read_excel(xls, sheet_name=selected_sheet)
+            col_x = df.columns[0]  # Category column
+    
+            if "nRecords" in df.columns and "Avg_meter_sale_price" in df.columns:
+                chart_df = df[(df["nRecords"] != 0) & (df["Avg_meter_sale_price"].notnull())]  # filter out zero y-values
+                if not chart_df.empty:
+                    # Create figure with secondary y-axis
+                    from plotly.subplots import make_subplots
+                    import plotly.graph_objects as go
+    
+                    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+                    # Bar for nRecords
+                    fig.add_trace(
+                        go.Bar(x=chart_df[col_x], y=chart_df["nRecords"], name="nRecords"),
+                        secondary_y=False
+                    )
+    
+                    # Line for Avg_meter_sale_price
+                    fig.add_trace(
+                        go.Scatter(x=chart_df[col_x], y=chart_df["Avg_Meter_Sale_Price"],
+                                   mode="lines+markers", name="Avg_meter_sale_price"),
+                        secondary_y=True
+                    )
+    
+                    fig.update_layout(
+                        title=f"nRecords and Avg_meter_sale_price by {col_x}",
+                        xaxis_title=col_x,
+                        yaxis_title="nRecords",
+                        yaxis2_title="Avg_meter_sale_price (Dirham)"
+                    )
+    
+                    st.plotly_chart(fig, use_container_width=True, key="nrecords_chart")
+                else:
+                    st.warning("No data available with non-zero nRecords and valid Avg_meter_sale_price.")
+            else:
+                st.warning("'nRecords' or 'Avg_meter_sale_price' column not found.")
+    
+            st.dataframe(df, use_container_width=True, key="nrecords_table")
 
 
 
