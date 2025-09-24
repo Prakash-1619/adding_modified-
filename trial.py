@@ -1517,7 +1517,7 @@ elif page == "V2.1":
         # Define all your area model variables
         Al_Barsha_South_Fifth = "dt_model_Al_Barsha_South_Fifth.pkl"
         Al_Barsha_South_Fourth = "dt_model_Al_Barsha_South_Fourth.pkl"
-        Al_Barsha_South_Third = "dt_model_Al_Barsha_South_Third.pkl"
+        Al_Barshaa_South_Third = "dt_model_Al_Barshaa_South_Third.pkl"
         Al_Hebiah_Fourth = "dt_model_Al_Hebiah_Fourth.pkl"
         Al_Khairan_First = "dt_model_Al_Khairan_First.pkl"
         Al_Merkadh = "dt_model_Al_Merkadh.pkl"
@@ -1525,25 +1525,25 @@ elif page == "V2.1":
         Al_Warsan_First = "dt_model_Al_Warsan_First.pkl"
         Al_Yelayiss_2 = "dt_model_Al_Yelayiss_2.pkl"
         Bukadra = "dt_model_Bukadra.pkl"
-        Buri_Khalifa = "dt_model_Buri_Khalifa.pkl"
+        Burj_Khalifa = "dt_model_Burj_Khalifa.pkl"
         Business_Bay = "dt_model_Business_Bay.pkl"
         Hadaeq_Sheikh_Mohammed_Bin_Rashid = "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl"
-        label_All_First = "dt_model_label_All_First.pkl"
+        Jabel_Ali_First = "dt_model_Jabel_Ali_First.pkl"
         Madinat_Al_Mataar = "dt_model_Madinat_Al_Mataar.pkl"
         Madinat_Dubai_Almelaheyah = "dt_model_Madinat_Dubai_Almelaheyah.pkl"
         Marsa_Dubai = "dt_model_Marsa_Dubai.pkl"
-        MeAisem_First = "dt_model_MeAisem_First.pkl"
+        MeAisem_First = "dt_model_Me'Aisem First.pkl"
         Nadd_Hessa = "dt_model_Nadd_Hessa.pkl"
         Wadi_Al_Safa_5 = "dt_model_Wadi_Al_Safa_5.pkl"
         
         # Create area_models dictionary using your variables
         area_models = {}
         area_files = [
-            Al_Barsha_South_Fifth, Al_Barsha_South_Fourth, Al_Barsha_South_Third,
+            Al_Barsha_South_Fifth, Al_Barsha_South_Fourth, Al_Barshaa_South_Third,
             Al_Hebiah_Fourth, Al_Khairan_First, Al_Merkadh, Al_Thanyah_Fifth,
-            Al_Warsan_First, Al_Yelayiss_2, Bukadra, Buri_Khalifa, Business_Bay,
-            Hadaeq_Sheikh_Mohammed_Bin_Rashid, label_All_First, Madinat_Al_Mataar,
-            Madinat_Dubai_Almelaheyah, Marsa_Dubai, MeAisem_First, Nadd_Hessa, Wadi_Al_Safa_5
+            Al_Warsan_First, Al_Yelayiss_2, Bukadra, Burj_Khalifa, Business_Bay,
+            Hadaeq_Sheikh_Mohammed_Bin_Rashid, Jabel_Ali_First, Madinat_Al_Mataar,
+            Madinat_Dubai_Almelaheyah, Marsa_Dubai, Me'Aisem First, Nadd_Hessa, Wadi_Al_Safa_5
         ]
         
         for model_file in area_files:
