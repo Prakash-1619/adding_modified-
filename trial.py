@@ -1525,6 +1525,13 @@ if sidebar_option == "📈 Model Results":
     except Exception as e:
         st.error(f"❌ Error loading OneHot encoder: {e}")
         st.stop()
+    file_options = {
+        "Test_data": "test_data_20 areas_1.csv",
+        "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
+        "all_data_sample_50": "all_values_area_data.csv"}
+    
+    # Create selectbox
+    selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
     
     # =========================
     # 2️⃣ LOAD AREA-WISE MODELS
@@ -1571,7 +1578,7 @@ if sidebar_option == "📈 Model Results":
         # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
         # =========================
         try:
-            test_samples = pd.read_csv("test_data_20 areas_1.csv")
+            test_samples = pd.read_csv(selected_file_label)
             
             # Remove unwanted columns including 'Unnamed: 0'
             columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
@@ -1823,7 +1830,7 @@ if sidebar_option == "📈 Model Results":
             """Load forecasting-specific data"""
             try:
                 # Load test data for forecasting
-                test_samples_forecast = pd.read_csv("test_data_20 areas_1.csv")
+                test_samples_forecast = pd.read_csv(selected_file_label)
                 
                 # Remove unwanted columns
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
