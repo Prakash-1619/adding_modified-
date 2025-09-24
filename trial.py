@@ -1853,19 +1853,28 @@ if sidebar_option == "📈 Model Results":
         
         # Prepare test data for forecasting
         try:
-            # Identify categorical columns
-            cat_cols = X_test_forecast_raw.select_dtypes(include='object').columns.tolist()
+            # Separate area_name_en column for later use
+            area_names_forecast = X_test_forecast_raw['area_name_en']
+            X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
+            
+            # Identify categorical columns (excluding area_name_en)
+            cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
             
             # Apply one-hot encoding
             if cat_cols:
-                X_cat_test = ohe.transform(X_test_forecast_raw[cat_cols])
-                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_raw.index)
-                X_test_forecast = X_test_forecast_raw.drop(columns=cat_cols)
+                X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
+                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_no_area.index)
+                
+                X_test_forecast = X_test_forecast_no_area.drop(columns=cat_cols)
                 X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
             else:
-                X_test_forecast = X_test_forecast_raw.copy()
+                X_test_forecast = X_test_forecast_no_area.copy()
             
             # Ensure we have all training columns
+            # This step assumes 'area_name_en' was not one-hot encoded, 
+            # as it's used for splitting.
+            # If area_name_en OHE columns were in train_columns, 
+            # they must be present and set to 0 where needed.
             for col in train_columns:
                 if col not in X_test_forecast.columns:
                     X_test_forecast[col] = 0
@@ -1873,6 +1882,10 @@ if sidebar_option == "📈 Model Results":
             X_test_forecast = X_test_forecast[train_columns]
             X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
             
+            # Re-inserting area_names_forecast is not needed in X_test_forecast here 
+            # because the slicing in step 10 uses test_samples_forecast['area_name_en']
+            # and X_test_forecast is only for prediction input.
+
         except Exception as e:
             st.error(f"❌ Error preparing forecasting data: {str(e)}")
             st.stop()
