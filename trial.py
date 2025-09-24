@@ -1398,19 +1398,19 @@ elif page == "V2.1":
             
 
 
-        # --- Metrics Tab ---
-        with sub_tab2:
-            st.subheader("Metrics on meter_sale_price & procedure_area")
-        
-            numeric_cols = ['meter_sale_price', 'procedure_area']
+            # --- Metrics Tab ---
+            with sub_tab2:
+                st.subheader("Metrics on meter_sale_price & procedure_area")
             
-            for col in numeric_cols:
-                st.markdown(f"### {col} Distribution")
-                fig_hist = px.histogram(df_train[numeric_cols], x=col, nbins=50, marginal="box", title=f"{col} Distribution with Boxplot")
-                st.plotly_chart(fig_hist, use_container_width=True)
-        
-                num_cols = ['meter_sale_price', 'procedure_area']
-                st.dataframe(df_train[num_cols].describe().round(2))
+                numeric_cols = ['meter_sale_price', 'procedure_area']
+                
+                for col in numeric_cols:
+                    st.markdown(f"### {col} Distribution")
+                    fig_hist = px.histogram(df_train[numeric_cols], x=col, nbins=50, marginal="box", title=f"{col} Distribution with Boxplot")
+                    st.plotly_chart(fig_hist, use_container_width=True)
+            
+                    num_cols = ['meter_sale_price', 'procedure_area']
+                    st.dataframe(df_train[num_cols].describe().round(2))
                 
         # --- Area-wise Analysis ---
         with main_tabs[1]:
