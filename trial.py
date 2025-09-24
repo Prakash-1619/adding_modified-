@@ -1589,7 +1589,7 @@ if sidebar_option == "📈 Model Results":
             y_test = test_samples['meter_sale_price']
             
             st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
-            st.dataframe(test_samples.head(), use_container_width=True)
+            #st.dataframe(test_samples.head(), use_container_width=True)
             
             # Identify categorical columns
             cat_cols = X_test.select_dtypes(include='object').columns.tolist()
