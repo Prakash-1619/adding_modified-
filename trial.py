@@ -1579,6 +1579,7 @@ if sidebar_option == "📈 Model Results":
         # =========================
         try:
             test_samples = pd.read_csv(file_path)
+            test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
             st.dataframe(test_samples)
             # Remove unwanted columns including 'Unnamed: 0'
             columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
@@ -1831,7 +1832,9 @@ if sidebar_option == "📈 Model Results":
             try:
                 # Load test data for forecasting
                 #test_samples_forecast = pd.read_csv(selected_file_label)
+                
                 test_samples_forecast = pd.read_csv(file_path)
+                test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
                 st.dataframe(test_samples_forecast)
                 # Remove unwanted columns
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
