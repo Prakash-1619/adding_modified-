@@ -1561,7 +1561,7 @@ if sidebar_option == "📈 Model Results":
     # =========================
     # 3️⃣ STREAMLIT UI
     # =========================
-    st.title("🏠 Dubai Real Estate Price Predictor")
+    #st.title("🏠 Dubai Real Estate Price Predictor")
     st.write("Area-wise model performance analysis")
     
     # =========================
@@ -1570,7 +1570,7 @@ if sidebar_option == "📈 Model Results":
     try:
         test_samples = pd.read_csv("test_data_20 areas_1.csv")
         # Make sure drop_col is defined - if not, define it or remove this line
-        # test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
+        test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
         st.dataframe(test_samples.head(), use_container_width=True)
         
         # =========================
