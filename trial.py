@@ -1329,26 +1329,28 @@ elif page == "V2.1":
         "📈 Model Results",
         "🤖 Model Input / Prediction"
     ])
-    drop_col = 'Unnamed: 0'
+    drop_col = ['Unnamed: 0']  # list instead of string
+    
     train_file_path = "df_trained_dataset_6000.csv"  # Replace with your CSV path
+    test_file_path = "test_data_20 areas.csv"  # Replace with your CSV path
+    
+    # --- Load Train Data ---
     try:
         df_train = pd.read_csv(train_file_path)
-        for col in drop_col:
-            if col in df_train.columns:
-                df_train = df_train.drop(columns = col)
-        #st.dataframe(df_train)
+        # Drop columns if they exist
+        df_train = df_train.drop(columns=[col for col in drop_col if col in df_train.columns])
+        # st.dataframe(df_train)
     except FileNotFoundError:
         st.error(f"Training file not found: {train_file_path}")
-    test_file_path = "test_data_20 areas.csv"  # Replace with your CSV path
-
+    
+    # --- Load Test Data ---
     try:
         df_test = pd.read_csv(test_file_path)
-        for col in drop_col:
-            if col in df_test.columns:
-                df_test = df_test.drop(columns = col)
-        #st.dataframe(df_test)
+        df_test = df_test.drop(columns=[col for col in drop_col if col in df_test.columns])
+        # st.dataframe(df_test)
     except FileNotFoundError:
         st.error(f"Test file not found: {test_file_path}")
+
 
         
     # --- Data Files Tab with inner tabs ---
