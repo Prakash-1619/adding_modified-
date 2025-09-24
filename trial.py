@@ -1435,11 +1435,49 @@ elif page == "V2.1":
                 df_area = df_train[df_train['area_name_en'] == selected_area]
                 
                 area_tabs = st.tabs(["Dimensions", "Metrics"])
+                    
+    # =========================
+    # 2️⃣ Area-wise Analysis
+    # =========================
+    with main_tabs[1]:
+        st.subheader("Area-wise Analysis")
+        
+        if 'area_name_en' not in df_train.columns:
+            st.warning("'area_name_en' column not found in dataset.")
+        else:
+            areas = df_train['area_name_en'].unique().tolist()
+            selected_area = st.selectbox("Select Area", areas)
+            df_area = df_train[df_train['area_name_en'] == selected_area]
+            
+            area_tabs = st.tabs(["Categorical Distributions", "Metrics"])
+        
+
+            # --- Categorical Distributions Tab ---
+            with area_tabs[0]:
+                st.subheader(f"Categorical Column Distributions for {selected_area}")
                 
-                # --- Dimensions Tab ---
-                with area_tabs[0]:
-                    st.subheader(f"Dimensions for {selected_area}")
-                    st.dataframe(df_area.describe(include='all').transpose())
+                cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
+                            'metro','has_parking','property_sub_type_en']
+                cat_cols_existing = [col for col in cat_cols if col in df_area.columns]
+                
+                if not cat_cols_existing:
+                    st.warning("No categorical columns found for this area.")
+                else:
+                    for col in cat_cols_existing:
+                        chart_df = df_area.groupby(col).agg(
+                            nRecords=('meter_sale_price','count'),
+                            Avg_Meter_Sale_Price=('meter_sale_price','mean')
+                        ).reset_index()
+                        
+                        fig = px.bar(chart_df, x=col, y='nRecords', color=col,
+                                     title=f"{col} Distribution vs Avg Meter Sale Price for {selected_area}")
+                        fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
+                                        mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
+                        fig.update_layout(
+                            yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
                 
                 # --- Metrics Tab with Plots ---
                 with area_tabs[1]:
