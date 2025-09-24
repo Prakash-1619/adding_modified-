@@ -1568,7 +1568,7 @@ elif page == "V2.1":
         # =========================
         try:
             test_samples = pd.read_csv("test_data_20 areas_1.csv")  # Change this to your actual test file path
-            
+            test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
             st.dataframe(test_samples.head(), use_container_width=True)
             
             # =========================
