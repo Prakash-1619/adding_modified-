@@ -1504,7 +1504,7 @@ elif page == "V2.1":
     from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
     import pickle
     import glob
-    if sidebar_option == "📊 EDA & Feature Engineering":
+    if sidebar_option == "📈 Model Results":
         # =========================
         # 1️⃣ LOAD ONEHOT ENCODER
         # =========================
@@ -1560,25 +1560,14 @@ elif page == "V2.1":
         # =========================
         # 3️⃣ STREAMLIT UI
         # =========================
-        st.title("🏠 Dubai Real Estate Price Predictor")
-        st.write("Area-wise model performance analysis")
+        #st.title("🏠 Dubai Real Estate Price Predictor")
+        #st.write("Area-wise model performance analysis")
         
         # =========================
         # 4️⃣ LOAD TEST DATA (HARDCODED PATH)
         # =========================
         try:
             test_samples = pd.read_csv("test_data_20 areas_1.csv")  # Change this to your actual test file path
-            
-            st.subheader("📊 Test Data Overview")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Samples", len(test_samples))
-            with col2:
-                st.metric("Number of Areas", test_samples['area_name_en'].nunique())
-            with col3:
-                st.metric("Price Range", f"AED {test_samples['meter_sale_price'].min():,.0f} - AED {test_samples['meter_sale_price'].max():,.0f}")
-            with col4:
-                st.metric("Average Price", f"AED {test_samples['meter_sale_price'].mean():,.0f}")
             
             st.dataframe(test_samples.head(), use_container_width=True)
             
