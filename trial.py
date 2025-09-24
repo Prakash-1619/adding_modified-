@@ -1507,6 +1507,15 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 if sidebar_option == "📈 Model Results":
     # =========================
+    # 0️⃣ IMPORT REQUIRED LIBRARIES
+    # =========================
+    from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+    import numpy as np
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import plotly.express as px
+    
+    # =========================
     # 1️⃣ LOAD ONEHOT ENCODER
     # =========================
     with open("onehot_encoder.pkl", "rb") as f:
@@ -1561,7 +1570,7 @@ if sidebar_option == "📈 Model Results":
     # =========================
     # 3️⃣ STREAMLIT UI
     # =========================
-    #st.title("🏠 Dubai Real Estate Price Predictor")
+    st.title("🏠 Dubai Real Estate Price Predictor")
     st.write("Area-wise model performance analysis")
     
     # =========================
@@ -1570,7 +1579,7 @@ if sidebar_option == "📈 Model Results":
     try:
         test_samples = pd.read_csv("test_data_20 areas_1.csv")
         # Make sure drop_col is defined - if not, define it or remove this line
-        test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
+        # test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
         st.dataframe(test_samples.head(), use_container_width=True)
         
         # =========================
@@ -1749,7 +1758,7 @@ if sidebar_option == "📈 Model Results":
                 "Select Areas to Display",
                 options=available_areas,
                 default=available_areas[:6] if len(available_areas) > 6 else available_areas,
-                key="forecast_areas"  # Unique key for this widget
+                key="forecast_areas"
             )
             
             # Feature grouping options
@@ -1761,7 +1770,7 @@ if sidebar_option == "📈 Model Results":
                 "Group by Feature",
                 options=grouping_options,
                 index=0,
-                key="grouping_feature"  # Unique key for this widget
+                key="grouping_feature"
             )
             
             # Display options
@@ -1822,7 +1831,8 @@ if sidebar_option == "📈 Model Results":
                     pred_df = pd.concat(pred_list)
                 
                     # Group by area + feature groups → median prediction
-                    median_pred_group = pred_df.groupby(['area_name_en'] + grouping_features).median().reset_index()
+                    group_cols = ['area_name_en'] + grouping_features
+                    median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
                 
                     # Merge with growth factors
                     forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
@@ -1834,7 +1844,7 @@ if sidebar_option == "📈 Model Results":
                             forecast_df[q] = forecast_df['prediction'] * forecast_df[q]
                 
                     # Final forecast
-                    final_forecast = forecast_df[['area_name_en'] + grouping_features + ['prediction'] + quarter_cols]
+                    final_forecast = forecast_df[group_cols + ['prediction'] + quarter_cols]
                 
                 # =========================
                 # 5️⃣ DISPLAY RESULTS
@@ -1904,10 +1914,10 @@ if sidebar_option == "📈 Model Results":
                                         feature_label = f"Configuration {idx+1}"
                                     
                                     # Get values for plotting
-                                    y_vals = [row_data['prediction']] + [row_data[q] for q in quarter_cols if q in row_data]
-                                    x_vals = ['Current'] + [f"Q{q.split('-')[1]}" if '-' in q else q for q in quarter_cols if q in row_data]
+                                    y_vals = [row_data['prediction']] + [row_data[q] for q in quarter_cols if q in row_data and pd.notna(row_data[q])]
+                                    x_vals = ['Current'] + [self._format_quarter_label(q) for q in quarter_cols if q in row_data and pd.notna(row_data[q])]
                                     
-                                    if y_vals and x_vals:
+                                    if len(y_vals) > 1 and len(x_vals) == len(y_vals):  # Ensure we have data to plot
                                         fig.add_trace(
                                             go.Scatter(
                                                 x=x_vals,
@@ -1936,30 +1946,36 @@ if sidebar_option == "📈 Model Results":
                         
                         # Prepare data for heatmap
                         heatmap_data = []
+                        quarter_labels = [self._format_quarter_label(q) for q in quarter_cols]
+                        
                         for area in selected_areas:
                             area_data = filtered_forecast[filtered_forecast['area_name_en'] == area]
                             if not area_data.empty:
+                                # Take the first configuration for each area
                                 row = area_data.iloc[0]
                                 growth_rates = []
                                 for q in quarter_cols:
-                                    if q in row:
+                                    if q in row and pd.notna(row[q]):
                                         growth_rate = ((row[q] - row['prediction']) / row['prediction']) * 100
                                         growth_rates.append(growth_rate)
+                                    else:
+                                        growth_rates.append(0)  # Default value if missing
                                 
-                                heatmap_data.append([area] + growth_rates)
+                                heatmap_data.append(growth_rates)
                         
-                        if heatmap_data:
+                        if heatmap_data and quarter_labels:
                             heatmap_df = pd.DataFrame(
                                 heatmap_data, 
-                                columns=['Area'] + [f"Q{q.split('-')[1]}" if '-' in q else q for q in quarter_cols]
+                                index=selected_areas,
+                                columns=quarter_labels
                             )
-                            heatmap_df.set_index('Area', inplace=True)
                             
                             fig_heat = px.imshow(
                                 heatmap_df,
                                 title="Growth Rate Heatmap (%)",
                                 color_continuous_scale="RdYlGn",
-                                aspect="auto"
+                                aspect="auto",
+                                labels=dict(x="Quarter", y="Area", color="Growth %")
                             )
                             fig_heat.update_layout(height=400)
                             st.plotly_chart(fig_heat, use_container_width=True)
@@ -2003,7 +2019,19 @@ if sidebar_option == "📈 Model Results":
         st.error(f"❌ Error loading test data: {str(e)}")
     
     # =========================
-    # 8️⃣ SIDEBAR INFO
+    # 8️⃣ HELPER FUNCTION FOR QUARTER FORMATTING
+    # =========================
+    def _format_quarter_label(self, quarter_str):
+        """Format quarter labels for better display"""
+        if '-' in quarter_str:
+            # Handle date format like '2024-Q1'
+            parts = quarter_str.split('-')
+            if len(parts) == 2:
+                return f"{parts[0]} {parts[1]}"
+        return quarter_str.replace('_', ' ').title()
+    
+    # =========================
+    # 9️⃣ SIDEBAR INFO
     # =========================
     st.sidebar.title("ℹ️ Model Information")
     st.sidebar.write(f"**Loaded Models:** {len(area_models)}")
@@ -2015,7 +2043,6 @@ if sidebar_option == "📈 Model Results":
     
     **Area Names:** Converted from filename format
     """)
-
         
             
 
