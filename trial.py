@@ -1319,16 +1319,17 @@ elif page == "V2":
 
 elif page == "V2.1":
     
-        tab1, tab2, tab3, tab4 = st.tabs([
-        "📂 Data Files",
-        "📊 EDA & Feature Engineering",
-        "📈 Model Results",
-        "🤖 Model Input / Prediction"
-            ])
-
-    
-
- 
+        st.sidebar.title("🔍 FlipOse-RE-Analytics-V2.1")
+        
+        # Sidebar navigation
+        sidebar_option = st.sidebar.radio("Choose Section", [
+            "📂 Data Files",
+            "📊 EDA & Feature Engineering",
+            "📈 Model Results",
+            "🤖 Model Input / Prediction"
+        ])
+        
+         
             
             
 
