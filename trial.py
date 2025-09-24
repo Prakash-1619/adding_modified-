@@ -1315,7 +1315,8 @@ elif page == "V2":
             st.plotly_chart(fig_drop2, use_container_width=True, key="drop_tab_2")
 
     
-
+#########################################################################################################################################################################
+#######################################################################################################################################################################
 
 elif page == "V2.1":
     
@@ -1340,7 +1341,7 @@ elif page == "V2.1":
         # --- Training Data Tab ---
         with tab1:
             st.subheader("Training Dataset")
-            train_file_path = "train.csv"  # Replace with your CSV path
+            train_file_path = "df_trained_dataset_6000.csv"  # Replace with your CSV path
             try:
                 df_train = pd.read_csv(train_file_path)
                 st.dataframe(df_train)
@@ -1350,7 +1351,7 @@ elif page == "V2.1":
         # --- Test Data Tab ---
         with tab2:
             st.subheader("Test Dataset")
-            test_file_path = "test.csv"  # Replace with your CSV path
+            test_file_path = "test_data_20 areas.csv"  # Replace with your CSV path
             try:
                 df_test = pd.read_csv(test_file_path)
                 st.dataframe(df_test)
