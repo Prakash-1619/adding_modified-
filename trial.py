@@ -1548,7 +1548,7 @@ if sidebar_option == "📈 Model Results":
             area_name = model_file.split("dt_model_")[1].replace(".pkl", "").replace("_", " ")
             with open(model_file, "rb") as f:
                 area_models[area_name] = pickle.load(f)
-            st.sidebar.success(f"✅ {area_name}")
+            #st.sidebar.success(f"✅ {area_name}")
         except FileNotFoundError:
             st.sidebar.warning(f"⚠️ {model_file} not found")
         except Exception as e:
@@ -1557,8 +1557,8 @@ if sidebar_option == "📈 Model Results":
     # =========================
     # 3️⃣ STREAMLIT UI
     # =========================
-    st.title("🏠 Dubai Real Estate Price Predictor")
-    st.write("Area-wise model performance analysis")
+    #st.title("🏠 Dubai Real Estate Price Predictor")
+    #st.write("Area-wise model performance analysis")
     
     # Create tabs for different functionalities
     tab1, tab2 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting"])
@@ -1765,7 +1765,7 @@ if sidebar_option == "📈 Model Results":
                             )
                             fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
                             fig_residual.update_layout(height=400)
-                            st.plotly_chart(fig_residual, use_container_width=True)
+                            #st.plotly_chart(fig_residual, use_container_width=True)
                     
                     with viz_tab3:
                         # Price comparison chart
@@ -1811,8 +1811,8 @@ if sidebar_option == "📈 Model Results":
             st.error(f"❌ Error loading test data: {str(e)}")
     
     with tab2:
-        st.header("🔮 Price Forecasting")
-        st.markdown("Area-wise predictions with growth factor projections")
+        #st.header("🔮 Price Forecasting")
+        #st.markdown("Area-wise predictions with growth factor projections")
         
         # =========================
         # 8️⃣ LOAD DATA FOR FORECASTING TAB
