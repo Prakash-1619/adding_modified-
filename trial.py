@@ -1566,40 +1566,7 @@ if sidebar_option == "📈 Model Results":
     with tab1:
         st.header("📊 Model Predictions & Performance Analysis")
         import pandas as pd
-        import os
         
-        def load_test_data():
-            """
-            Load test data with option to upload or use default file
-            """
-            default_file = "test_data_20 areas_1.csv"
-            
-            # Check if default file exists
-            if os.path.exists(default_file):
-                choice = input(f"Default file '{default_file}' found. Press Enter to use default file, or type 'upload' to choose a different file: ")
-                
-                if choice.lower() == 'upload':
-                    file_path = input("Enter the path to your CSV file: ")
-                    try:
-                        test_samples = pd.read_csv(file_path)
-                        print(f"Successfully loaded uploaded file: {file_path}")
-                    except Exception as e:
-                        print(f"Error loading file: {e}")
-                        print(f"Falling back to default file: {default_file}")
-                        test_samples = pd.read_csv(default_file)
-                else:
-                    test_samples = pd.read_csv(default_file)
-                    print(f"Using default file: {default_file}")
-            else:
-                print(f"Default file '{default_file}' not found. Please upload a file.")
-                file_path = input("Enter the path to your CSV file: ")
-                test_samples = pd.read_csv(file_path)
-            
-            return test_samples
-        
-        # Usage
-        test_samples = load_test_data()
-        print(f"Loaded data with {len(test_samples)} records and {len(test_samples.columns)} columns")
         # =========================
         # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
         # =========================
