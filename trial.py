@@ -1532,7 +1532,7 @@ if sidebar_option == "📈 Model Results":
     
     # Create selectbox
     selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
-    
+    file_path = file_options[selected_file_label]
     # =========================
     # 2️⃣ LOAD AREA-WISE MODELS
     # =========================
@@ -1578,8 +1578,8 @@ if sidebar_option == "📈 Model Results":
         # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
         # =========================
         try:
-            test_samples = pd.read_csv(selected_file_label)
-            
+            test_samples = pd.read_csv(file_path)
+            st.dataframe(test_samples)
             # Remove unwanted columns including 'Unnamed: 0'
             columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
             columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
@@ -1830,8 +1830,9 @@ if sidebar_option == "📈 Model Results":
             """Load forecasting-specific data"""
             try:
                 # Load test data for forecasting
-                test_samples_forecast = pd.read_csv(selected_file_label)
-                
+                #test_samples_forecast = pd.read_csv(selected_file_label)
+                test_samples_forecast = pd.read_csv(file_path)
+                st.dataframe(test_samples_forecast)
                 # Remove unwanted columns
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
                 columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
