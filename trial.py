@@ -1319,18 +1319,44 @@ elif page == "V2":
 
 elif page == "V2.1":
     
-        st.sidebar.title("🔍 FlipOse-RE-Analytics-V2.1")
+    st.sidebar.title("🔍 FlipOse-RE-Analytics-V2.1")
+    
+    # Sidebar navigation
+    sidebar_option = st.sidebar.radio("Choose Section", [
+        "📂 Data Files",
+        "📊 EDA & Feature Engineering",
+        "📈 Model Results",
+        "🤖 Model Input / Prediction"
+    ])
+
+    
+    # --- Data Files Tab with inner tabs ---
+    if sidebar_option == "📂 Data Files":
+        st.header("📂 Data Files Overview")
         
-        # Sidebar navigation
-        sidebar_option = st.sidebar.radio("Choose Section", [
-            "📂 Data Files",
-            "📊 EDA & Feature Engineering",
-            "📈 Model Results",
-            "🤖 Model Input / Prediction"
-        ])
+        # Create inner tabs for Training and Test data
+        tab1, tab2 = st.tabs(["Training Data", "Test Data"])
         
-         
-            
+        # --- Training Data Tab ---
+        with tab1:
+            st.subheader("Training Dataset")
+            train_file_path = "train.csv"  # Replace with your CSV path
+            try:
+                df_train = pd.read_csv(train_file_path)
+                st.dataframe(df_train)
+            except FileNotFoundError:
+                st.error(f"Training file not found: {train_file_path}")
+        
+        # --- Test Data Tab ---
+        with tab2:
+            st.subheader("Test Dataset")
+            test_file_path = "test.csv"  # Replace with your CSV path
+            try:
+                df_test = pd.read_csv(test_file_path)
+                st.dataframe(df_test)
+            except FileNotFoundError:
+                st.error(f"Test file not found: {test_file_path}")
+
             
 
         
