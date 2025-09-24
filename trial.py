@@ -1357,7 +1357,84 @@ elif page == "V2.1":
                 st.dataframe(df_test)
             except FileNotFoundError:
                 st.error(f"Test file not found: {test_file_path}")
+    
+    
+    # --- EDA & Feature Engineering Tab ---
+    if sidebar_option == "📊 EDA & Feature Engineering":
+        st.header("📊 EDA & Feature Engineering")
+        
+        main_tabs = st.tabs(["Column-wise Analysis", "Area-wise Analysis"])
+        
+        # =========================
+        # 1️⃣ Column-wise Analysis
+        # =========================
+        with main_tabs[0]:
+            sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
+            
+            # --- Distribution Tab ---
+            with sub_tab1:
+                st.subheader("Categorical Columns Distribution")
+                # Select categorical columns automatically
+                cat_cols = ['rooms_en','floor_bin','swimming_pool', 'balcony', 'elevator', 'metro','has_parking','area_name_en','property_sub_type_en']
+                if not cat_cols:
+                    st.warning("No categorical columns found.")
+                else:
+                    for col in cat_cols:
+                        chart_df = df_train.groupby(col).agg(
+                            nRecords=('meter_sale_price','count'),
+                            Avg_Meter_Sale_Price=('meter_sale_price','mean')
+                        ).reset_index()
+                        
+                        # Dual-axis bar + line plot
+                        fig = px.bar(chart_df, x=col, y='nRecords', color=col, title=f"{col} Distribution vs Avg Meter Sale Price")
+                        fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'], mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
+                        fig.update_layout(
+                            yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+            
 
+
+        # --- Metrics Tab ---
+        with sub_tab2:
+            st.subheader("Metrics on meter_sale_price & procedure_area")
+        
+            numeric_cols = ['meter_sale_price', 'procedure_area']
+            
+            for col in numeric_cols:
+                st.markdown(f"### {col} Distribution")
+                fig_hist = px.histogram(df_train[numeric_cols], x=col, nbins=50, marginal="box", title=f"{col} Distribution with Boxplot")
+                st.plotly_chart(fig_hist, use_container_width=True)
+        
+                num_cols = ['meter_sale_price', 'procedure_area']
+                st.dataframe(df_train[num_cols].describe().round(2))
+                
+        # --- Area-wise Analysis ---
+        with main_tabs[1]:
+            st.subheader("Area-wise Analysis")
+            areas = df_train['area_name_en'].unique().tolist()
+            selected_area = st.selectbox("Select Area", areas)
+            df_area = df_train[df_train['area_name_en'] == selected_area]
+            
+            area_tabs = st.tabs(["Dimensions", "Metrics"])
+            
+            # --- Dimensions Tab ---
+            with area_tabs[0]:
+                st.subheader(f"Dimensions for {selected_area}")
+                st.dataframe(df_area.describe(include='all').transpose())
+            
+            # --- Metrics Tab with Plots ---
+            with area_tabs[1]:
+                st.subheader(f"Metrics on meter_sale_price & procedure_area for {selected_area}")
+                numeric_cols = ['meter_sale_price','procedure_area']
+                
+                for col in numeric_cols:
+                    st.markdown(f"### {col} Distribution for {selected_area}")
+                    fig_area = px.histogram(df_area, x=col, nbins=50, marginal="box",
+                                            title=f"{col} Distribution with Boxplot for {selected_area}")
+                    st.plotly_chart(fig_area, use_container_width=True)
+
+        
             
 
         
