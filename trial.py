@@ -1329,8 +1329,20 @@ elif page == "V2.1":
         "📈 Model Results",
         "🤖 Model Input / Prediction"
     ])
+    train_file_path = "df_trained_dataset_6000.csv"  # Replace with your CSV path
+    try:
+        df_train = pd.read_csv(train_file_path)
+        #st.dataframe(df_train)
+    except FileNotFoundError:
+        st.error(f"Training file not found: {train_file_path}")
+    test_file_path = "test_data_20 areas.csv"  # Replace with your CSV path
+    try:
+        df_test = pd.read_csv(test_file_path)
+        st.dataframe(df_test)
+    except FileNotFoundError:
+        st.error(f"Test file not found: {test_file_path}")
 
-    
+        
     # --- Data Files Tab with inner tabs ---
     if sidebar_option == "📂 Data Files":
         st.header("📂 Data Files Overview")
@@ -1341,22 +1353,13 @@ elif page == "V2.1":
         # --- Training Data Tab ---
         with tab1:
             st.subheader("Training Dataset")
-            train_file_path = "df_trained_dataset_6000.csv"  # Replace with your CSV path
-            try:
-                df_train = pd.read_csv(train_file_path)
-                st.dataframe(df_train)
-            except FileNotFoundError:
-                st.error(f"Training file not found: {train_file_path}")
+            st.dataframe(df_train)
+    
         
         # --- Test Data Tab ---
         with tab2:
             st.subheader("Test Dataset")
-            test_file_path = "test_data_20 areas.csv"  # Replace with your CSV path
-            try:
-                df_test = pd.read_csv(test_file_path)
-                st.dataframe(df_test)
-            except FileNotFoundError:
-                st.error(f"Test file not found: {test_file_path}")
+            st.dataframe(df_test)
     
     
     # --- EDA & Feature Engineering Tab ---
