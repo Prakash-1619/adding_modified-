@@ -1497,7 +1497,14 @@ elif page == "V2.1":
                             )
                             # Use a unique key per plot
                             st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}")
-
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import glob
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.express as px
 if sidebar_option == "📈 Model Results":
     # =========================
     # 1️⃣ LOAD ONEHOT ENCODER
