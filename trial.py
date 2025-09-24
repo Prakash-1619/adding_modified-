@@ -1498,7 +1498,233 @@ elif page == "V2.1":
                             # Use a unique key per plot
                             st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}")
 
-
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+    import pickle
+    import glob
+    if sidebar_option == "📊 EDA & Feature Engineering":
+        # =========================
+        # 1️⃣ LOAD ONEHOT ENCODER
+        # =========================
+        with open("onehot_encoder.pkl", "rb") as f:
+            ohe = pickle.load(f)
+        
+        # =========================
+        # 2️⃣ LOAD AREA-WISE MODELS (USING YOUR VARIABLES)
+        # =========================
+        # Define all your area model variables
+        Al_Barsha_South_Fifth = "dt_model_Al_Barsha_South_Fifth.pkl"
+        Al_Barsha_South_Fourth = "dt_model_Al_Barsha_South_Fourth.pkl"
+        Al_Barsha_South_Third = "dt_model_Al_Barsha_South_Third.pkl"
+        Al_Hebiah_Fourth = "dt_model_Al_Hebiah_Fourth.pkl"
+        Al_Khairan_First = "dt_model_Al_Khairan_First.pkl"
+        Al_Merkadh = "dt_model_Al_Merkadh.pkl"
+        Al_Thanyah_Fifth = "dt_model_Al_Thanyah_Fifth.pkl"
+        Al_Warsan_First = "dt_model_Al_Warsan_First.pkl"
+        Al_Yelayiss_2 = "dt_model_Al_Yelayiss_2.pkl"
+        Bukadra = "dt_model_Bukadra.pkl"
+        Buri_Khalifa = "dt_model_Buri_Khalifa.pkl"
+        Business_Bay = "dt_model_Business_Bay.pkl"
+        Hadaeq_Sheikh_Mohammed_Bin_Rashid = "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl"
+        label_All_First = "dt_model_label_All_First.pkl"
+        Madinat_Al_Mataar = "dt_model_Madinat_Al_Mataar.pkl"
+        Madinat_Dubai_Almelaheyah = "dt_model_Madinat_Dubai_Almelaheyah.pkl"
+        Marsa_Dubai = "dt_model_Marsa_Dubai.pkl"
+        MeAisem_First = "dt_model_MeAisem_First.pkl"
+        Nadd_Hessa = "dt_model_Nadd_Hessa.pkl"
+        Wadi_Al_Safa_5 = "dt_model_Wadi_Al_Safa_5.pkl"
+        
+        # Create area_models dictionary using your variables
+        area_models = {}
+        area_files = [
+            Al_Barsha_South_Fifth, Al_Barsha_South_Fourth, Al_Barsha_South_Third,
+            Al_Hebiah_Fourth, Al_Khairan_First, Al_Merkadh, Al_Thanyah_Fifth,
+            Al_Warsan_First, Al_Yelayiss_2, Bukadra, Buri_Khalifa, Business_Bay,
+            Hadaeq_Sheikh_Mohammed_Bin_Rashid, label_All_First, Madinat_Al_Mataar,
+            Madinat_Dubai_Almelaheyah, Marsa_Dubai, MeAisem_First, Nadd_Hessa, Wadi_Al_Safa_5
+        ]
+        
+        for model_file in area_files:
+            try:
+                area_name = model_file.split("dt_model_")[1].replace(".pkl", "").replace("_", " ")
+                with open(model_file, "rb") as f:
+                    area_models[area_name] = pickle.load(f)
+                st.sidebar.success(f"✅ {area_name}")
+            except FileNotFoundError:
+                st.sidebar.warning(f"⚠️ {model_file}")
+            except Exception as e:
+                st.sidebar.error(f"❌ {model_file}: {str(e)}")
+        
+        # =========================
+        # 3️⃣ STREAMLIT UI
+        # =========================
+        st.title("🏠 Dubai Real Estate Price Predictor")
+        st.write("Area-wise model performance analysis")
+        
+        # =========================
+        # 4️⃣ LOAD TEST DATA (HARDCODED PATH)
+        # =========================
+        try:
+            test_samples = pd.read_csv("test_data_20 areas_1.csv")  # Change this to your actual test file path
+            
+            st.subheader("📊 Test Data Overview")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Samples", len(test_samples))
+            with col2:
+                st.metric("Number of Areas", test_samples['area_name_en'].nunique())
+            with col3:
+                st.metric("Price Range", f"AED {test_samples['meter_sale_price'].min():,.0f} - AED {test_samples['meter_sale_price'].max():,.0f}")
+            with col4:
+                st.metric("Average Price", f"AED {test_samples['meter_sale_price'].mean():,.0f}")
+            
+            st.dataframe(test_samples.head(), use_container_width=True)
+            
+            # =========================
+            # 5️⃣ PREPARE TEST DATA
+            # =========================
+            X_test = test_samples.drop(columns=['meter_sale_price', 'instance_date', 'quarter', 'area_name_en','Year'], errors='ignore')
+            y_test = test_samples['meter_sale_price']
+        
+            # Identify categorical columns
+            cat_cols = X_test.select_dtypes(include='object').columns.tolist()
+        
+            # Apply saved encoder
+            if cat_cols:
+                X_cat_test = ohe.transform(X_test[cat_cols])
+                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test.index)
+                X_test = X_test.drop(columns=cat_cols)
+                X_test = pd.concat([X_test, X_cat_test], axis=1)
+        
+            # =========================
+            # 6️⃣ PREDICTION & METRICS
+            # =========================
+            if st.button("🚀 Run Predictions", type="primary"):
+                y_pred_total = pd.Series(index=test_samples.index, dtype=float)
+                test_metrics = {}
+        
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+        
+                areas = test_samples['area_name_en'].unique()
+                for i, area in enumerate(areas):
+                    status_text.text(f"Processing {area}... ({i+1}/{len(areas)})")
+                    progress_bar.progress((i + 1) / len(areas))
+                    
+                    if area not in area_models:
+                        st.warning(f"⚠️ Skipping area '{area}' (model not available)")
+                        continue
+        
+                    model = area_models[area]
+                    mask = test_samples['area_name_en'] == area
+                    X_area_test = X_test.loc[mask]
+                    y_area_test = y_test.loc[mask]
+        
+                    if len(X_area_test) > 0:
+                        y_pred = model.predict(X_area_test)
+                        y_pred_total.loc[mask] = y_pred
+        
+                        # Metrics
+                        r2 = r2_score(y_area_test, y_pred)
+                        rmse = np.sqrt(mean_squared_error(y_area_test, y_pred))
+                        mae = mean_absolute_error(y_area_test, y_pred)
+        
+                        test_metrics[area] = {
+                            'R2': round(r2, 4), 
+                            'RMSE': round(rmse, 2), 
+                            'MAE': round(mae, 2),
+                            'Samples': len(y_area_test),
+                            'Avg_Actual_Price': round(y_area_test.mean(), 2),
+                            'Avg_Predicted_Price': round(y_pred.mean(), 2)
+                        }
+        
+                status_text.text("✅ Prediction completed!")
+                progress_bar.empty()
+        
+                # =========================
+                # 7️⃣ DISPLAY RESULTS
+                # =========================
+                st.subheader("📈 Prediction Results")
+                
+                if test_metrics:
+                    test_metrics_df = pd.DataFrame(test_metrics).T
+                    test_metrics_df = test_metrics_df.sort_values(by='R2', ascending=False)
+                    
+                    # Display metrics table
+                    st.dataframe(test_metrics_df.style.format({
+                        'R2': '{:.4f}',
+                        'RMSE': '{:.2f}',
+                        'MAE': '{:.2f}',
+                        'Avg_Actual_Price': '{:,.2f}',
+                        'Avg_Predicted_Price': '{:,.2f}'
+                    }), use_container_width=True)
+                    
+                    # Summary statistics
+                    st.subheader("📊 Summary Statistics")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Total Areas Processed", len(test_metrics))
+                    with col2:
+                        avg_r2 = test_metrics_df['R2'].mean()
+                        st.metric("Average R² Score", f"{avg_r2:.4f}")
+                    with col3:
+                        total_samples = test_metrics_df['Samples'].sum()
+                        st.metric("Total Samples", total_samples)
+                    with col4:
+                        avg_rmse = test_metrics_df['RMSE'].mean()
+                        st.metric("Average RMSE", f"{avg_rmse:.2f}")
+                    
+                    # Best and worst performing areas
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        best_area = test_metrics_df.loc[test_metrics_df['R2'].idxmax()]
+                        st.metric("Best R² Score", 
+                                 f"{best_area['R2']:.4f}", 
+                                 f"{test_metrics_df['R2'].idxmax()}")
+                    
+                    with col2:
+                        worst_area = test_metrics_df.loc[test_metrics_df['R2'].idxmin()]
+                        st.metric("Worst R² Score", 
+                                 f"{worst_area['R2']:.4f}", 
+                                 f"{test_metrics_df['R2'].idxmin()}")
+                    
+                    # Download results
+                    results_df = test_samples.copy()
+                    results_df['predicted_price'] = y_pred_total
+                    results_df['prediction_error'] = results_df['meter_sale_price'] - results_df['predicted_price']
+                    results_df['error_percentage'] = (results_df['prediction_error'] / results_df['meter_sale_price'] * 100).round(2)
+                    
+                    csv = results_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Full Predictions CSV",
+                        data=csv,
+                        file_name="dubai_real_estate_predictions.csv",
+                        mime="text/csv"
+                    )
+                        
+                else:
+                    st.warning("No predictions were made. Check if area names match the trained models.")
+        
+        except FileNotFoundError:
+            st.error("❌ Test data file 'test_data.csv' not found. Please make sure the file exists in the same directory.")
+        except Exception as e:
+            st.error(f"❌ Error loading test data: {str(e)}")
+        
+        # =========================
+        # 8️⃣ SIDEBAR INFO
+        # =========================
+        st.sidebar.title("ℹ️ Model Information")
+        st.sidebar.write(f"**Loaded Models:** {len(area_models)}")
+        st.sidebar.write("""
+        **Metrics Explanation:**
+        - **R² Score**: Closer to 1.0 is better
+        - **RMSE**: Lower is better (in price units)
+        - **MAE**: Lower is better (in price units)
+        
+        **Area Names:** Converted from filename format
+        """)
     
 
         
