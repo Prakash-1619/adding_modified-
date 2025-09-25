@@ -1375,12 +1375,193 @@ elif page == "V2.1":
     if sidebar_option == "📊 EDA & Feature Engineering":
         st.header("📊 EDA & Feature Engineering")
         
-        main_tabs = st.tabs(["Column-wise Analysis", "Area-wise Analysis"])
+        main_tabs = st.tabs(["Price_trend_areawise","Column-wise Analysis", "Area-wise Analysis"])
         
         # =========================
         # 1️⃣ Column-wise Analysis
         # =========================
         with main_tabs[0]:
+            import streamlit as st
+            import pandas as pd
+            import plotly.express as px
+            import os
+            
+            def create_time_series_plot(df, time_period):
+                """
+                Create a time series plot based on selected time period
+                """
+                df = df.copy()
+                df['instance_date'] = pd.to_datetime(df['instance_date'])
+                
+                if time_period == 'Monthly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
+                    df['sort_key'] = df['instance_date'].dt.to_period('M')
+                    title_suffix = 'Month'
+                
+                elif time_period == 'Quarterly':
+                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    df['sort_key'] = df['instance_date'].dt.to_period('Q')
+                    title_suffix = 'Quarter'
+                
+                elif time_period == 'Half-Yearly':
+                    # Create half-year periods (H1: Jan-Jun, H2: Jul-Dec)
+                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
+                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
+                    title_suffix = 'Half-Year'
+                
+                # Group by time period and area
+                period_avg = df.groupby(['time_period', 'sort_key', 'area_name_en'])['meter_sale_price'].mean().reset_index()
+                period_avg = period_avg.sort_values('sort_key')
+                
+                return period_avg, title_suffix
+            
+            def main():
+                #st.set_page_config(page_title="Real Estate Analytics", page_icon="🏠", layout="wide")
+                
+                #st.title("🏠 Real Estate Price Analytics")
+                st.markdown("Analyze average meter sale prices across different time periods")
+                
+                # File path input
+                file_path = st.text_input("Enter the path to your CSV file:", value="df_trained_dataset_6000.csv")
+                
+                if os.path.exists(file_path):
+                    try:
+                        df = pd.read_csv(file_path)
+                        st.success(f"✅ File loaded successfully: {file_path}")
+                        
+                        # Validate required columns
+                        required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
+                        missing_columns = [col for col in required_columns if col not in df.columns]
+                        
+                        if missing_columns:
+                            st.error(f"Missing required columns: {', '.join(missing_columns)}")
+                            st.info("Please make sure your CSV contains: instance_date, area_name_en, meter_sale_price")
+                            
+                            # Show available columns
+                            st.write("Available columns in your file:")
+                            st.write(list(df.columns))
+                            return
+                        
+                        # Display basic info about the loaded data
+                        st.sidebar.header("Data Overview")
+                        st.sidebar.write(f"Total records: {len(df):,}")
+                        st.sidebar.write(f"Date range: {df['instance_date'].min()} to {df['instance_date'].max()}")
+                        st.sidebar.write(f"Areas: {df['area_name_en'].nunique()}")
+                        st.sidebar.write(f"Average price: {df['meter_sale_price'].mean():.2f}")
+                        
+                        # Show first few rows of the data
+                        st.subheader("Preview of Your Data")
+                        st.dataframe(df.head(10), use_container_width=True)
+                        
+                        # Sidebar filters
+                        st.sidebar.header("Filters")
+                        
+                        # Time period selection
+                        time_period = st.sidebar.selectbox(
+                            "Select Time Period",
+                            options=['Monthly', 'Quarterly', 'Half-Yearly'],
+                            index=0
+                        )
+                        
+                        # Area filter
+                        areas = df['area_name_en'].unique()
+                        selected_areas = st.sidebar.multiselect(
+                            "Select Areas to Display",
+                            options=areas,
+                            default=areas[:5] if len(areas) > 5 else areas
+                        )
+                        
+                        if selected_areas:
+                            df_filtered = df[df['area_name_en'].isin(selected_areas)]
+                        else:
+                            df_filtered = df.copy()
+                        
+                        # Date range filter
+                        min_date = pd.to_datetime(df_filtered['instance_date']).min()
+                        max_date = pd.to_datetime(df_filtered['instance_date']).max()
+                        
+                        date_range = st.sidebar.date_input(
+                            "Select Date Range",
+                            value=(min_date, max_date),
+                            min_value=min_date,
+                            max_value=max_date
+                        )
+                        
+                        if len(date_range) == 2:
+                            start_date, end_date = date_range
+                            df_filtered = df_filtered[
+                                (pd.to_datetime(df_filtered['instance_date']) >= pd.to_datetime(start_date)) & 
+                                (pd.to_datetime(df_filtered['instance_date']) <= pd.to_datetime(end_date))
+                            ]
+                        
+                        # Process data based on selected time period
+                        processed_df, title_suffix = create_time_series_plot(df_filtered, time_period)
+                        
+                        # Display the plot
+                        st.header(f"{time_period} Analysis")
+                        
+                        fig = px.line(processed_df, x='time_period', y='meter_sale_price', color='area_name_en',
+                                     title=f'Average Meter Sale Price by {title_suffix} and Area',
+                                     markers=True, line_shape='linear')
+                        
+                        fig.update_layout(
+                            xaxis_title=title_suffix,
+                            yaxis_title='Average Meter Sale Price',
+                            legend_title='Area Name',
+                            hovermode='x unified'
+                        )
+                        
+                        fig.update_xaxes(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Display the dataframe
+                        st.subheader(f"{time_period} Summary Data")
+                        
+                        # Create a clean dataframe for display
+                        display_df = processed_df[['time_period', 'area_name_en', 'meter_sale_price']].copy()
+                        display_df = display_df.rename(columns={
+                            'time_period': title_suffix,
+                            'area_name_en': 'Area Name',
+                            'meter_sale_price': 'Average Price'
+                        })
+                        
+                        # Pivot for better readability
+                        pivot_df = display_df.pivot_table(
+                            index=title_suffix,
+                            columns='Area Name',
+                            values='Average Price',
+                            aggfunc='mean'
+                        ).round(2)
+                        
+                        st.dataframe(pivot_df.style.background_gradient(cmap='Blues'), use_container_width=True)
+                    
+                    except Exception as e:
+                        st.error(f"Error processing file: {str(e)}")
+                
+                else:
+                    st.error(f"❌ File not found: {file_path}")
+                    st.info("""
+                    **How to use:**
+                    1. Make sure your CSV file is in the same directory as this script
+                    2. Enter the filename (e.g., 'data.csv') or full path
+                    3. Your CSV should have these columns: instance_date, area_name_en, meter_sale_price
+                    
+                    **Example file structure:**
+                    """)
+                    
+                    # Display sample data structure
+                    sample_data = {
+                        'instance_date': ['2023-01-15', '2023-01-20', '2023-02-10', '2023-02-25', '2023-03-15'],
+                        'area_name_en': ['Downtown', 'Suburb', 'Downtown', 'Suburb', 'Downtown'],
+                        'meter_sale_price': [5000, 4500, 5200, 4600, 5300]
+                    }
+                    sample_df = pd.DataFrame(sample_data)
+                    st.dataframe(sample_df, use_container_width=True)
+            
+            if __name__ == "__main__":
+                main()
+        with main_tabs[1]:
             sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
             
             # --- Distribution Tab ---
@@ -2092,7 +2273,7 @@ if sidebar_option == "📈 Model Results":
                 mime="text/csv",
                 key="forecast_download"
                 )
-        if sidebar_option == "🤖 Model Input / Prediction":
+    if sidebar_option == "🤖 Model Input / Prediction":
             # =========================
             # 1️⃣2️⃣ SIDEBAR INFO
             # =========================
