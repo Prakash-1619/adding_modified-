@@ -1686,7 +1686,7 @@ import glob
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-elif sidebar_option == "📈 Model Results":
+if sidebar_option == "📈 Model Results":
     # =========================
     # 0️⃣ IMPORT REQUIRED LIBRARIES
     # =========================
@@ -2274,6 +2274,10 @@ elif sidebar_option == "📈 Model Results":
                 key="forecast_download")
     ###########################################################################################################################################################################################################################
     ###########################################################################################################################################################################################################################
+    
+    # =========================
+    # 🤖 MODEL INPUT / PREDICTION SECTION
+    # =========================
     elif sidebar_option == "🤖 Model Input / Prediction":
         # =========================
         # 1️⃣2️⃣ SIDEBAR INFO
