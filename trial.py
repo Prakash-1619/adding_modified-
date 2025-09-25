@@ -2091,17 +2091,297 @@ if sidebar_option == "📈 Model Results":
                 file_name="dubai_forecast_results.csv",
                 mime="text/csv",
                 key="forecast_download"
-            )
-    
-    # =========================
-    # 1️⃣2️⃣ SIDEBAR INFO
-    # =========================
-    st.sidebar.title("ℹ️ Model Information")
-    st.sidebar.write(f"**Loaded Models:** {len(area_models)}")
-    st.sidebar.write("""
-    **Metrics Explanation:**
-    - **R² Score**: Closer to 1.0 is better
-    - **RMSE**: Lower is better (in price units)
-    - **MAE**: Lower is better (in price units)
-    """)
+                )
+        if sidebar_option == "🤖 Model Input / Prediction":
+            # =========================
+            # 1️⃣2️⃣ SIDEBAR INFO
+            # =========================
+            #st.sidebar.title("ℹ️ Model Information")
+            #st.sidebar.write(f"**Loaded Models:** {len(area_models)}")
+            #st.sidebar.write("""**Metrics Explanation:*- **R² Score**: Closer to 1.0 is better   **RMSE**: Lower is better (in price units) - **MAE**: Lower is better (in price units) """)
         
+     
+            #st.header("🔮 Single Property Price Forecasting")
+            st.markdown("Predict property prices for specific area and features")
+            
+            # =========================
+            # 8️⃣ LOAD DATA FOR FORECASTING TAB
+            # =========================
+            @st.cache_data
+            def load_forecasting_data():
+                """Load forecasting-specific data"""
+                try:
+                    # Load test data for forecasting
+                    test_samples_forecast = pd.read_csv(file_path)
+                    test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+                    
+                    # Load growth factors
+                    growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+                    growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
+                    growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+                    
+                    return test_samples_forecast, growth_pivot
+                except Exception as e:
+                    st.error(f"Error loading forecasting data: {str(e)}")
+                    return None, None
+        
+            # Load data for forecasting
+            with st.spinner("Loading forecasting data..."):
+                test_samples_forecast, growth_pivot = load_forecasting_data()
+        
+            if test_samples_forecast is None:
+                st.error("❌ Failed to load forecasting data")
+                st.stop()
+            
+            # =========================
+            # 9️⃣ USER INPUT FORM
+            # =========================
+            st.sidebar.title("🏠 Property Features")
+            
+            # Get available areas from the loaded models
+            available_areas = list(area_models.keys())
+            
+            # Area selection
+            selected_area = st.sidebar.selectbox(
+                "Select Area",
+                options=available_areas,
+                key="selected_area"
+            )
+            
+            # Property features input
+            st.sidebar.subheader("Property Features")
+            
+            # Get unique values from the dataset for each feature
+            rooms_options = test_samples_forecast['rooms_en'].unique().tolist()
+            floor_bin_options = test_samples_forecast['floor_bin'].unique().tolist()
+            
+            col1, col2 = st.sidebar.columns(2)
+            
+            with col1:
+                rooms_en = st.selectbox("Number of Rooms", options=rooms_options, index=0)
+                floor_bin = st.selectbox("Floor Level", options=floor_bin_options, index=0)
+                swimming_pool = st.selectbox("Swimming Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+                balcony = st.selectbox("Balcony", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+            
+            with col2:
+                elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+                metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+                has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+                procedure_area = st.number_input("Area (sqft)", min_value=100, max_value=10000, value=1000, step=100)
+            
+            # =========================
+            # 🔟 PREPARE INPUT DATA
+            # =========================
+            def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
+                """Prepare user input for prediction"""
+                
+                # Create a DataFrame with the input values
+                input_data = pd.DataFrame({
+                    'rooms_en': [rooms],
+                    'floor_bin': [floor],
+                    'swimming_pool': [pool],
+                    'balcony': [balcony_val],
+                    'elevator': [elevator_val],
+                    'metro': [metro_val],
+                    'has_parking': [parking],
+                    'area_name_en': [area],
+                    'procedure_area': [area_size]
+                })
+                
+                # Separate area name for later use
+                area_name = input_data['area_name_en'].iloc[0]
+                input_no_area = input_data.drop(columns=['area_name_en'])
+                
+                # Apply one-hot encoding to categorical columns
+                cat_cols = ['rooms_en', 'floor_bin']  # Categorical columns that need encoding
+                
+                if cat_cols:
+                    # Transform using the fitted OHE
+                    X_cat = ohe.transform(input_no_area[cat_cols])
+                    X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
+                    
+                    # Combine with numerical features
+                    X_numerical = input_no_area.drop(columns=cat_cols)
+                    X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
+                else:
+                    X_processed = input_no_area.copy()
+                
+                # Ensure we have all training columns
+                for col in train_columns:
+                    if col not in X_processed.columns:
+                        X_processed[col] = 0
+                
+                # Select only the columns that were used during training
+                X_processed = X_processed[train_columns]
+                X_processed = X_processed.select_dtypes(include=[np.number])
+                
+                return X_processed, area_name, input_data
+        
+            # =========================
+            # 1️⃣1️⃣ PREDICTION EXECUTION
+            # =========================
+            if st.sidebar.button("🚀 Predict Price", type="primary", key="predict_button"):
+                with st.spinner("Generating prediction..."):
+                    # Prepare input data
+                    X_input, area_name, original_input = prepare_input_data(
+                        selected_area, rooms_en, floor_bin, swimming_pool, balcony, 
+                        elevator, metro, has_parking, procedure_area
+                    )
+                    
+                    # Get the model for the selected area
+                    if area_name in area_models:
+                        model = area_models[area_name]
+                        
+                        # Make prediction
+                        predicted_price = model.predict(X_input)[0]
+                        
+                        # =========================
+                        # 1️⃣2️⃣ DISPLAY PREDICTION RESULTS
+                        # =========================
+                        st.success("✅ Prediction Generated!")
+                        
+                        # Display input summary
+                        st.subheader("📋 Property Details")
+                        input_display = original_input.copy()
+                        input_display = input_display.T.reset_index()
+                        input_display.columns = ['Feature', 'Value']
+                        
+                        # Format the display
+                        feature_display_map = {
+                            'rooms_en': 'Number of Rooms',
+                            'floor_bin': 'Floor Level',
+                            'swimming_pool': 'Swimming Pool',
+                            'balcony': 'Balcony',
+                            'elevator': 'Elevator',
+                            'metro': 'Near Metro',
+                            'has_parking': 'Parking',
+                            'area_name_en': 'Area',
+                            'procedure_area': 'Area (sqft)'
+                        }
+                        
+                        input_display['Feature'] = input_display['Feature'].map(feature_display_map)
+                        input_display['Value'] = input_display['Value'].apply(
+                            lambda x: "Yes" if x == 1 else "No" if x == 0 else x
+                        )
+                        
+                        st.table(input_display)
+                        
+                        # Display prediction
+                        st.subheader("💰 Price Prediction")
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            st.metric(
+                                label="Predicted Property Price",
+                                value=f"AED {predicted_price:,.0f}",
+                                delta=None
+                            )
+                        
+                        # =========================
+                        # 1️⃣3️⃣ FORECASTING WITH GROWTH FACTORS
+                        # =========================
+                        st.subheader("📈 Price Forecast")
+                        
+                        # Get growth factors for the selected area
+                        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
+                        
+                        if not area_growth.empty:
+                            # Prepare forecast data
+                            forecast_data = []
+                            current_price = predicted_price
+                            
+                            # Current quarter
+                            forecast_data.append({
+                                'Period': 'Current',
+                                'Price': current_price,
+                                'Growth_Rate': 0
+                            })
+                            
+                            # Future quarters
+                            quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                            
+                            for quarter in quarter_cols:
+                                if quarter in area_growth.columns:
+                                    growth_factor = area_growth[quarter].iloc[0]
+                                    forecast_price = current_price * growth_factor
+                                    growth_rate = ((forecast_price - current_price) / current_price) * 100
+                                    
+                                    forecast_data.append({
+                                        'Period': quarter.replace('_', ' ').title(),
+                                        'Price': forecast_price,
+                                        'Growth_Rate': growth_rate
+                                    })
+                            
+                            forecast_df = pd.DataFrame(forecast_data)
+                            
+                            # Display forecast table
+                            st.write("**Forecast Table:**")
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
+                            display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
+                            st.dataframe(display_forecast, use_container_width=True)
+                            
+                            # Create forecast chart
+                            fig = go.Figure()
+                            
+                            fig.add_trace(go.Scatter(
+                                x=forecast_df['Period'],
+                                y=forecast_df['Price'],
+                                mode='lines+markers+text',
+                                line=dict(color='#1f77b4', width=4),
+                                marker=dict(size=10, color='#ff7f0e'),
+                                text=[f"AED {x:,.0f}" for x in forecast_df['Price']],
+                                textposition="top center",
+                                name='Predicted Price'
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"Price Forecast - {area_name}",
+                                xaxis_title="Time Period",
+                                yaxis_title="Predicted Price (AED)",
+                                height=500,
+                                template="plotly_white",
+                                showlegend=False
+                            )
+                            
+                            # Add growth rate annotations
+                            for i, row in forecast_df.iterrows():
+                                if row['Growth_Rate'] != 0:
+                                    fig.add_annotation(
+                                        x=row['Period'],
+                                        y=row['Price'],
+                                        text=f"+{row['Growth_Rate']:.1f}%",
+                                        showarrow=True,
+                                        arrowhead=2,
+                                        ax=0,
+                                        ay=-40,
+                                        bgcolor="green",
+                                        font=dict(color="white")
+                                    )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Growth rate bar chart
+                            if len(forecast_df) > 1:
+                                growth_fig = px.bar(
+                                    forecast_df[forecast_df['Period'] != 'Current'],
+                                    x='Period',
+                                    y='Growth_Rate',
+                                    title=f"Growth Rate Projection - {area_name}",
+                                    color='Growth_Rate',
+                                    color_continuous_scale='RdYlGn'
+                                )
+                                growth_fig.update_layout(
+                                    xaxis_title="Time Period",
+                                    yaxis_title="Growth Rate (%)",
+                                    height=400
+                                )
+                                st.plotly_chart(growth_fig, use_container_width=True)
+                        
+                        else:
+                            st.warning(f"No growth factors available for {area_name}")
+                        
+                    else:
+                        st.error(f"❌ No model found for area: {area_name}")
+            
+            else:
+                st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
