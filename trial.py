@@ -2373,7 +2373,7 @@ def load_forecasting_data():
 # =========================
 # MAIN APP
 # =========================
-st.sidebar.title("🏠 Property Price Predictor")
+#st.sidebar.title("🏠 Property Price Predictor")
 
 # Load models and data
 with st.spinner("Loading models and data..."):
