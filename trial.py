@@ -1372,7 +1372,7 @@ elif page == "V2.1":
             st.dataframe(df_test)
         
     # --- EDA & Feature Engineering Tab ---
-    elif sidebar_option == "📊 EDA & Feature Engineering":
+    if sidebar_option == "📊 EDA & Feature Engineering":
         st.header("📊 EDA & Feature Engineering")
         
         main_tabs = st.tabs(["Price_trend_areawise","Column-wise Analysis", "Area-wise Analysis"])
@@ -2278,7 +2278,7 @@ if sidebar_option == "📈 Model Results":
     # =========================
     # 🤖 MODEL INPUT / PREDICTION SECTION
     # =========================
-    elif sidebar_option == "🤖 Model Input / Prediction":
+    if sidebar_option == "🤖 Model Input / Prediction":
         # =========================
         # 1️⃣2️⃣ SIDEBAR INFO
         # =========================
