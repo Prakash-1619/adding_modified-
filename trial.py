@@ -1372,7 +1372,7 @@ elif page == "V2.1":
             st.dataframe(df_test)
         
     # --- EDA & Feature Engineering Tab ---
-    if sidebar_option == "📊 EDA & Feature Engineering":
+    elif sidebar_option == "📊 EDA & Feature Engineering":
         st.header("📊 EDA & Feature Engineering")
         
         main_tabs = st.tabs(["Price_trend_areawise","Column-wise Analysis", "Area-wise Analysis"])
@@ -1686,7 +1686,7 @@ import glob
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-if sidebar_option == "📈 Model Results":
+elif sidebar_option == "📈 Model Results":
     # =========================
     # 0️⃣ IMPORT REQUIRED LIBRARIES
     # =========================
@@ -2274,7 +2274,7 @@ if sidebar_option == "📈 Model Results":
                 key="forecast_download")
     ###########################################################################################################################################################################################################################
     ###########################################################################################################################################################################################################################
-    if sidebar_option == "🤖 Model Input / Prediction":
+    elif sidebar_option == "🤖 Model Input / Prediction":
         # =========================
         # 1️⃣2️⃣ SIDEBAR INFO
         # =========================
