@@ -1423,12 +1423,12 @@ elif page == "V2.1":
                 st.markdown("Analyze average meter sale prices across different time periods")
                 
                 # File path input
-                file_path = st.text_input("Enter the path to your CSV file:", value="df_trained_dataset_6000.csv")
+                file_path =  "df_trained_dataset_6000.csv"
                 
                 if os.path.exists(file_path):
                     try:
                         df = pd.read_csv(file_path)
-                        st.success(f"✅ File loaded successfully: {file_path}")
+                        #st.success(f"✅ File loaded successfully: {file_path}")
                         
                         # Validate required columns
                         required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
