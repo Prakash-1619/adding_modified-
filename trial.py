@@ -1616,7 +1616,7 @@ elif page == "V2.1":
         # =========================
         # 2️⃣ Area-wise Analysis
         # =========================
-        with main_tabs[1]:
+        with main_tabs[2]:
             st.subheader("Area-wise Analysis")
             
             if 'area_name_en' not in df_train.columns:
