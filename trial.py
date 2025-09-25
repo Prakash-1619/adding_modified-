@@ -1702,7 +1702,7 @@ if sidebar_option == "📈 Model Results":
     try:
         with open("onehot_encoder.pkl", "rb") as f:
             ohe = pickle.load(f)
-        st.sidebar.success("✅ OneHot Encoder loaded")
+        #st.sidebar.success("✅ OneHot Encoder loaded")
     except Exception as e:
         st.error(f"❌ Error loading OneHot encoder: {e}")
         st.stop()
@@ -2436,7 +2436,7 @@ def load_area_models():
                 model = pickle.load(f)
             
             loaded_models[area_name] = model
-            st.sidebar.success(f"✅ Loaded: {area_name}")
+            #st.sidebar.success(f"✅ Loaded: {area_name}")
             
         except FileNotFoundError:
             missing_models.append(model_file)
