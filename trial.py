@@ -2320,7 +2320,7 @@ def load_area_models():
                 model = pickle.load(f)
             
             loaded_models[area_name] = model
-            st.sidebar.success(f"✅ Loaded: {area_name}")
+            #st.sidebar.success(f"✅ Loaded: {area_name}")
             
         except FileNotFoundError:
             missing_models.append(model_file)
