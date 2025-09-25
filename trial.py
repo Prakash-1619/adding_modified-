@@ -1686,714 +1686,598 @@ import glob
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
-    if sidebar_option == "📈 Model Results":
-        # =========================
-        # 0️⃣ IMPORT REQUIRED LIBRARIES
-        # =========================
-        from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-        import numpy as np
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-        import plotly.express as px
+if sidebar_option == "📈 Model Results":
+    # =========================
+    # 0️⃣ IMPORT REQUIRED LIBRARIES
+    # =========================
+    from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+    import numpy as np
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import plotly.express as px
+    
+    # =========================
+    # 1️⃣ LOAD ONEHOT ENCODER
+    # =========================
+    try:
+        with open("onehot_encoder.pkl", "rb") as f:
+            ohe = pickle.load(f)
+        st.sidebar.success("✅ OneHot Encoder loaded")
+    except Exception as e:
+        st.error(f"❌ Error loading OneHot encoder: {e}")
+        st.stop()
+    file_options = {
+        "Test_data": "test_data_20 areas_1.csv",
+        "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
+        "all_data_sample_50": "all_values_area_data.csv"}
+    
+    # Create selectbox
+    selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
+    file_path = file_options[selected_file_label]
+    # =========================
+    # 2️⃣ LOAD AREA-WISE MODELS
+    # =========================
+    area_models = {}
+    area_files = [
+        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
+        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
+        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
+        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
+        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
+        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
+        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
+        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
+        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
+        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
+    ]
+    
+    for model_file in area_files:
+        try:
+            area_name = model_file.split("dt_model_")[1].replace(".pkl", "").replace("_", " ")
+            with open(model_file, "rb") as f:
+                area_models[area_name] = pickle.load(f)
+            #st.sidebar.success(f"✅ {area_name}")
+        except FileNotFoundError:
+            st.sidebar.warning(f"⚠️ {model_file} not found")
+        except Exception as e:
+            st.sidebar.error(f"❌ {model_file}: {str(e)}")
+    
+    # =========================
+    # 3️⃣ STREAMLIT UI
+    # =========================
+    #st.title("🏠 Dubai Real Estate Price Predictor")
+    #st.write("Area-wise model performance analysis")
+    
+    # Create tabs for different functionalities
+    tab1, tab2 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting"])
+    
+    with tab1:
+        st.header("📊 Model Predictions & Performance Analysis")
+        import pandas as pd
         
         # =========================
-        # 1️⃣ LOAD ONEHOT ENCODER
+        # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
         # =========================
         try:
-            with open("onehot_encoder.pkl", "rb") as f:
-                ohe = pickle.load(f)
-            st.sidebar.success("✅ OneHot Encoder loaded")
-        except Exception as e:
-            st.error(f"❌ Error loading OneHot encoder: {e}")
-            st.stop()
-        file_options = {
-            "Test_data": "test_data_20 areas_1.csv",
-            "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
-            "all_data_sample_50": "all_values_area_data.csv"}
-        
-        # Create selectbox
-        selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
-        file_path = file_options[selected_file_label]
-        # =========================
-        # 2️⃣ LOAD AREA-WISE MODELS
-        # =========================
-        area_models = {}
-        area_files = [
-            "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
-            "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
-            "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
-            "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
-            "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
-            "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
-            "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
-            "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
-            "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
-            "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
-        ]
-        
-        for model_file in area_files:
-            try:
-                area_name = model_file.split("dt_model_")[1].replace(".pkl", "").replace("_", " ")
-                with open(model_file, "rb") as f:
-                    area_models[area_name] = pickle.load(f)
-                #st.sidebar.success(f"✅ {area_name}")
-            except FileNotFoundError:
-                st.sidebar.warning(f"⚠️ {model_file} not found")
-            except Exception as e:
-                st.sidebar.error(f"❌ {model_file}: {str(e)}")
-        
-        # =========================
-        # 3️⃣ STREAMLIT UI
-        # =========================
-        #st.title("🏠 Dubai Real Estate Price Predictor")
-        #st.write("Area-wise model performance analysis")
-        
-        # Create tabs for different functionalities
-        tab1, tab2 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting"])
-        
-        with tab1:
-            st.header("📊 Model Predictions & Performance Analysis")
-            import pandas as pd
+            test_samples = pd.read_csv(file_path)
+            test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
+            st.dataframe(test_samples)
+            # Remove unwanted columns including 'Unnamed: 0'
+            columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
+            columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
+            
+            X_test = test_samples.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
+            y_test = test_samples['meter_sale_price']
+            
+            st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
+            #st.dataframe(test_samples.head(), use_container_width=True)
+            
+            # Identify categorical columns
+            cat_cols = X_test.select_dtypes(include='object').columns.tolist()
+    
+            # Apply saved encoder
+            if cat_cols:
+                X_cat_test = ohe.transform(X_test[cat_cols])
+                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test.index)
+                X_test = X_test.drop(columns=cat_cols)
+                X_test = pd.concat([X_test, X_cat_test], axis=1)
+            
+            # Ensure we only have numeric columns
+            X_test = X_test.select_dtypes(include=[np.number])
             
             # =========================
-            # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
+            # 5️⃣ PREDICTION & METRICS
             # =========================
-            try:
-                test_samples = pd.read_csv(file_path)
-                test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
-                st.dataframe(test_samples)
-                # Remove unwanted columns including 'Unnamed: 0'
-                columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
-                columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
+            if st.button("🚀 Run Predictions", type="primary", key="predict_btn"):
+                if len(area_models) == 0:
+                    st.error("❌ No models loaded. Please check model files.")
+                    st.stop()
                 
-                X_test = test_samples.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
-                y_test = test_samples['meter_sale_price']
-                
-                st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
-                #st.dataframe(test_samples.head(), use_container_width=True)
-                
-                # Identify categorical columns
-                cat_cols = X_test.select_dtypes(include='object').columns.tolist()
+                y_pred_total = pd.Series(index=test_samples.index, dtype=float)
+                test_metrics = {}
+                area_predictions = {}
         
-                # Apply saved encoder
-                if cat_cols:
-                    X_cat_test = ohe.transform(X_test[cat_cols])
-                    X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test.index)
-                    X_test = X_test.drop(columns=cat_cols)
-                    X_test = pd.concat([X_test, X_cat_test], axis=1)
-                
-                # Ensure we only have numeric columns
-                X_test = X_test.select_dtypes(include=[np.number])
-                
-                # =========================
-                # 5️⃣ PREDICTION & METRICS
-                # =========================
-                if st.button("🚀 Run Predictions", type="primary", key="predict_btn"):
-                    if len(area_models) == 0:
-                        st.error("❌ No models loaded. Please check model files.")
-                        st.stop()
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+        
+                areas = test_samples['area_name_en'].unique()
+                for i, area in enumerate(areas):
+                    status_text.text(f"Processing {area}... ({i+1}/{len(areas)})")
+                    progress_bar.progress((i + 1) / len(areas))
                     
-                    y_pred_total = pd.Series(index=test_samples.index, dtype=float)
-                    test_metrics = {}
-                    area_predictions = {}
-            
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-            
-                    areas = test_samples['area_name_en'].unique()
-                    for i, area in enumerate(areas):
-                        status_text.text(f"Processing {area}... ({i+1}/{len(areas)})")
-                        progress_bar.progress((i + 1) / len(areas))
-                        
-                        if area not in area_models:
-                            st.warning(f"⚠️ Skipping area '{area}' (model not available)")
+                    if area not in area_models:
+                        st.warning(f"⚠️ Skipping area '{area}' (model not available)")
+                        continue
+        
+                    model = area_models[area]
+                    mask = test_samples['area_name_en'] == area
+                    X_area_test = X_test.loc[mask]
+                    y_area_test = y_test.loc[mask]
+        
+                    if len(X_area_test) > 0:
+                        try:
+                            y_pred = model.predict(X_area_test)
+                            y_pred_total.loc[mask] = y_pred
+        
+                            # Metrics
+                            r2 = r2_score(y_area_test, y_pred)
+                            rmse = np.sqrt(mean_squared_error(y_area_test, y_pred))
+                            mae = mean_absolute_error(y_area_test, y_pred)
+        
+                            test_metrics[area] = {
+                                'R2': round(r2, 4), 
+                                'RMSE': round(rmse, 2), 
+                                'MAE': round(mae, 2),
+                                'Samples': len(y_area_test),
+                                'Avg_Actual_Price': round(y_area_test.mean(), 2),
+                                'Avg_Predicted_Price': round(y_pred.mean(), 2)
+                            }
+                            
+                            # Store predictions for plotting
+                            area_predictions[area] = {
+                                'actual': y_area_test,
+                                'predicted': y_pred
+                            }
+                        except Exception as e:
+                            st.error(f"❌ Error predicting for {area}: {e}")
                             continue
-            
-                        model = area_models[area]
-                        mask = test_samples['area_name_en'] == area
-                        X_area_test = X_test.loc[mask]
-                        y_area_test = y_test.loc[mask]
-            
-                        if len(X_area_test) > 0:
-                            try:
-                                y_pred = model.predict(X_area_test)
-                                y_pred_total.loc[mask] = y_pred
-            
-                                # Metrics
-                                r2 = r2_score(y_area_test, y_pred)
-                                rmse = np.sqrt(mean_squared_error(y_area_test, y_pred))
-                                mae = mean_absolute_error(y_area_test, y_pred)
-            
-                                test_metrics[area] = {
-                                    'R2': round(r2, 4), 
-                                    'RMSE': round(rmse, 2), 
-                                    'MAE': round(mae, 2),
-                                    'Samples': len(y_area_test),
-                                    'Avg_Actual_Price': round(y_area_test.mean(), 2),
-                                    'Avg_Predicted_Price': round(y_pred.mean(), 2)
-                                }
-                                
-                                # Store predictions for plotting
-                                area_predictions[area] = {
-                                    'actual': y_area_test,
-                                    'predicted': y_pred
-                                }
-                            except Exception as e:
-                                st.error(f"❌ Error predicting for {area}: {e}")
-                                continue
-            
-                    status_text.text("✅ Prediction completed!")
-                    progress_bar.empty()
-            
-                    # =========================
-                    # 6️⃣ DISPLAY RESULTS
-                    # =========================
-                    if test_metrics:
-                        test_metrics_df = pd.DataFrame(test_metrics).T
-                        test_metrics_df = test_metrics_df.sort_values(by='R2', ascending=False)
-                        
-                        # Display metrics table
-                        st.subheader("📈 Prediction Results")
-                        st.dataframe(test_metrics_df.style.format({
-                            'R2': '{:.4f}',
-                            'RMSE': '{:.2f}',
-                            'MAE': '{:.2f}',
-                            'Avg_Actual_Price': '{:,.2f}',
-                            'Avg_Predicted_Price': '{:,.2f}'
-                        }), use_container_width=True)
-                        
-                        # Summary statistics
-                        st.subheader("📊 Summary Statistics")
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("Total Areas Processed", len(test_metrics))
-                        with col2:
-                            avg_r2 = test_metrics_df['R2'].mean()
-                            st.metric("Average R² Score", f"{avg_r2:.4f}")
-                        with col3:
-                            total_samples = test_metrics_df['Samples'].sum()
-                            st.metric("Total Samples", total_samples)
-                        with col4:
-                            avg_rmse = test_metrics_df['RMSE'].mean()
-                            st.metric("Average RMSE", f"{avg_rmse:.2f}")
-                        
-                        # Best and worst performing areas
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            best_area = test_metrics_df.loc[test_metrics_df['R2'].idxmax()]
-                            st.metric("Best R² Score", 
-                                     f"{best_area['R2']:.4f}", 
-                                     f"{test_metrics_df['R2'].idxmax()}")
-                        
-                        with col2:
-                            worst_area = test_metrics_df.loc[test_metrics_df['R2'].idxmin()]
-                            st.metric("Worst R² Score", 
-                                     f"{worst_area['R2']:.4f}", 
-                                     f"{test_metrics_df['R2'].idxmin()}")
-                        
-                        # =========================
-                        # 7️⃣ VISUALIZATIONS FOR PREDICTIONS TAB
-                        # =========================
-                        st.subheader("📊 Prediction Visualizations")
-                        
-                        # Tab for different visualizations
-                        viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📈 Performance Metrics", "🔍 Actual vs Predicted", "📊 Area Comparison"])
-                        
-                        with viz_tab1:
-                            # R2 Score Bar Chart
-                            fig_r2 = px.bar(
-                                x=test_metrics_df.index,
-                                y=test_metrics_df['R2'],
-                                title="R² Scores by Area",
-                                labels={'x': 'Area', 'y': 'R² Score'},
-                                color=test_metrics_df['R2'],
-                                color_continuous_scale="RdYlGn"
-                            )
-                            fig_r2.update_layout(height=500)
-                            st.plotly_chart(fig_r2, use_container_width=True)
-                            
-                            # RMSE and MAE comparison
-                            fig_errors = go.Figure()
-                            fig_errors.add_trace(go.Bar(name='RMSE', x=test_metrics_df.index, y=test_metrics_df['RMSE']))
-                            fig_errors.add_trace(go.Bar(name='MAE', x=test_metrics_df.index, y=test_metrics_df['MAE']))
-                            fig_errors.update_layout(title="Error Metrics by Area", barmode='group', height=500)
-                            st.plotly_chart(fig_errors, use_container_width=True)
-                        
-                        with viz_tab2:
-                            # Scatter plots for actual vs predicted
-                            selected_area = st.selectbox("Select Area for Detailed Analysis", list(area_predictions.keys()))
-                            
-                            if selected_area in area_predictions:
-                                actual = area_predictions[selected_area]['actual']
-                                predicted = area_predictions[selected_area]['predicted']
-                                
-                                fig_scatter = px.scatter(
-                                    x=actual, y=predicted,
-                                    title=f"Actual vs Predicted Prices - {selected_area}",
-                                    labels={'x': 'Actual Price', 'y': 'Predicted Price'},
-                                    trendline="ols"
-                                )
-                                
-                                # Add perfect prediction line
-                                max_val = max(actual.max(), predicted.max())
-                                min_val = min(actual.min(), predicted.min())
-                                fig_scatter.add_trace(go.Scatter(
-                                    x=[min_val, max_val], y=[min_val, max_val],
-                                    mode='lines', name='Perfect Prediction',
-                                    line=dict(dash='dash', color='red')
-                                ))
-                                
-                                fig_scatter.update_layout(height=500)
-                                st.plotly_chart(fig_scatter, use_container_width=True)
-                                
-                                # Residual plot
-                                residuals = actual - predicted
-                                fig_residual = px.scatter(
-                                    x=predicted, y=residuals,
-                                    title=f"Residual Plot - {selected_area}",
-                                    labels={'x': 'Predicted Price', 'y': 'Residuals'}
-                                )
-                                fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
-                                fig_residual.update_layout(height=400)
-                                #st.plotly_chart(fig_residual, use_container_width=True)
-                        
-                        with viz_tab3:
-                            # Price comparison chart
-                            fig_prices = go.Figure()
-                            fig_prices.add_trace(go.Bar(name='Actual Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Actual_Price']))
-                            fig_prices.add_trace(go.Bar(name='Predicted Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Predicted_Price']))
-                            fig_prices.update_layout(title="Average Actual vs Predicted Prices by Area", barmode='group', height=500)
-                            st.plotly_chart(fig_prices, use_container_width=True)
-                            
-                            # Error percentage by area
-                            error_percentage = ((test_metrics_df['Avg_Actual_Price'] - test_metrics_df['Avg_Predicted_Price']) / test_metrics_df['Avg_Actual_Price'] * 100).abs()
-                            fig_error_pct = px.bar(
-                                x=error_percentage.index,
-                                y=error_percentage.values,
-                                title="Absolute Error Percentage by Area",
-                                labels={'x': 'Area', 'y': 'Error %'},
-                                color=error_percentage.values,
-                                color_continuous_scale="Reds"
-                            )
-                            fig_error_pct.update_layout(height=400)
-                            st.plotly_chart(fig_error_pct, use_container_width=True)
-                        
-                        # Download results
-                        results_df = test_samples.copy()
-                        results_df['predicted_price'] = y_pred_total
-                        results_df['prediction_error'] = results_df['meter_sale_price'] - results_df['predicted_price']
-                        results_df['error_percentage'] = (results_df['prediction_error'] / results_df['meter_sale_price'] * 100).round(2)
-                        
-                        csv = results_df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download Full Predictions CSV",
-                            data=csv,
-                            file_name="dubai_real_estate_predictions.csv",
-                            mime="text/csv"
-                        )
-                            
-                    else:
-                        st.warning("No predictions were made. Check if area names match the trained models.")
-                        
-            except FileNotFoundError:
-                st.error("❌ Test data file 'test_data_20 areas_1.csv' not found. Please make sure the file exists in the same directory.")
-            except Exception as e:
-                st.error(f"❌ Error loading test data: {str(e)}")
         
-        with tab2:
-            #st.header("🔮 Price Forecasting")
-            #st.markdown("Area-wise predictions with growth factor projections")
-            
-            # =========================
-            # 8️⃣ LOAD DATA FOR FORECASTING TAB
-            # =========================
-            @st.cache_data
-            def load_forecasting_data():
-                """Load forecasting-specific data"""
-                try:
-                    # Load test data for forecasting
-                    #test_samples_forecast = pd.read_csv(selected_file_label)
+                status_text.text("✅ Prediction completed!")
+                progress_bar.empty()
+        
+                # =========================
+                # 6️⃣ DISPLAY RESULTS
+                # =========================
+                if test_metrics:
+                    test_metrics_df = pd.DataFrame(test_metrics).T
+                    test_metrics_df = test_metrics_df.sort_values(by='R2', ascending=False)
                     
-                    test_samples_forecast = pd.read_csv(file_path)
-                    test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
-                    st.dataframe(test_samples_forecast)
-                    # Remove unwanted columns
-                    columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
-                    columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
-                    X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
+                    # Display metrics table
+                    st.subheader("📈 Prediction Results")
+                    st.dataframe(test_metrics_df.style.format({
+                        'R2': '{:.4f}',
+                        'RMSE': '{:.2f}',
+                        'MAE': '{:.2f}',
+                        'Avg_Actual_Price': '{:,.2f}',
+                        'Avg_Predicted_Price': '{:,.2f}'
+                    }), use_container_width=True)
                     
-                    # Load train columns
-                    with open("train_columns.pkl", "rb") as f:
-                        train_columns = pickle.load(f)
+                    # Summary statistics
+                    st.subheader("📊 Summary Statistics")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Total Areas Processed", len(test_metrics))
+                    with col2:
+                        avg_r2 = test_metrics_df['R2'].mean()
+                        st.metric("Average R² Score", f"{avg_r2:.4f}")
+                    with col3:
+                        total_samples = test_metrics_df['Samples'].sum()
+                        st.metric("Total Samples", total_samples)
+                    with col4:
+                        avg_rmse = test_metrics_df['RMSE'].mean()
+                        st.metric("Average RMSE", f"{avg_rmse:.2f}")
                     
-                    # Load growth factors
-                    growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-                    growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-                    growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+                    # Best and worst performing areas
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        best_area = test_metrics_df.loc[test_metrics_df['R2'].idxmax()]
+                        st.metric("Best R² Score", 
+                                 f"{best_area['R2']:.4f}", 
+                                 f"{test_metrics_df['R2'].idxmax()}")
                     
-                    return test_samples_forecast, X_test_forecast, train_columns, growth_pivot
-                except Exception as e:
-                    st.error(f"Error loading forecasting data: {str(e)}")
-                    return None, None, None, None
-    
-            # Load data for forecasting
-            with st.spinner("Loading forecasting data..."):
-                test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot = load_forecasting_data()
-    
-            if test_samples_forecast is None:
-                st.error("❌ Failed to load forecasting data")
-                st.stop()
-            
-            # Prepare test data for forecasting
-            try:
-                # Separate area_name_en column for later use
-                area_names_forecast = X_test_forecast_raw['area_name_en']
-                X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
-                
-                # Identify categorical columns (excluding area_name_en)
-                cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
-                
-                # Apply one-hot encoding
-                if cat_cols:
-                    X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
-                    X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_no_area.index)
+                    with col2:
+                        worst_area = test_metrics_df.loc[test_metrics_df['R2'].idxmin()]
+                        st.metric("Worst R² Score", 
+                                 f"{worst_area['R2']:.4f}", 
+                                 f"{test_metrics_df['R2'].idxmin()}")
                     
-                    X_test_forecast = X_test_forecast_no_area.drop(columns=cat_cols)
-                    X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
+                    # =========================
+                    # 7️⃣ VISUALIZATIONS FOR PREDICTIONS TAB
+                    # =========================
+                    st.subheader("📊 Prediction Visualizations")
+                    
+                    # Tab for different visualizations
+                    viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📈 Performance Metrics", "🔍 Actual vs Predicted", "📊 Area Comparison"])
+                    
+                    with viz_tab1:
+                        # R2 Score Bar Chart
+                        fig_r2 = px.bar(
+                            x=test_metrics_df.index,
+                            y=test_metrics_df['R2'],
+                            title="R² Scores by Area",
+                            labels={'x': 'Area', 'y': 'R² Score'},
+                            color=test_metrics_df['R2'],
+                            color_continuous_scale="RdYlGn"
+                        )
+                        fig_r2.update_layout(height=500)
+                        st.plotly_chart(fig_r2, use_container_width=True)
+                        
+                        # RMSE and MAE comparison
+                        fig_errors = go.Figure()
+                        fig_errors.add_trace(go.Bar(name='RMSE', x=test_metrics_df.index, y=test_metrics_df['RMSE']))
+                        fig_errors.add_trace(go.Bar(name='MAE', x=test_metrics_df.index, y=test_metrics_df['MAE']))
+                        fig_errors.update_layout(title="Error Metrics by Area", barmode='group', height=500)
+                        st.plotly_chart(fig_errors, use_container_width=True)
+                    
+                    with viz_tab2:
+                        # Scatter plots for actual vs predicted
+                        selected_area = st.selectbox("Select Area for Detailed Analysis", list(area_predictions.keys()))
+                        
+                        if selected_area in area_predictions:
+                            actual = area_predictions[selected_area]['actual']
+                            predicted = area_predictions[selected_area]['predicted']
+                            
+                            fig_scatter = px.scatter(
+                                x=actual, y=predicted,
+                                title=f"Actual vs Predicted Prices - {selected_area}",
+                                labels={'x': 'Actual Price', 'y': 'Predicted Price'},
+                                trendline="ols"
+                            )
+                            
+                            # Add perfect prediction line
+                            max_val = max(actual.max(), predicted.max())
+                            min_val = min(actual.min(), predicted.min())
+                            fig_scatter.add_trace(go.Scatter(
+                                x=[min_val, max_val], y=[min_val, max_val],
+                                mode='lines', name='Perfect Prediction',
+                                line=dict(dash='dash', color='red')
+                            ))
+                            
+                            fig_scatter.update_layout(height=500)
+                            st.plotly_chart(fig_scatter, use_container_width=True)
+                            
+                            # Residual plot
+                            residuals = actual - predicted
+                            fig_residual = px.scatter(
+                                x=predicted, y=residuals,
+                                title=f"Residual Plot - {selected_area}",
+                                labels={'x': 'Predicted Price', 'y': 'Residuals'}
+                            )
+                            fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
+                            fig_residual.update_layout(height=400)
+                            #st.plotly_chart(fig_residual, use_container_width=True)
+                    
+                    with viz_tab3:
+                        # Price comparison chart
+                        fig_prices = go.Figure()
+                        fig_prices.add_trace(go.Bar(name='Actual Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Actual_Price']))
+                        fig_prices.add_trace(go.Bar(name='Predicted Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Predicted_Price']))
+                        fig_prices.update_layout(title="Average Actual vs Predicted Prices by Area", barmode='group', height=500)
+                        st.plotly_chart(fig_prices, use_container_width=True)
+                        
+                        # Error percentage by area
+                        error_percentage = ((test_metrics_df['Avg_Actual_Price'] - test_metrics_df['Avg_Predicted_Price']) / test_metrics_df['Avg_Actual_Price'] * 100).abs()
+                        fig_error_pct = px.bar(
+                            x=error_percentage.index,
+                            y=error_percentage.values,
+                            title="Absolute Error Percentage by Area",
+                            labels={'x': 'Area', 'y': 'Error %'},
+                            color=error_percentage.values,
+                            color_continuous_scale="Reds"
+                        )
+                        fig_error_pct.update_layout(height=400)
+                        st.plotly_chart(fig_error_pct, use_container_width=True)
+                    
+                    # Download results
+                    results_df = test_samples.copy()
+                    results_df['predicted_price'] = y_pred_total
+                    results_df['prediction_error'] = results_df['meter_sale_price'] - results_df['predicted_price']
+                    results_df['error_percentage'] = (results_df['prediction_error'] / results_df['meter_sale_price'] * 100).round(2)
+                    
+                    csv = results_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Full Predictions CSV",
+                        data=csv,
+                        file_name="dubai_real_estate_predictions.csv",
+                        mime="text/csv"
+                    )
+                        
                 else:
-                    X_test_forecast = X_test_forecast_no_area.copy()
-                
-                # Ensure we have all training columns
-                # This step assumes 'area_name_en' was not one-hot encoded, 
-                # as it's used for splitting.
-                # If area_name_en OHE columns were in train_columns, 
-                # they must be present and set to 0 where needed.
-                for col in train_columns:
-                    if col not in X_test_forecast.columns:
-                        X_test_forecast[col] = 0
-                
-                X_test_forecast = X_test_forecast[train_columns]
-                X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
-                
-                # Re-inserting area_names_forecast is not needed in X_test_forecast here 
-                # because the slicing in step 10 uses test_samples_forecast['area_name_en']
-                # and X_test_forecast is only for prediction input.
+                    st.warning("No predictions were made. Check if area names match the trained models.")
+                    
+        except FileNotFoundError:
+            st.error("❌ Test data file 'test_data_20 areas_1.csv' not found. Please make sure the file exists in the same directory.")
+        except Exception as e:
+            st.error(f"❌ Error loading test data: {str(e)}")
     
+    with tab2:
+        #st.header("🔮 Price Forecasting")
+        #st.markdown("Area-wise predictions with growth factor projections")
+        
+        # =========================
+        # 8️⃣ LOAD DATA FOR FORECASTING TAB
+        # =========================
+        @st.cache_data
+        def load_forecasting_data():
+            """Load forecasting-specific data"""
+            try:
+                # Load test data for forecasting
+                #test_samples_forecast = pd.read_csv(selected_file_label)
+                
+                test_samples_forecast = pd.read_csv(file_path)
+                test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+                st.dataframe(test_samples_forecast)
+                # Remove unwanted columns
+                columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
+                columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
+                X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
+                
+                # Load train columns
+                with open("train_columns.pkl", "rb") as f:
+                    train_columns = pickle.load(f)
+                
+                # Load growth factors
+                growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+                growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
+                growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+                
+                return test_samples_forecast, X_test_forecast, train_columns, growth_pivot
             except Exception as e:
-                st.error(f"❌ Error preparing forecasting data: {str(e)}")
+                st.error(f"Error loading forecasting data: {str(e)}")
+                return None, None, None, None
+
+        # Load data for forecasting
+        with st.spinner("Loading forecasting data..."):
+            test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot = load_forecasting_data()
+
+        if test_samples_forecast is None:
+            st.error("❌ Failed to load forecasting data")
+            st.stop()
+        
+        # Prepare test data for forecasting
+        try:
+            # Separate area_name_en column for later use
+            area_names_forecast = X_test_forecast_raw['area_name_en']
+            X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
+            
+            # Identify categorical columns (excluding area_name_en)
+            cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
+            
+            # Apply one-hot encoding
+            if cat_cols:
+                X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
+                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_no_area.index)
+                
+                X_test_forecast = X_test_forecast_no_area.drop(columns=cat_cols)
+                X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
+            else:
+                X_test_forecast = X_test_forecast_no_area.copy()
+            
+            # Ensure we have all training columns
+            # This step assumes 'area_name_en' was not one-hot encoded, 
+            # as it's used for splitting.
+            # If area_name_en OHE columns were in train_columns, 
+            # they must be present and set to 0 where needed.
+            for col in train_columns:
+                if col not in X_test_forecast.columns:
+                    X_test_forecast[col] = 0
+            
+            X_test_forecast = X_test_forecast[train_columns]
+            X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
+            
+            # Re-inserting area_names_forecast is not needed in X_test_forecast here 
+            # because the slicing in step 10 uses test_samples_forecast['area_name_en']
+            # and X_test_forecast is only for prediction input.
+
+        except Exception as e:
+            st.error(f"❌ Error preparing forecasting data: {str(e)}")
+            st.stop()
+        
+        # =========================
+        # 9️⃣ FORECASTING CONTROLS
+        # =========================
+        st.sidebar.title("🔧 Forecast Controls")
+        
+        # Area selection
+        available_areas = list(area_models.keys())
+        selected_areas_forecast = st.sidebar.multiselect(
+            "Select Areas for Forecasting",
+            options=available_areas,
+            default=available_areas[:4] if len(available_areas) > 4 else available_areas,
+            key="forecast_areas"
+        )
+        
+        # Feature grouping options
+        grouping_options = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
+        selected_grouping = st.sidebar.selectbox(
+            "Group by Feature",
+            options=grouping_options,
+            index=0,
+            key="grouping_feature"
+        )
+        
+        # =========================
+        # 🔟 FORECASTING EXECUTION
+        # =========================
+        if st.button("🚀 Generate Forecast", type="primary", key="forecast_button"):
+            if len(selected_areas_forecast) == 0:
+                st.warning("Please select at least one area for forecasting")
                 st.stop()
+                
+            with st.spinner("Generating forecasts..."):
+                # Dynamic grouping features
+                if selected_grouping == 'rooms_en':
+                    grouping_features = [col for col in X_test_forecast.columns if col.startswith("rooms_en_")]
+                elif selected_grouping == 'floor_bin':
+                    grouping_features = [col for col in X_test_forecast.columns if col.startswith("floor_bin_")]
+                else:
+                    grouping_features = [selected_grouping]
             
-            # =========================
-            # 9️⃣ FORECASTING CONTROLS
-            # =========================
-            st.sidebar.title("🔧 Forecast Controls")
+                pred_list = []
             
-            # Area selection
-            available_areas = list(area_models.keys())
-            selected_areas_forecast = st.sidebar.multiselect(
-                "Select Areas for Forecasting",
-                options=available_areas,
-                default=available_areas[:4] if len(available_areas) > 4 else available_areas,
-                key="forecast_areas"
-            )
+                for area in selected_areas_forecast:
+                    if area not in area_models:
+                        continue
             
-            # Feature grouping options
-            grouping_options = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
-            selected_grouping = st.sidebar.selectbox(
-                "Group by Feature",
-                options=grouping_options,
-                index=0,
-                key="grouping_feature"
-            )
+                    model = area_models[area]
+                    mask = test_samples_forecast['area_name_en'] == area
+                    X_area_test = X_test_forecast.loc[mask]
             
-            # =========================
-            # 🔟 FORECASTING EXECUTION
-            # =========================
-            if st.button("🚀 Generate Forecast", type="primary", key="forecast_button"):
-                if len(selected_areas_forecast) == 0:
-                    st.warning("Please select at least one area for forecasting")
+                    if len(X_area_test) > 0:
+                        y_pred = model.predict(X_area_test)
+            
+                        # Collect predictions
+                        df_area_pred = X_area_test[grouping_features].copy()
+                        df_area_pred['area_name_en'] = area
+                        df_area_pred['prediction'] = y_pred
+                        pred_list.append(df_area_pred)
+            
+                if not pred_list:
+                    st.error("No predictions generated. Check area selection.")
                     st.stop()
                     
-                with st.spinner("Generating forecasts..."):
-                    # Dynamic grouping features
-                    if selected_grouping == 'rooms_en':
-                        grouping_features = [col for col in X_test_forecast.columns if col.startswith("rooms_en_")]
-                    elif selected_grouping == 'floor_bin':
-                        grouping_features = [col for col in X_test_forecast.columns if col.startswith("floor_bin_")]
-                    else:
-                        grouping_features = [selected_grouping]
+                pred_df = pd.concat(pred_list)
+            
+                # Group by area + features
+                group_cols = ['area_name_en'] + grouping_features
+                median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
+            
+                # Merge with growth factors
+                forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
+            
+                # Apply growth factors
+                quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                for q in quarter_cols:
+                    if q in forecast_df.columns:
+                        forecast_df[q] = forecast_df['prediction'] * forecast_df[q]
+            
+                # Final forecast
+                final_forecast = forecast_df[group_cols + ['prediction'] + quarter_cols]
+            
+            # =========================
+            # 1️⃣1️⃣ FORECASTING VISUALIZATIONS
+            # =========================
+            st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
+            
+            # Display forecast table
+            st.subheader("📋 Forecast Results")
+            display_df = final_forecast.copy()
+            for col in ['prediction'] + quarter_cols:
+                if col in display_df.columns:
+                    display_df[col] = display_df[col].round(2)
+            
+            st.dataframe(display_df, use_container_width=True)
+            
+            # Visualizations
+            st.subheader("📈 Forecast Visualizations")
+            
+            # Helper function for quarter formatting
+            def format_quarter_label(quarter_str):
+                if '-' in quarter_str:
+                    parts = quarter_str.split('-')
+                    if len(parts) == 2:
+                        return f"{parts[0]} {parts[1]}"
+                return quarter_str.replace('_', ' ').title()
+            
+            # Area-wise forecast charts
+            for area in selected_areas_forecast:
+                area_data = final_forecast[final_forecast['area_name_en'] == area]
+                if area_data.empty:
+                    continue
+                    
+                st.markdown(f"### 📊 {area} Forecast")
                 
-                    pred_list = []
+                # Create forecast chart
+                fig = go.Figure()
                 
-                    for area in selected_areas_forecast:
-                        if area not in area_models:
-                            continue
+                for idx, (_, row) in enumerate(area_data.iterrows()):
+                    # Create feature label
+                    feature_label = ""
+                    for gf in grouping_features:
+                        if gf in row and row[gf] == 1:
+                            feature_label += f"{gf.replace('_', ' ').title()}, "
+                    feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
+                    
+                    # Prepare data for plotting
+                    quarters = ['Current'] + [format_quarter_label(q) for q in quarter_cols if q in row]
+                    prices = [row['prediction']] + [row[q] for q in quarter_cols if q in row]
+                    
+                    fig.add_trace(go.Scatter(
+                        x=quarters, y=prices,
+                        mode='lines+markers',
+                        name=feature_label,
+                        line=dict(width=3),
+                        marker=dict(size=8)
+                    ))
                 
-                        model = area_models[area]
-                        mask = test_samples_forecast['area_name_en'] == area
-                        X_area_test = X_test_forecast.loc[mask]
-                
-                        if len(X_area_test) > 0:
-                            y_pred = model.predict(X_area_test)
-                
-                            # Collect predictions
-                            df_area_pred = X_area_test[grouping_features].copy()
-                            df_area_pred['area_name_en'] = area
-                            df_area_pred['prediction'] = y_pred
-                            pred_list.append(df_area_pred)
-                
-                    if not pred_list:
-                        st.error("No predictions generated. Check area selection.")
-                        st.stop()
-                        
-                    pred_df = pd.concat(pred_list)
-                
-                    # Group by area + features
-                    group_cols = ['area_name_en'] + grouping_features
-                    median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
-                
-                    # Merge with growth factors
-                    forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
-                
-                    # Apply growth factors
-                    quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                fig.update_layout(
+                    title=f"Price Forecast - {area}",
+                    xaxis_title="Time Period",
+                    yaxis_title="Predicted Price (AED)",
+                    height=400,
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Growth heatmap
+            st.subheader("🔥 Growth Rate Heatmap")
+            heatmap_data = []
+            quarter_labels = [format_quarter_label(q) for q in quarter_cols]
+            
+            for area in selected_areas_forecast:
+                area_data = final_forecast[final_forecast['area_name_en'] == area]
+                if not area_data.empty:
+                    row = area_data.iloc[0]  # Take first configuration
+                    growth_rates = []
                     for q in quarter_cols:
-                        if q in forecast_df.columns:
-                            forecast_df[q] = forecast_df['prediction'] * forecast_df[q]
-                
-                    # Final forecast
-                    final_forecast = forecast_df[group_cols + ['prediction'] + quarter_cols]
-                
-                # =========================
-                # 1️⃣1️⃣ FORECASTING VISUALIZATIONS
-                # =========================
-                st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
-                
-                # Display forecast table
-                st.subheader("📋 Forecast Results")
-                display_df = final_forecast.copy()
-                for col in ['prediction'] + quarter_cols:
-                    if col in display_df.columns:
-                        display_df[col] = display_df[col].round(2)
-                
-                st.dataframe(display_df, use_container_width=True)
-                
-                # Visualizations
-                st.subheader("📈 Forecast Visualizations")
-                
-                # Helper function for quarter formatting
-                def format_quarter_label(quarter_str):
-                    if '-' in quarter_str:
-                        parts = quarter_str.split('-')
-                        if len(parts) == 2:
-                            return f"{parts[0]} {parts[1]}"
-                    return quarter_str.replace('_', ' ').title()
-                
-                # Area-wise forecast charts
-                for area in selected_areas_forecast:
-                    area_data = final_forecast[final_forecast['area_name_en'] == area]
-                    if area_data.empty:
-                        continue
-                        
-                    st.markdown(f"### 📊 {area} Forecast")
-                    
-                    # Create forecast chart
-                    fig = go.Figure()
-                    
-                    for idx, (_, row) in enumerate(area_data.iterrows()):
-                        # Create feature label
-                        feature_label = ""
-                        for gf in grouping_features:
-                            if gf in row and row[gf] == 1:
-                                feature_label += f"{gf.replace('_', ' ').title()}, "
-                        feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
-                        
-                        # Prepare data for plotting
-                        quarters = ['Current'] + [format_quarter_label(q) for q in quarter_cols if q in row]
-                        prices = [row['prediction']] + [row[q] for q in quarter_cols if q in row]
-                        
-                        fig.add_trace(go.Scatter(
-                            x=quarters, y=prices,
-                            mode='lines+markers',
-                            name=feature_label,
-                            line=dict(width=3),
-                            marker=dict(size=8)
-                        ))
-                    
-                    fig.update_layout(
-                        title=f"Price Forecast - {area}",
-                        xaxis_title="Time Period",
-                        yaxis_title="Predicted Price (AED)",
-                        height=400,
-                        template="plotly_white"
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Growth heatmap
-                st.subheader("🔥 Growth Rate Heatmap")
-                heatmap_data = []
-                quarter_labels = [format_quarter_label(q) for q in quarter_cols]
-                
-                for area in selected_areas_forecast:
-                    area_data = final_forecast[final_forecast['area_name_en'] == area]
-                    if not area_data.empty:
-                        row = area_data.iloc[0]  # Take first configuration
-                        growth_rates = []
-                        for q in quarter_cols:
-                            if q in row:
-                                growth_rate = ((row[q] - row['prediction']) / row['prediction']) * 100
-                                growth_rates.append(growth_rate)
-                            else:
-                                growth_rates.append(0)
-                        heatmap_data.append(growth_rates)
-                
-                if heatmap_data:
-                    heatmap_df = pd.DataFrame(
-                        heatmap_data,
-                        index=selected_areas_forecast,
-                        columns=quarter_labels
-                    )
-                    
-                    fig_heat = px.imshow(
-                        heatmap_df,
-                        title="Price Growth Rate (%) by Area and Quarter",
-                        color_continuous_scale="RdYlGn",
-                        aspect="auto",
-                        labels=dict(x="Quarter", y="Area", color="Growth %")
-                    )
-                    fig_heat.update_layout(height=400)
-                    st.plotly_chart(fig_heat, use_container_width=True)
-                
-                # Download forecast results
-                csv_forecast = final_forecast.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Forecast Results",
-                    data=csv_forecast,
-                    file_name="dubai_forecast_results.csv",
-                    mime="text/csv",
-                    key="forecast_download")
-    ###########################################################################################################################################################################################################################
-    ###########################################################################################################################################################################################################################
-    
-    # =========================
-    # 🤖 MODEL INPUT / PREDICTION SECTION
-    # =========================
-
-    import streamlit as st
-    import pandas as pd
-    import numpy as np
-    import plotly.express as px
-    import plotly.graph_objects as go
-    import pickle
-    import os
-    
-    # =========================
-    # INITIALIZATION & MODEL LOADING
-    # =========================
-    @st.cache_resource
-    def load_area_models():
-        """Load all area-specific models"""
-        area_models = {}
-        area_files = [
-            "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
-            "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
-            "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
-            "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
-            "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
-            "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
-            "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
-            "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
-            "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
-            "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
-        ]
-        
-        loaded_models = {}
-        missing_models = []
-        
-        for model_file in area_files:
-            try:
-                # Extract area name from filename
-                area_name = model_file.replace('dt_model_', '').replace('.pkl', '').replace('_', ' ')
-                
-                # Load the model
-                with open(model_file, 'rb') as f:
-                    model = pickle.load(f)
-                
-                loaded_models[area_name] = model
-                st.sidebar.success(f"✅ Loaded: {area_name}")
-                
-            except FileNotFoundError:
-                missing_models.append(model_file)
-            except Exception as e:
-                st.sidebar.error(f"❌ Error loading {model_file}: {str(e)}")
-        
-        if missing_models:
-            st.sidebar.warning(f"Missing models: {len(missing_models)} files")
-        
-        return loaded_models
-    
-    # =========================
-    # LOAD ENCODER AND TRAIN COLUMNS
-    # =========================
-    @st.cache_resource
-    def load_encoder_and_columns():
-        """Load the encoder and training columns"""
-        try:
-            with open('onehot_encoder.pkl', 'rb') as f:
-                ohe = pickle.load(f)
-            with open('train_columns.pkl', 'rb') as f:
-                train_columns = pickle.load(f)
-            return ohe, train_columns
-        except Exception as e:
-            st.error(f"Error loading encoder/columns: {str(e)}")
-            return None, None
-    
-    # =========================
-    # LOAD FORECASTING DATA
-    # =========================
-    @st.cache_data
-    def load_forecasting_data():
-        """Load forecasting-specific data"""
-        try:
-            # Load test data for forecasting
-            test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
-            # Remove unnecessary columns if needed
-            test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+                        if q in row:
+                            growth_rate = ((row[q] - row['prediction']) / row['prediction']) * 100
+                            growth_rates.append(growth_rate)
+                        else:
+                            growth_rates.append(0)
+                    heatmap_data.append(growth_rates)
             
-            # Load growth factors
-            growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-            growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-            growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+            if heatmap_data:
+                heatmap_df = pd.DataFrame(
+                    heatmap_data,
+                    index=selected_areas_forecast,
+                    columns=quarter_labels
+                )
+                
+                fig_heat = px.imshow(
+                    heatmap_df,
+                    title="Price Growth Rate (%) by Area and Quarter",
+                    color_continuous_scale="RdYlGn",
+                    aspect="auto",
+                    labels=dict(x="Quarter", y="Area", color="Growth %")
+                )
+                fig_heat.update_layout(height=400)
+                st.plotly_chart(fig_heat, use_container_width=True)
             
-            return test_samples_forecast, growth_pivot
-        except Exception as e:
-            st.error(f"Error loading forecasting data: {str(e)}")
-            return None, None
-    
-    # =========================
-    # MAIN APP
-    # =========================
-    st.sidebar.title("🏠 Property Price Predictor")
-    
-    # Load models and data
-    with st.spinner("Loading models and data..."):
-        area_models = load_area_models()
-        ohe, train_columns = load_encoder_and_columns()
-        test_samples_forecast, growth_pivot = load_forecasting_data()
-    
-    # Check if essential components are loaded
-    if not area_models:
-        st.error("❌ No area models were loaded. Please check your model files.")
-        st.stop()
-    
-    if ohe is None or train_columns is None:
-        st.error("❌ Encoder or training columns not loaded properly.")
-        st.stop()
-    
+            # Download forecast results
+            csv_forecast = final_forecast.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Forecast Results",
+                data=csv_forecast,
+                file_name="dubai_forecast_results.csv",
+                mime="text/csv",
+                key="forecast_download")
+###########################################################################################################################################################################################################################
+###########################################################################################################################################################################################################################
 
-    # =========================
-    # 🤖 MODEL INPUT / PREDICTION SECTION
-    # =========================
+# =========================
+# 🤖 MODEL INPUT / PREDICTION SECTION
+# =========================
 
 import streamlit as st
 import pandas as pd
@@ -2403,397 +2287,513 @@ import plotly.graph_objects as go
 import pickle
 import os
 
-    # =========================
-    # INITIALIZATION & MODEL LOADING
-    # =========================
-    @st.cache_resource
-    def load_area_models():
-        """Load all area-specific models"""
-        area_models = {}
-        area_files = [
-            "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
-            "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
-            "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
-            "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
-            "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
-            "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
-            "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
-            "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
-            "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
-            "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
-        ]
-        
-        loaded_models = {}
-        missing_models = []
-        
-        for model_file in area_files:
-            try:
-                # Extract area name from filename
-                area_name = model_file.replace('dt_model_', '').replace('.pkl', '').replace('_', ' ')
-                
-                # Load the model
-                with open(model_file, 'rb') as f:
-                    model = pickle.load(f)
-                
-                loaded_models[area_name] = model
-                st.sidebar.success(f"✅ Loaded: {area_name}")
-                
-            except FileNotFoundError:
-                missing_models.append(model_file)
-            except Exception as e:
-                st.sidebar.error(f"❌ Error loading {model_file}: {str(e)}")
-        
-        if missing_models:
-            st.sidebar.warning(f"Missing models: {len(missing_models)} files")
-        
-        return loaded_models
+# =========================
+# INITIALIZATION & MODEL LOADING
+# =========================
+@st.cache_resource
+def load_area_models():
+    """Load all area-specific models"""
+    area_models = {}
+    area_files = [
+        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
+        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
+        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
+        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
+        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
+        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
+        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
+        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
+        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
+        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
+    ]
     
-    # =========================
-    # LOAD ENCODER AND TRAIN COLUMNS
-    # =========================
-    @st.cache_resource
-    def load_encoder_and_columns():
-        """Load the encoder and training columns"""
+    loaded_models = {}
+    missing_models = []
+    
+    for model_file in area_files:
         try:
-            with open('onehot_encoder.pkl', 'rb') as f:
-                ohe = pickle.load(f)
-            with open('train_columns.pkl', 'rb') as f:
-                train_columns = pickle.load(f)
-            return ohe, train_columns
+            # Extract area name from filename
+            area_name = model_file.replace('dt_model_', '').replace('.pkl', '').replace('_', ' ')
+            
+            # Load the model
+            with open(model_file, 'rb') as f:
+                model = pickle.load(f)
+            
+            loaded_models[area_name] = model
+            st.sidebar.success(f"✅ Loaded: {area_name}")
+            
+        except FileNotFoundError:
+            missing_models.append(model_file)
         except Exception as e:
-            st.error(f"Error loading encoder/columns: {str(e)}")
-            return None, None
+            st.sidebar.error(f"❌ Error loading {model_file}: {str(e)}")
     
-    # =========================
-    # LOAD FORECASTING DATA
-    # =========================
-    @st.cache_data
-    def load_forecasting_data():
-        """Load forecasting-specific data"""
+    if missing_models:
+        st.sidebar.warning(f"Missing models: {len(missing_models)} files")
+    
+    return loaded_models
+
+# =========================
+# LOAD ENCODER AND TRAIN COLUMNS
+# =========================
+@st.cache_resource
+def load_encoder_and_columns():
+    """Load the encoder and training columns"""
+    try:
+        with open('onehot_encoder.pkl', 'rb') as f:
+            ohe = pickle.load(f)
+        with open('train_columns.pkl', 'rb') as f:
+            train_columns = pickle.load(f)
+        return ohe, train_columns
+    except Exception as e:
+        st.error(f"Error loading encoder/columns: {str(e)}")
+        return None, None
+
+# =========================
+# LOAD FORECASTING DATA
+# =========================
+@st.cache_data
+def load_forecasting_data():
+    """Load forecasting-specific data"""
+    try:
+        # Load test data for forecasting
+        test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
+        # Remove unnecessary columns if needed
+        test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+        
+        # Load growth factors
+        growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+        growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
+        growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+        
+        return test_samples_forecast, growth_pivot
+    except Exception as e:
+        st.error(f"Error loading forecasting data: {str(e)}")
+        return None, None
+
+# =========================
+# MAIN APP
+# =========================
+st.sidebar.title("🏠 Property Price Predictor")
+
+# Load models and data
+with st.spinner("Loading models and data..."):
+    area_models = load_area_models()
+    ohe, train_columns = load_encoder_and_columns()
+    test_samples_forecast, growth_pivot = load_forecasting_data()
+
+# Check if essential components are loaded
+if not area_models:
+    st.error("❌ No area models were loaded. Please check your model files.")
+    st.stop()
+
+if ohe is None or train_columns is None:
+    st.error("❌ Encoder or training columns not loaded properly.")
+    st.stop()
+
+
+# =========================
+# 🤖 MODEL INPUT / PREDICTION SECTION
+# =========================
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import pickle
+import os
+
+# =========================
+# INITIALIZATION & MODEL LOADING
+# =========================
+@st.cache_resource
+def load_area_models():
+    """Load all area-specific models"""
+    area_models = {}
+    area_files = [
+        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
+        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
+        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
+        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
+        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
+        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
+        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
+        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
+        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
+        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
+    ]
+    
+    loaded_models = {}
+    missing_models = []
+    
+    for model_file in area_files:
         try:
-            # Load test data for forecasting
-            test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
+            # Extract area name from filename
+            area_name = model_file.replace('dt_model_', '').replace('.pkl', '').replace('_', ' ')
             
-            # Define drop columns (you need to define this variable)
-            drop_col = ['Unnamed: 0']  # Add the columns you want to drop
+            # Load the model
+            with open(model_file, 'rb') as f:
+                model = pickle.load(f)
             
-            # Remove unnecessary columns if needed
-            test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+            loaded_models[area_name] = model
+            st.sidebar.success(f"✅ Loaded: {area_name}")
             
-            # Load growth factors
-            growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-            growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-            growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
-            
-            return test_samples_forecast, growth_pivot
+        except FileNotFoundError:
+            missing_models.append(model_file)
         except Exception as e:
-            st.error(f"Error loading forecasting data: {str(e)}")
-            return None, None
+            st.sidebar.error(f"❌ Error loading {model_file}: {str(e)}")
+    
+    if missing_models:
+        st.sidebar.warning(f"Missing models: {len(missing_models)} files")
+    
+    return loaded_models
+
+# =========================
+# LOAD ENCODER AND TRAIN COLUMNS
+# =========================
+@st.cache_resource
+def load_encoder_and_columns():
+    """Load the encoder and training columns"""
+    try:
+        with open('onehot_encoder.pkl', 'rb') as f:
+            ohe = pickle.load(f)
+        with open('train_columns.pkl', 'rb') as f:
+            train_columns = pickle.load(f)
+        return ohe, train_columns
+    except Exception as e:
+        st.error(f"Error loading encoder/columns: {str(e)}")
+        return None, None
+
+# =========================
+# LOAD FORECASTING DATA
+# =========================
+@st.cache_data
+def load_forecasting_data():
+    """Load forecasting-specific data"""
+    try:
+        # Load test data for forecasting
+        test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
+        
+        # Define drop columns (you need to define this variable)
+        drop_col = ['Unnamed: 0']  # Add the columns you want to drop
+        
+        # Remove unnecessary columns if needed
+        test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+        
+        # Load growth factors
+        growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+        growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
+        growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+        
+        return test_samples_forecast, growth_pivot
+    except Exception as e:
+        st.error(f"Error loading forecasting data: {str(e)}")
+        return None, None
+
+# =========================
+# SIDEBAR NAVIGATION
+# =========================
+st.sidebar.title("🏠 Property Price Predictor")
+
+# Define sidebar options
+sidebar_option = st.sidebar.radio(
+    "Navigation",
+    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
+    index=0  # Default to first option
+)
+
+# =========================
+# MAIN APP
+# =========================
+
+# Load models and data
+with st.spinner("Loading models and data..."):
+    area_models = load_area_models()
+    ohe, train_columns = load_encoder_and_columns()
+    test_samples_forecast, growth_pivot = load_forecasting_data()
+
+# Check if essential components are loaded
+if not area_models:
+    st.error("❌ No area models were loaded. Please check your model files.")
+    st.stop()
+
+if ohe is None or train_columns is None:
+    st.error("❌ Encoder or training columns not loaded properly.")
+    st.stop()
+
+# =========================
+# 🤖 MODEL INPUT / PREDICTION SECTION
+# =========================
+if sidebar_option == "🤖 Model Input / Prediction":
+    st.header("🤖 Property Price Prediction")
+    st.markdown("Predict property prices for specific area and features")
     
     # =========================
-    # SIDEBAR NAVIGATION
+    # USER INPUT FORM
     # =========================
-    st.sidebar.title("🏠 Property Price Predictor")
+    st.sidebar.subheader("🏠 Property Features")
     
-    # Define sidebar options
-    sidebar_option = st.sidebar.radio(
-        "Navigation",
-        ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
-        index=0  # Default to first option
+    # Get available areas from the loaded models
+    available_areas = list(area_models.keys())
+    
+    # Area selection
+    selected_area = st.sidebar.selectbox(
+        "Select Area",
+        options=available_areas,
+        key="selected_area"
     )
     
-    # =========================
-    # MAIN APP
-    # =========================
+    # Property features input
+    st.sidebar.subheader("Property Features")
     
-    # Load models and data
-    with st.spinner("Loading models and data..."):
-        area_models = load_area_models()
-        ohe, train_columns = load_encoder_and_columns()
-        test_samples_forecast, growth_pivot = load_forecasting_data()
+    # Define available options for categorical features
+    rooms_options = ['1 B/R', 'Studio', '2 B/R', '3 B/R', 'PENTHOUSE', 'More than 3B/R']
+    floor_bin_options = ['1-10', '11-20', '41-50', '21-30', 'Below 1st floor', '31-40',
+   '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
+   '71-80', 'Duplex']
     
-    # Check if essential components are loaded
-    if not area_models:
-        st.error("❌ No area models were loaded. Please check your model files.")
-        st.stop()
+    col1, col2 = st.sidebar.columns(2)
     
-    if ohe is None or train_columns is None:
-        st.error("❌ Encoder or training columns not loaded properly.")
-        st.stop()
+    with col1:
+        rooms_en = st.selectbox("Number of Rooms", options=rooms_options, index=2)
+        floor_bin = st.selectbox("Floor Level", options=floor_bin_options, index=1)
+        swimming_pool = st.selectbox("Swimming Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        balcony = st.selectbox("Balcony", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+    
+    with col2:
+        elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        procedure_area = st.number_input("Area (sqft)", min_value=100, max_value=10000, value=1000, step=100)
     
     # =========================
-    # 🤖 MODEL INPUT / PREDICTION SECTION
+    # PREPARE INPUT DATA FUNCTION
     # =========================
-    if sidebar_option == "🤖 Model Input / Prediction":
-        st.header("🤖 Property Price Prediction")
-        st.markdown("Predict property prices for specific area and features")
+    def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
+        """Prepare user input for prediction"""
         
-        # =========================
-        # USER INPUT FORM
-        # =========================
-        st.sidebar.subheader("🏠 Property Features")
+        # Create a DataFrame with the input values
+        input_data = pd.DataFrame({
+            'rooms_en': [rooms],
+            'floor_bin': [floor],
+            'swimming_pool': [pool],
+            'balcony': [balcony_val],
+            'elevator': [elevator_val],
+            'metro': [metro_val],
+            'has_parking': [parking],
+            'area_name_en': [area],
+            'procedure_area': [area_size]
+        })
         
-        # Get available areas from the loaded models
-        available_areas = list(area_models.keys())
+        st.write("📊 Input Data Prepared:")
+        st.dataframe(input_data)
         
-        # Area selection
-        selected_area = st.sidebar.selectbox(
-            "Select Area",
-            options=available_areas,
-            key="selected_area"
-        )
+        # Separate area name for later use
+        area_name = input_data['area_name_en'].iloc[0]
+        input_no_area = input_data.drop(columns=['area_name_en'])
         
-        # Property features input
-        st.sidebar.subheader("Property Features")
+        # Apply one-hot encoding to categorical columns
+        cat_cols = ['rooms_en', 'floor_bin']
         
-        # Define available options for categorical features
-        rooms_options = ['1 B/R', 'Studio', '2 B/R', '3 B/R', 'PENTHOUSE', 'More than 3B/R']
-        floor_bin_options = ['1-10', '11-20', '41-50', '21-30', 'Below 1st floor', '31-40',
-       '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
-       '71-80', 'Duplex']
-        
-        col1, col2 = st.sidebar.columns(2)
-        
-        with col1:
-            rooms_en = st.selectbox("Number of Rooms", options=rooms_options, index=2)
-            floor_bin = st.selectbox("Floor Level", options=floor_bin_options, index=1)
-            swimming_pool = st.selectbox("Swimming Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            balcony = st.selectbox("Balcony", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        
-        with col2:
-            elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-            procedure_area = st.number_input("Area (sqft)", min_value=100, max_value=10000, value=1000, step=100)
-        
-        # =========================
-        # PREPARE INPUT DATA FUNCTION
-        # =========================
-        def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
-            """Prepare user input for prediction"""
+        try:
+            # Transform using the fitted OHE
+            X_cat = ohe.transform(input_no_area[cat_cols])
+            X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
             
-            # Create a DataFrame with the input values
-            input_data = pd.DataFrame({
-                'rooms_en': [rooms],
-                'floor_bin': [floor],
-                'swimming_pool': [pool],
-                'balcony': [balcony_val],
-                'elevator': [elevator_val],
-                'metro': [metro_val],
-                'has_parking': [parking],
-                'area_name_en': [area],
-                'procedure_area': [area_size]
-            })
+            # Combine with numerical features
+            X_numerical = input_no_area.drop(columns=cat_cols)
+            X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
             
-            st.write("📊 Input Data Prepared:")
-            st.dataframe(input_data)
-            
-            # Separate area name for later use
-            area_name = input_data['area_name_en'].iloc[0]
-            input_no_area = input_data.drop(columns=['area_name_en'])
-            
-            # Apply one-hot encoding to categorical columns
-            cat_cols = ['rooms_en', 'floor_bin']
-            
-            try:
-                # Transform using the fitted OHE
-                X_cat = ohe.transform(input_no_area[cat_cols])
-                X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
-                
-                # Combine with numerical features
-                X_numerical = input_no_area.drop(columns=cat_cols)
-                X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
-                
-                st.write("🔧 After One-Hot Encoding:")
-                st.dataframe(X_processed)
-                
-            except Exception as e:
-                st.error(f"Error in encoding: {str(e)}")
-                return None, None, None
-            
-            # Ensure we have all training columns
-            for col in train_columns:
-                if col not in X_processed.columns:
-                    X_processed[col] = 0
-            
-            # Select only the columns that were used during training
-            X_processed = X_processed[train_columns]
-            X_processed = X_processed.select_dtypes(include=[np.number])
-            
-            st.write("🎯 Final Processed Features for Prediction:")
+            st.write("🔧 After One-Hot Encoding:")
             st.dataframe(X_processed)
             
-            return X_processed, area_name, input_data
-    
-        # =========================
-        # PREDICTION EXECUTION
-        # =========================
-        if st.sidebar.button("🚀 Predict Price", type="primary", key="predict_button"):
-            with st.spinner("Generating prediction..."):
-                # Prepare input data
-                X_input, area_name, original_input = prepare_input_data(
-                    selected_area, rooms_en, floor_bin, swimming_pool, balcony, 
-                    elevator, metro, has_parking, procedure_area
-                )
-                
-                if X_input is None:
-                    st.error("❌ Failed to prepare input data")
-                    st.stop()
-                
-                # Get the model for the selected area
-                if area_name in area_models:
-                    model = area_models[area_name]
-                    
-                    try:
-                        # Make prediction
-                        predicted_price = model.predict(X_input)[0]
-                        
-                        # =========================
-                        # DISPLAY PREDICTION RESULTS
-                        # =========================
-                        st.success("✅ Prediction Generated!")
-                        
-                        # Display input summary
-                        st.subheader("📋 Property Details")
-                        input_display = original_input.copy()
-                        input_display = input_display.T.reset_index()
-                        input_display.columns = ['Feature', 'Value']
-                        
-                        # Format the display
-                        feature_display_map = {
-                            'rooms_en': 'Number of Rooms',
-                            'floor_bin': 'Floor Level',
-                            'swimming_pool': 'Swimming Pool',
-                            'balcony': 'Balcony',
-                            'elevator': 'Elevator',
-                            'metro': 'Near Metro',
-                            'has_parking': 'Parking',
-                            'area_name_en': 'Area',
-                            'procedure_area': 'Area (sqft)'
-                        }
-                        
-                        input_display['Feature'] = input_display['Feature'].map(feature_display_map)
-                        input_display['Value'] = input_display['Value'].apply(
-                            lambda x: "Yes" if x == 1 else "No" if x == 0 else x
-                        )
-                        
-                        st.table(input_display)
-                        
-                        # Display prediction
-                        st.subheader("💰 Price Prediction")
-                        col1, col2, col3 = st.columns([1, 2, 1])
-                        with col2:
-                            st.metric(
-                                label="Predicted Property Price",
-                                value=f"AED {predicted_price:,.0f}",
-                                delta=None
-                            )
-                        
-                        # =========================
-                        # FORECASTING WITH GROWTH FACTORS
-                        # =========================
-                        if growth_pivot is not None:
-                            st.subheader("📈 Price Forecast")
-                            
-                            # Get growth factors for the selected area
-                            area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
-                            
-                            if not area_growth.empty:
-                                # Prepare forecast data
-                                forecast_data = []
-                                current_price = predicted_price
-                                
-                                # Current quarter
-                                forecast_data.append({
-                                    'Period': 'Current',
-                                    'Price': current_price,
-                                    'Growth_Rate': 0
-                                })
-                                
-                                # Future quarters
-                                quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
-                                
-                                for quarter in quarter_cols:
-                                    if quarter in area_growth.columns:
-                                        growth_factor = area_growth[quarter].iloc[0]
-                                        forecast_price = current_price * growth_factor
-                                        growth_rate = ((forecast_price - current_price) / current_price) * 100
-                                        
-                                        forecast_data.append({
-                                            'Period': quarter.replace('_', ' ').title(),
-                                            'Price': forecast_price,
-                                            'Growth_Rate': growth_rate
-                                        })
-                                
-                                forecast_df = pd.DataFrame(forecast_data)
-                                
-                                # Display forecast table
-                                st.write("**Forecast Table:**")
-                                display_forecast = forecast_df.copy()
-                                display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
-                                display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
-                                st.dataframe(display_forecast, use_container_width=True)
-                                
-                                # Create forecast chart
-                                fig = go.Figure()
-                                
-                                fig.add_trace(go.Scatter(
-                                    x=forecast_df['Period'],
-                                    y=forecast_df['Price'],
-                                    mode='lines+markers+text',
-                                    line=dict(color='#1f77b4', width=4),
-                                    marker=dict(size=10, color='#ff7f0e'),
-                                    text=[f"AED {x:,.0f}" for x in forecast_df['Price']],
-                                    textposition="top center",
-                                    name='Predicted Price'
-                                ))
-                                
-                                fig.update_layout(
-                                    title=f"Price Forecast - {area_name}",
-                                    xaxis_title="Time Period",
-                                    yaxis_title="Predicted Price (AED)",
-                                    height=500,
-                                    template="plotly_white",
-                                    showlegend=False
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                            else:
-                                st.warning(f"No growth factors available for {area_name}")
-                        else:
-                            st.warning("Growth factors data not available")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Prediction error: {str(e)}")
-                    
-                else:
-                    st.error(f"❌ No model found for area: {area_name}")
+        except Exception as e:
+            st.error(f"Error in encoding: {str(e)}")
+            return None, None, None
         
-        else:
-            st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
-    
+        # Ensure we have all training columns
+        for col in train_columns:
+            if col not in X_processed.columns:
+                X_processed[col] = 0
+        
+        # Select only the columns that were used during training
+        X_processed = X_processed[train_columns]
+        X_processed = X_processed.select_dtypes(include=[np.number])
+        
+        st.write("🎯 Final Processed Features for Prediction:")
+        st.dataframe(X_processed)
+        
+        return X_processed, area_name, input_data
+
     # =========================
-    # OTHER SECTIONS (Placeholder)
+    # PREDICTION EXECUTION
     # =========================
-    elif sidebar_option == "📂 Data Files":
-        st.header("📂 Data Files")
-        st.write("Data files section content...")
+    if st.sidebar.button("🚀 Predict Price", type="primary", key="predict_button"):
+        with st.spinner("Generating prediction..."):
+            # Prepare input data
+            X_input, area_name, original_input = prepare_input_data(
+                selected_area, rooms_en, floor_bin, swimming_pool, balcony, 
+                elevator, metro, has_parking, procedure_area
+            )
+            
+            if X_input is None:
+                st.error("❌ Failed to prepare input data")
+                st.stop()
+            
+            # Get the model for the selected area
+            if area_name in area_models:
+                model = area_models[area_name]
+                
+                try:
+                    # Make prediction
+                    predicted_price = model.predict(X_input)[0]
+                    
+                    # =========================
+                    # DISPLAY PREDICTION RESULTS
+                    # =========================
+                    st.success("✅ Prediction Generated!")
+                    
+                    # Display input summary
+                    st.subheader("📋 Property Details")
+                    input_display = original_input.copy()
+                    input_display = input_display.T.reset_index()
+                    input_display.columns = ['Feature', 'Value']
+                    
+                    # Format the display
+                    feature_display_map = {
+                        'rooms_en': 'Number of Rooms',
+                        'floor_bin': 'Floor Level',
+                        'swimming_pool': 'Swimming Pool',
+                        'balcony': 'Balcony',
+                        'elevator': 'Elevator',
+                        'metro': 'Near Metro',
+                        'has_parking': 'Parking',
+                        'area_name_en': 'Area',
+                        'procedure_area': 'Area (sqft)'
+                    }
+                    
+                    input_display['Feature'] = input_display['Feature'].map(feature_display_map)
+                    input_display['Value'] = input_display['Value'].apply(
+                        lambda x: "Yes" if x == 1 else "No" if x == 0 else x
+                    )
+                    
+                    st.table(input_display)
+                    
+                    # Display prediction
+                    st.subheader("💰 Price Prediction")
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    with col2:
+                        st.metric(
+                            label="Predicted Property Price",
+                            value=f"AED {predicted_price:,.0f}",
+                            delta=None
+                        )
+                    
+                    # =========================
+                    # FORECASTING WITH GROWTH FACTORS
+                    # =========================
+                    if growth_pivot is not None:
+                        st.subheader("📈 Price Forecast")
+                        
+                        # Get growth factors for the selected area
+                        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
+                        
+                        if not area_growth.empty:
+                            # Prepare forecast data
+                            forecast_data = []
+                            current_price = predicted_price
+                            
+                            # Current quarter
+                            forecast_data.append({
+                                'Period': 'Current',
+                                'Price': current_price,
+                                'Growth_Rate': 0
+                            })
+                            
+                            # Future quarters
+                            quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                            
+                            for quarter in quarter_cols:
+                                if quarter in area_growth.columns:
+                                    growth_factor = area_growth[quarter].iloc[0]
+                                    forecast_price = current_price * growth_factor
+                                    growth_rate = ((forecast_price - current_price) / current_price) * 100
+                                    
+                                    forecast_data.append({
+                                        'Period': quarter.replace('_', ' ').title(),
+                                        'Price': forecast_price,
+                                        'Growth_Rate': growth_rate
+                                    })
+                            
+                            forecast_df = pd.DataFrame(forecast_data)
+                            
+                            # Display forecast table
+                            st.write("**Forecast Table:**")
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
+                            display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
+                            st.dataframe(display_forecast, use_container_width=True)
+                            
+                            # Create forecast chart
+                            fig = go.Figure()
+                            
+                            fig.add_trace(go.Scatter(
+                                x=forecast_df['Period'],
+                                y=forecast_df['Price'],
+                                mode='lines+markers+text',
+                                line=dict(color='#1f77b4', width=4),
+                                marker=dict(size=10, color='#ff7f0e'),
+                                text=[f"AED {x:,.0f}" for x in forecast_df['Price']],
+                                textposition="top center",
+                                name='Predicted Price'
+                            ))
+                            
+                            fig.update_layout(
+                                title=f"Price Forecast - {area_name}",
+                                xaxis_title="Time Period",
+                                yaxis_title="Predicted Price (AED)",
+                                height=500,
+                                template="plotly_white",
+                                showlegend=False
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                        else:
+                            st.warning(f"No growth factors available for {area_name}")
+                    else:
+                        st.warning("Growth factors data not available")
+                        
+                except Exception as e:
+                    st.error(f"❌ Prediction error: {str(e)}")
+                
+            else:
+                st.error(f"❌ No model found for area: {area_name}")
     
-    elif sidebar_option == "📊 EDA & Feature Engineering":
-        st.header("📊 EDA & Feature Engineering")
-        st.write("EDA section content...")
-    
-    elif sidebar_option == "📈 Model Results":
-        st.header("📈 Model Results")
-        st.write("Model results section content...")
-    
-    # =========================
-    # DEBUG INFORMATION
-    # =========================
-    if st.sidebar.checkbox("Show Debug Info"):
-        st.sidebar.subheader("Debug Information")
-        st.sidebar.write(f"Models loaded: {len(area_models)}")
-        st.sidebar.write(f"Available areas: {list(area_models.keys())}")
-        st.sidebar.write(f"OHE loaded: {ohe is not None}")
-        st.sidebar.write(f"Train columns: {len(train_columns) if train_columns else 0}")
+    else:
+        st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
+
+# =========================
+# OTHER SECTIONS (Placeholder)
+# =========================
+elif sidebar_option == "📂 Data Files":
+    st.header("📂 Data Files")
+    st.write("Data files section content...")
+
+elif sidebar_option == "📊 EDA & Feature Engineering":
+    st.header("📊 EDA & Feature Engineering")
+    st.write("EDA section content...")
+
+elif sidebar_option == "📈 Model Results":
+    st.header("📈 Model Results")
+    st.write("Model results section content...")
+
+# =========================
+# DEBUG INFORMATION
+# =========================
+if st.sidebar.checkbox("Show Debug Info"):
+    st.sidebar.subheader("Debug Information")
+    st.sidebar.write(f"Models loaded: {len(area_models)}")
+    st.sidebar.write(f"Available areas: {list(area_models.keys())}")
+    st.sidebar.write(f"OHE loaded: {ohe is not None}")
+    st.sidebar.write(f"Train columns: {len(train_columns) if train_columns else 0}")
