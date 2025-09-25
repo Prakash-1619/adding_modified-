@@ -2475,10 +2475,10 @@ def load_forecasting_data():
         test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
         
         # Define drop columns (you need to define this variable)
-        drop_col = ['Unnamed: 0']  # Add the columns you want to drop
+        #drop_col = ['Unnamed: 0']  # Add the columns you want to drop
         
         # Remove unnecessary columns if needed
-        test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
+        #test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
         
         # Load growth factors
         growth_df = pd.read_csv('arima_areas_growth_6M.csv')
@@ -2493,14 +2493,13 @@ def load_forecasting_data():
 # =========================
 # SIDEBAR NAVIGATION
 # =========================
-st.sidebar.title("🏠 Property Price Predictor")
+#st.sidebar.title("🏠 Property Price Predictor")
 
 # Define sidebar options
-sidebar_option = st.sidebar.radio(
-    "Navigation",
-    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
-    index=0  # Default to first option
-)
+#sidebar_option = st.sidebar.radio(
+    #"Navigation",
+    #["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
+    #index=0  # Default to first option)
 
 # =========================
 # MAIN APP
@@ -2773,20 +2772,6 @@ if sidebar_option == "🤖 Model Input / Prediction":
     else:
         st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
 
-# =========================
-# OTHER SECTIONS (Placeholder)
-# =========================
-elif sidebar_option == "📂 Data Files":
-    st.header("📂 Data Files")
-    st.write("Data files section content...")
-
-elif sidebar_option == "📊 EDA & Feature Engineering":
-    st.header("📊 EDA & Feature Engineering")
-    st.write("EDA section content...")
-
-elif sidebar_option == "📈 Model Results":
-    st.header("📈 Model Results")
-    st.write("Model results section content...")
 
 # =========================
 # DEBUG INFORMATION
