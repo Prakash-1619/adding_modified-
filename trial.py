@@ -2080,7 +2080,7 @@ if sidebar_option == "📈 Model Results":
             # and X_test_forecast is only for prediction input.
 
         except Exception as e:
-            st.error(f"❌ Error preparing forecasting data: {str(e)}")
+           # st.error(f"❌ Error preparing forecasting data: {str(e)}")
             st.stop()
         
         # =========================
@@ -2367,7 +2367,7 @@ def load_forecasting_data():
         
         return test_samples_forecast, growth_pivot
     except Exception as e:
-        st.error(f"Error loading forecasting data: {str(e)}")
+        #st.error(f"Error loading forecasting data: {str(e)}")
         return None, None
 
 # =========================
