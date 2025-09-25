@@ -2339,7 +2339,7 @@ if sidebar_option == "📈 Model Results":
     def load_encoder_and_columns():
         """Load the encoder and training columns"""
         try:
-            with open('ohe.pkl', 'rb') as f:
+            with open('onehot_encoder.pkl', 'rb') as f:
                 ohe = pickle.load(f)
             with open('train_columns.pkl', 'rb') as f:
                 train_columns = pickle.load(f)
