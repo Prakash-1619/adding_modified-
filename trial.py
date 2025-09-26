@@ -2282,15 +2282,33 @@ if sidebar_option == "📈 Model Results":
                 
                 # Add future overall forecast
                 future_prices = []
+                valid_future_quarters = []
+                
                 for area in selected_areas_forecast:
                     area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
                     if not area_data.empty:
-                        future_prices.append([area_data[q].iloc[0] for q in future_quarter_cols if q in area_data.columns])
+                        area_future_prices = []
+                        for q in future_quarter_cols:
+                            if q in area_data.columns and pd.notna(area_data[q].iloc[0]):
+                                area_future_prices.append(area_data[q].iloc[0])
+                                if q not in valid_future_quarters:
+                                    valid_future_quarters.append(q)
+                        if area_future_prices:  # Only add if we have future prices for this area
+                            future_prices.append(area_future_prices)
                 
                 if future_prices:
                     # Calculate median future prices across all areas
-                    future_median_prices = np.median(future_prices, axis=0)
-                    future_labels = [format_quarter_label(q) for q in future_quarter_cols if any(q in df.columns for df in future_prices)]
+                    # Ensure all arrays are the same length by padding with NaN if necessary
+                    max_len = max(len(prices) for prices in future_prices)
+                    padded_prices = []
+                    for prices in future_prices:
+                        if len(prices) < max_len:
+                            padded_prices.append(prices + [np.nan] * (max_len - len(prices)))
+                        else:
+                            padded_prices.append(prices)
+                    
+                    future_median_prices = np.nanmedian(padded_prices, axis=0)
+                    future_labels = [format_quarter_label(q) for q in valid_future_quarters]
                     
                     time_periods.extend(future_labels)
                     overall_prices.extend(future_median_prices)
