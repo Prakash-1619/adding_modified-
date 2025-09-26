@@ -2010,17 +2010,13 @@ import plotly.graph_objects as go
 import plotly.express as px
     
     # =========================
-    # Tab setup
-    # =========================
-    #tab1, tab2 = st.tabs(["📊 Overall Forecast", "🧩 Feature-wise Forecast"])
-    
-    # =========================
     # Tab 2: Price Forecasting
     # =========================
     with tab2:
+        
         st.header("🔮 Price Forecasting")
         st.markdown("Area-wise predictions with growth factor projections")
-    
+        
         # =========================
         # Load Forecasting Data
         # =========================
@@ -2031,29 +2027,24 @@ import plotly.express as px
                 test_samples_forecast = test_samples_forecast.drop(
                     columns=[col for col in drop_col if col in test_samples_forecast.columns]
                 )
-                # Show raw data for debugging
-                st.dataframe(test_samples_forecast.head())
-    
-                # Drop unnecessary columns
+                st.dataframe(test_samples_forecast.head())  # Show raw data
+        
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
                 columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
                 X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
-    
-                # Load training columns
+        
                 with open("train_columns.pkl", "rb") as f:
                     train_columns = pickle.load(f)
-    
-                # Load growth factors
-                growth_df = pd.read_csv('arima_forecast_df_quarterly
-                .csv')
+        
+                growth_df = pd.read_csv('arima_forecast_df_quarterly.csv')
                 growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
                 growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
-    
+        
                 return test_samples_forecast, X_test_forecast, train_columns, growth_pivot
             except Exception as e:
                 st.error(f"Error loading forecasting data: {str(e)}")
                 return None, None, None, None
-    
+        
         # Load data
         with st.spinner("Loading forecasting data..."):
             test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot = load_forecasting_data()
@@ -2061,14 +2052,14 @@ import plotly.express as px
         if test_samples_forecast is None:
             st.error("❌ Failed to load forecasting data")
             st.stop()
-    
+        
         # =========================
-        # Prepare test data
+        # Prepare Test Data
         # =========================
         try:
             area_names_forecast = X_test_forecast_raw['area_name_en']
             X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
-    
+        
             cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
             if cat_cols:
                 X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
@@ -2077,21 +2068,21 @@ import plotly.express as px
                 X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
             else:
                 X_test_forecast = X_test_forecast_no_area.copy()
-    
+        
             for col in train_columns:
                 if col not in X_test_forecast.columns:
                     X_test_forecast[col] = 0
-    
+        
             X_test_forecast = X_test_forecast[train_columns]
             X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
         except Exception as e:
             st.stop()
-    
+        
         # =========================
         # Forecasting Controls
         # =========================
         st.sidebar.title("🔧 Forecast Controls")
-    
+        
         available_areas = list(area_models.keys())
         selected_areas_forecast = st.sidebar.multiselect(
             "Select Areas for Forecasting",
@@ -2099,7 +2090,7 @@ import plotly.express as px
             default=available_areas[:4] if len(available_areas) > 4 else available_areas,
             key="forecast_areas"
         )
-    
+        
         grouping_options = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
         selected_grouping = st.sidebar.selectbox(
             "Group by Feature",
@@ -2107,7 +2098,7 @@ import plotly.express as px
             index=0,
             key="grouping_feature"
         )
-    
+        
         # =========================
         # Generate Forecast
         # =========================
@@ -2115,7 +2106,7 @@ import plotly.express as px
             if len(selected_areas_forecast) == 0:
                 st.warning("Please select at least one area for forecasting")
                 st.stop()
-    
+        
             with st.spinner("Generating forecasts..."):
                 if selected_grouping == 'rooms_en':
                     grouping_features = [col for col in X_test_forecast.columns if col.startswith("rooms_en_")]
@@ -2123,53 +2114,52 @@ import plotly.express as px
                     grouping_features = [col for col in X_test_forecast.columns if col.startswith("floor_bin_")]
                 else:
                     grouping_features = [selected_grouping]
-    
+        
                 pred_list = []
-    
+        
                 for area in selected_areas_forecast:
                     if area not in area_models:
                         continue
-    
+        
                     model = area_models[area]
                     mask = test_samples_forecast['area_name_en'] == area
                     X_area_test = X_test_forecast.loc[mask]
-    
+        
                     if len(X_area_test) > 0:
                         y_pred = model.predict(X_area_test)
-    
+        
                         df_area_pred = X_area_test[grouping_features].copy()
                         df_area_pred['area_name_en'] = area
                         df_area_pred['prediction'] = y_pred
                         pred_list.append(df_area_pred)
-    
+        
                 if not pred_list:
                     st.error("No predictions generated. Check area selection.")
                     st.stop()
-    
+        
                 pred_df = pd.concat(pred_list)
                 group_cols = ['area_name_en'] + grouping_features
                 median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
                 forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
-    
+        
                 quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
                 for q in quarter_cols:
                     if q in forecast_df.columns:
                         forecast_df[q] = forecast_df['prediction'] * forecast_df[q]
-    
+        
                 final_forecast = forecast_df[group_cols + ['prediction'] + quarter_cols]
-    
+        
             # =========================
-            # Show Forecast Table with Actuals
+            # Show Forecast Table
             # =========================
             st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
             st.subheader("📋 Forecast Data with Actuals")
-    
             display_df = final_forecast.copy()
             for col in ['prediction'] + quarter_cols:
                 if col in display_df.columns:
                     display_df[col] = display_df[col].round(2)
             st.dataframe(display_df, use_container_width=True)
-    
+        
             # =========================
             # Area-wise Forecast Plots
             # =========================
@@ -2180,18 +2170,18 @@ import plotly.express as px
                     if len(parts) == 2:
                         return f"{parts[0]} {parts[1]}"
                 return quarter_str.replace('_', ' ').title()
-    
+        
             for area in selected_areas_forecast:
                 area_data = final_forecast[final_forecast['area_name_en'] == area]
                 actual_area_data = arima_forecast_df_quarterly[arima_forecast_df_quarterly['area_name_en'] == area]
-    
+        
                 if area_data.empty and actual_area_data.empty:
                     continue
-    
+        
                 st.markdown(f"### 📊 {area} Forecast vs Actual")
                 fig = go.Figure()
-    
-                # Plot actual
+        
+                # Plot actuals
                 if not actual_area_data.empty:
                     actual_df = actual_area_data[actual_area_data['type'] == 'fitted']
                     fig.add_trace(go.Scatter(
@@ -2202,7 +2192,7 @@ import plotly.express as px
                         line=dict(color='blue', width=3),
                         marker=dict(size=6)
                     ))
-    
+        
                 # Plot forecast
                 for idx, (_, row) in area_data.iterrows():
                     feature_label = ""
@@ -2210,10 +2200,10 @@ import plotly.express as px
                         if gf in row and row[gf] == 1:
                             feature_label += f"{gf.replace('_', ' ').title()}, "
                     feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
-    
+        
                     quarters = ['Current'] + [format_quarter_label(q) for q in quarter_cols if q in row]
                     prices = [row['prediction']] + [row[q] for q in quarter_cols if q in row]
-    
+        
                     fig.add_trace(go.Scatter(
                         x=quarters,
                         y=prices,
@@ -2222,7 +2212,7 @@ import plotly.express as px
                         line=dict(width=3),
                         marker=dict(size=8)
                     ))
-    
+        
                 # Connect last actual to first forecast
                 if not actual_area_data.empty and not area_data.empty:
                     last_actual = actual_df['actual'].iloc[-1]
@@ -2234,7 +2224,7 @@ import plotly.express as px
                         line=dict(color='green', dash='dash'),
                         name='Connection'
                     ))
-    
+        
                 fig.update_layout(
                     title=f"Price Forecast vs Actual - {area}",
                     xaxis_title="Quarter",
@@ -2243,16 +2233,16 @@ import plotly.express as px
                     height=400,
                     hovermode="x unified"
                 )
-    
+        
                 st.plotly_chart(fig, use_container_width=True)
-    
+        
             # =========================
             # Growth Heatmap
             # =========================
             st.subheader("🔥 Growth Rate Heatmap")
             heatmap_data = []
             quarter_labels = [format_quarter_label(q) for q in quarter_cols]
-    
+        
             for area in selected_areas_forecast:
                 area_data = final_forecast[final_forecast['area_name_en'] == area]
                 if not area_data.empty:
@@ -2265,14 +2255,14 @@ import plotly.express as px
                         else:
                             growth_rates.append(0)
                     heatmap_data.append(growth_rates)
-    
+        
             if heatmap_data:
                 heatmap_df = pd.DataFrame(
                     heatmap_data,
                     index=selected_areas_forecast,
                     columns=quarter_labels
                 )
-    
+        
                 fig_heat = px.imshow(
                     heatmap_df,
                     title="Price Growth Rate (%) by Area and Quarter",
@@ -2282,9 +2272,9 @@ import plotly.express as px
                 )
                 fig_heat.update_layout(height=400)
                 st.plotly_chart(fig_heat, use_container_width=True)
-    
+        
             # =========================
-            # Download Forecast Results
+            # Download CSV
             # =========================
             csv_forecast = final_forecast.to_csv(index=False)
             st.download_button(
@@ -2294,6 +2284,7 @@ import plotly.express as px
                 mime="text/csv",
                 key="forecast_download"
             )
+
 
 
 ###########################################################################################################################################################################################################################
