@@ -2003,7 +2003,7 @@ if sidebar_option == "📈 Model Results":
 
 ####################################################################________________________>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>______________________________________################################################
     with tab2:
-                #st.header("🔮 Price Forecasting")
+         #st.header("🔮 Price Forecasting")
         #st.markdown("Area-wise predictions with growth factor projections")
         
         # =========================
@@ -2051,35 +2051,14 @@ if sidebar_option == "📈 Model Results":
                 recent_quarters = sorted(historical_median['year_quarter'].unique())#[-12:]
                 historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
                 
-                # NEW: Load and prepare historical feature-wise data
-                # Extract feature information from training data
-                feature_columns = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
-                available_features = [col for col in feature_columns if col in train_data.columns]
-                
-                # Create historical feature-wise trends
-                historical_feature_trends = {}
-                
-                for feature in available_features:
-                    if feature in ['rooms_en', 'floor_bin']:
-                        # For categorical features with multiple values
-                        feature_trend = train_data.groupby(['area_name_en', 'year_quarter', feature])['meter_sale_price'].median().reset_index()
-                        historical_feature_trends[feature] = feature_trend
-                    else:
-                        # For binary features
-                        feature_trend = train_data.groupby(['area_name_en', 'year_quarter']).agg({
-                            'meter_sale_price': 'median',
-                            feature: 'mean'  # Average presence of the feature
-                        }).reset_index()
-                        historical_feature_trends[feature] = feature_trend
-                
-                return test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot, historical_feature_trends
+                return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot
             except Exception as e:
                 st.error(f"Error loading forecasting data: {str(e)}")
-                return None, None, None, None, None, None, None, None
+                return None, None, None, None, None, None, None
 
         # Load data for forecasting
         with st.spinner("Loading forecasting data..."):
-            test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, historical_pivot, historical_quarters, overall_historical_pivot, historical_feature_trends = load_forecasting_data()
+            test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, historical_pivot, historical_quarters, overall_historical_pivot = load_forecasting_data()
 
         if test_samples_forecast is None:
             st.error("❌ Failed to load forecasting data")
@@ -2138,13 +2117,6 @@ if sidebar_option == "📈 Model Results":
             index=0,
             key="grouping_feature_sidebar"
         )
-        
-        # NEW: Historical feature trend options
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📈 Historical Feature Trends")
-        show_feature_history = st.sidebar.checkbox("Show Feature-wise Historical Trends", value=True, key="show_feature_history")
-        historical_years = st.sidebar.slider("Years of Historical Data to Show", 
-                                           min_value=1, max_value=5, value=2, key="hist_years")
         
         # Display options
         st.sidebar.markdown("---")
@@ -2265,55 +2237,6 @@ if sidebar_option == "📈 Model Results":
                         overall_display_df[col] = overall_display_df[col].round(2)
                 st.dataframe(overall_display_df, use_container_width=True)
             
-            # NEW: FEATURE-WISE HISTORICAL TREND ANALYSIS
-            if show_feature_history and historical_feature_trends is not None:
-                st.subheader("📊 Feature-wise Historical Trends")
-                
-                # Calculate current year and previous years
-                current_year = pd.Timestamp.now().year
-                previous_years = [current_year - i for i in range(1, historical_years + 1)]
-                
-                for area in selected_areas_forecast:
-                    area_feature_data = final_forecast[final_forecast['area_name_en'] == area]
-                    
-                    if area_feature_data.empty:
-                        continue
-                    
-                    st.markdown(f"### 🏘️ {area} - Feature Historical Trends")
-                    
-                    # Create tabs for different feature configurations
-                    feature_configs = []
-                    for idx, (_, row) in enumerate(area_feature_data.iterrows()):
-                        # Create feature configuration label
-                        config_label = ""
-                        for gf in grouping_features:
-                            if gf in row and row[gf] == 1:
-                                feature_name = gf.replace(f"{selected_grouping}_", "").replace("_", " ").title()
-                                config_label += f"{feature_name}, "
-                        config_label = config_label.rstrip(", ") or f"Configuration {idx+1}"
-                        feature_configs.append((config_label, row))
-                    
-                    # Display each feature configuration in tabs
-                    if len(feature_configs) > 1:
-                        tabs = st.tabs([config[0] for config in feature_configs])
-                        
-                        for tab, (config_label, row) in zip(tabs, feature_configs):
-                            with tab:
-                                self.create_feature_historical_chart(
-                                    area, config_label, row, selected_grouping, 
-                                    historical_feature_trends, previous_years, 
-                                    show_historical, selected_historical, future_quarter_cols
-                                )
-                    else:
-                        # Single configuration - no tabs needed
-                        config_label, row = feature_configs[0]
-                        self.create_feature_historical_chart(
-                            area, config_label, row, selected_grouping,
-                            historical_feature_trends, previous_years,
-                            show_historical, selected_historical, future_quarter_cols
-                        )
-            
-            # Rest of your existing visualization code remains the same...
             # Visualizations
             st.subheader("📈 Forecast Visualizations")
             
@@ -2328,7 +2251,96 @@ if sidebar_option == "📈 Model Results":
             # 1. OVERALL MARKET TREND (ACROSS ALL SELECTED AREAS)
             if show_overall_trend:
                 st.markdown("### 🌐 Overall Market Trend")
-                # ... (rest of your existing overall market trend code)
+                fig_overall = go.Figure()
+                
+                # Add overall historical trend line
+                if show_historical and overall_historical_pivot:
+                    historical_quarters_sorted = sorted([q for q in overall_historical_pivot.keys() if q in selected_historical])
+                    historical_prices = [overall_historical_pivot[q] for q in historical_quarters_sorted]
+                    historical_labels = [format_quarter_label(q) for q in historical_quarters_sorted]
+                    
+                    fig_overall.add_trace(go.Scatter(
+                        x=historical_labels,
+                        y=historical_prices,
+                        mode='lines+markers',
+                        name='Overall Market Historical',
+                        line=dict(color='blue', width=4, dash='solid'),
+                        marker=dict(size=8)
+                    ))
+                
+                # Add current overall prediction
+                current_overall_median = overall_pred_df['prediction'].median()
+                time_periods = []
+                overall_prices = []
+                
+                if show_historical:
+                    time_periods.extend(historical_labels)
+                    overall_prices.extend(historical_prices)
+                
+                time_periods.append('Current')
+                overall_prices.append(current_overall_median)
+                
+                # Add future overall forecast
+                future_prices = []
+                valid_future_quarters = []
+                
+                for area in selected_areas_forecast:
+                    area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
+                    if not area_data.empty:
+                        area_future_prices = []
+                        for q in future_quarter_cols:
+                            if q in area_data.columns and pd.notna(area_data[q].iloc[0]):
+                                area_future_prices.append(area_data[q].iloc[0])
+                                if q not in valid_future_quarters:
+                                    valid_future_quarters.append(q)
+                        if area_future_prices:  # Only add if we have future prices for this area
+                            future_prices.append(area_future_prices)
+                
+                if future_prices:
+                    # Calculate median future prices across all areas
+                    # Ensure all arrays are the same length by padding with NaN if necessary
+                    max_len = max(len(prices) for prices in future_prices)
+                    padded_prices = []
+                    for prices in future_prices:
+                        if len(prices) < max_len:
+                            padded_prices.append(prices + [np.nan] * (max_len - len(prices)))
+                        else:
+                            padded_prices.append(prices)
+                    
+                    future_median_prices = np.nanmedian(padded_prices, axis=0)
+                    future_labels = [format_quarter_label(q) for q in valid_future_quarters]
+                    
+                    time_periods.extend(future_labels)
+                    overall_prices.extend(future_median_prices)
+                
+                fig_overall.add_trace(go.Scatter(
+                    x=time_periods,
+                    y=overall_prices,
+                    mode='lines+markers',
+                    name='Overall Market Forecast',
+                    line=dict(color='red', width=4, dash='dash'),
+                    marker=dict(size=10)
+                ))
+                
+                fig_overall.update_layout(
+                    title="Overall Market Price Trend & Forecast",
+                    xaxis_title="Time Period",
+                    yaxis_title="Median Price (AED)",
+                    height=500,
+                    template="plotly_white",
+                    showlegend=True
+                )
+                
+                if show_historical:
+                    fig_overall.add_vline(
+                        x=len(historical_labels) - 0.5, 
+                        line_width=2, 
+                        line_dash="dot", 
+                        line_color="green",
+                        annotation_text="Historical → Forecast"
+                    )
+                
+                st.plotly_chart(fig_overall, use_container_width=True)
             
             # 2. AREA-WISE FORECAST CHARTS (FEATURE-WISE AND OVERALL)
             for area in selected_areas_forecast:
@@ -2344,48 +2356,12 @@ if sidebar_option == "📈 Model Results":
                     st.markdown(f"### 📊 {area} - Feature-wise Forecast")
                     fig_features = go.Figure()
                     
-                    # NEW: Add historical feature trends if available
-                    if show_feature_history and selected_grouping in historical_feature_trends:
-                        historical_data = historical_feature_trends[selected_grouping]
-                        area_historical = historical_data[historical_data['area_name_en'] == area]
-                        
-                        if not area_historical.empty:
-                            # Get unique feature values from current predictions
-                            current_features = []
-                            for gf in grouping_features:
-                                if gf in area_data.columns:
-                                    feature_value = gf.replace(f"{selected_grouping}_", "")
-                                    current_features.append(feature_value)
-                            
-                            # Plot historical trends for each feature
-                            for feature_val in current_features:
-                                feature_historical = area_historical[area_historical[selected_grouping] == feature_val]
-                                
-                                if not feature_historical.empty:
-                                    # Filter by selected years
-                                    feature_historical['year'] = feature_historical['year_quarter'].str.split('-').str[0].astype(int)
-                                    feature_historical = feature_historical[feature_historical['year'].isin(previous_years)]
-                                    
-                                    if not feature_historical.empty:
-                                        time_periods_hist = [format_quarter_label(q) for q in feature_historical['year_quarter']]
-                                        prices_hist = feature_historical['meter_sale_price'].values
-                                        
-                                        fig_features.add_trace(go.Scatter(
-                                            x=time_periods_hist, y=prices_hist,
-                                            mode='lines+markers',
-                                            name=f'{feature_val} (Historical)',
-                                            line=dict(dash='dot', width=2),
-                                            marker=dict(size=4),
-                                            opacity=0.7
-                                        ))
-                    
                     for idx, (_, row) in enumerate(area_data.iterrows()):
                         # Create feature label
                         feature_label = ""
                         for gf in grouping_features:
                             if gf in row and row[gf] == 1:
-                                feature_val = gf.replace(f"{selected_grouping}_", "").replace("_", " ").title()
-                                feature_label += f"{feature_val}, "
+                                feature_label += f"{gf.replace('_', ' ').title()}, "
                         feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
                         
                         # Prepare data for plotting
@@ -2423,8 +2399,7 @@ if sidebar_option == "📈 Model Results":
                         xaxis_title="Time Period",
                         yaxis_title="Price (AED)",
                         height=400,
-                        template="plotly_white",
-                        showlegend=True
+                        template="plotly_white"
                     )
                     st.plotly_chart(fig_features, use_container_width=True)
                 
@@ -2554,101 +2529,6 @@ if sidebar_option == "📈 Model Results":
                 file_name="dubai_forecast_results.csv",
                 mime="text/csv",
                 key="forecast_download")
-
-    def create_feature_historical_chart(self, area, config_label, row, selected_grouping, 
-                                      historical_feature_trends, previous_years, 
-                                      show_historical, selected_historical, future_quarter_cols):
-        """Helper function to create historical feature trend charts"""
-        fig = go.Figure()
-        
-        # Get the feature value from the configuration
-        feature_value = None
-        for col in row.index:
-            if col.startswith(f"{selected_grouping}_") and row[col] == 1:
-                feature_value = col.replace(f"{selected_grouping}_", "")
-                break
-        
-        if feature_value and selected_grouping in historical_feature_trends:
-            historical_data = historical_feature_trends[selected_grouping]
-            area_historical = historical_data[historical_data['area_name_en'] == area]
-            
-            if not area_historical.empty:
-                # Filter for this specific feature value
-                feature_historical = area_historical[area_historical[selected_grouping] == feature_value]
-                
-                if not feature_historical.empty:
-                    # Filter by selected years
-                    feature_historical['year'] = feature_historical['year_quarter'].str.split('-').str[0].astype(int)
-                    feature_historical = feature_historical[feature_historical['year'].isin(previous_years)]
-                    
-                    if not feature_historical.empty:
-                        # Plot historical trend
-                        time_periods_hist = [format_quarter_label(q) for q in feature_historical['year_quarter']]
-                        prices_hist = feature_historical['meter_sale_price'].values
-                        
-                        fig.add_trace(go.Scatter(
-                            x=time_periods_hist, y=prices_hist,
-                            mode='lines+markers',
-                            name=f'Historical Trend ({feature_value})',
-                            line=dict(color='blue', width=3),
-                            marker=dict(size=6)
-                        ))
-        
-        # Add current and forecast data
-        time_periods = []
-        prices = []
-        
-        # Add historical quarters from forecast
-        if show_historical:
-            historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
-            for hq in historical_cols:
-                time_periods.append(format_quarter_label(hq))
-                prices.append(row[hq])
-        
-        # Add current and future
-        time_periods.append('Current')
-        prices.append(row['prediction'])
-        
-        for fq in future_quarter_cols:
-            if fq in row and pd.notna(row[fq]):
-                time_periods.append(format_quarter_label(fq))
-                prices.append(row[fq])
-        
-        fig.add_trace(go.Scatter(
-            x=time_periods, y=prices,
-            mode='lines+markers',
-            name='Current Forecast',
-            line=dict(color='red', width=3),
-            marker=dict(size=8)
-        ))
-        
-        fig.update_layout(
-            title=f"{config_label} - Historical vs Forecast",
-            xaxis_title="Time Period",
-            yaxis_title="Price (AED)",
-            height=400,
-            template="plotly_white",
-            showlegend=True
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Add some statistics
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if len(prices) > 1:
-                price_change = ((prices[-1] - prices[0]) / prices[0]) * 100
-                st.metric("Total Projected Change", f"{price_change:+.1f}%")
-        
-        with col2:
-            if 'prediction' in row:
-                st.metric("Current Price", f"AED {row['prediction']:,.0f}")
-        
-        with col3:
-            if len(prices) > 1:
-                avg_growth = ((prices[-1] / prices[0]) ** (1/len(prices)) - 1) * 100
-                st.metric("Avg Quarterly Growth", f"{avg_growth:+.1f}%")
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
 
