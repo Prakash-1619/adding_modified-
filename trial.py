@@ -2048,7 +2048,7 @@ if sidebar_option == "📈 Model Results":
                 overall_historical_pivot = overall_historical_median.set_index('year_quarter')['meter_sale_price'].to_dict()
                 
                 # Get the most recent 4 quarters for historical context
-                recent_quarters = sorted(historical_median['year_quarter'].unique())[-12:]
+                recent_quarters = sorted(historical_median['year_quarter'].unique())#[-12:]
                 historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
                 
                 return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot
@@ -2124,7 +2124,7 @@ if sidebar_option == "📈 Model Results":
         show_historical = st.sidebar.checkbox("Show Historical Quarterly Trends", value=True, key="show_historical")
         show_overall_trend = st.sidebar.checkbox("Show Overall Market Trend", value=True, key="show_overall")
         num_historical_quarters = st.sidebar.slider("Number of Historical Quarters to Show", 
-                                                  min_value=1, max_value=8, value=4, key="hist_quarters")
+                                                  min_value=1, max_value=12, value=4, key="hist_quarters")
         
         # =========================
         # 🔟 FORECASTING EXECUTION
