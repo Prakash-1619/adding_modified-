@@ -2429,9 +2429,131 @@ if sidebar_option == "📈 Model Results":
                     st.plotly_chart(fig_features, use_container_width=True)
                 
                 with col2:
-                    # ... (rest of your existing area overall trend code)
+                    st.markdown(f"### 📈 {area} - Overall Trend")
+                    fig_overall_area = go.Figure()
+                    
+                    if not area_overall_data.empty:
+                        row = area_overall_data.iloc[0]
+                        
+                        time_periods_area = []
+                        prices_area = []
+                        
+                        # Add historical data
+                        if show_historical:
+                            historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
+                            for hq in historical_cols:
+                                time_periods_area.append(format_quarter_label(hq))
+                                prices_area.append(row[hq])
+                        
+                        # Add current and future
+                        time_periods_area.append('Current')
+                        prices_area.append(row['prediction'])
+                        
+                        for fq in future_quarter_cols:
+                            if fq in row and pd.notna(row[fq]):
+                                time_periods_area.append(format_quarter_label(fq))
+                                prices_area.append(row[fq])
+                        
+                        fig_overall_area.add_trace(go.Scatter(
+                            x=time_periods_area, y=prices_area,
+                            mode='lines+markers',
+                            name=f'{area} Overall',
+                            line=dict(color='orange', width=4),
+                            marker=dict(size=8)
+                        ))
+                    
+                    fig_overall_area.update_layout(
+                        title=f"Overall Area Forecast - {area}",
+                        xaxis_title="Time Period",
+                        yaxis_title="Price (AED)",
+                        height=400,
+                        template="plotly_white"
+                    )
+                    st.plotly_chart(fig_overall_area, use_container_width=True)
             
-            # ... (rest of your existing heatmap and download code)
+            # 3. COMPARISON HEATMAP
+            st.subheader("🔥 Market Comparison Heatmap")
+            
+            # Prepare heatmap data
+            heatmap_data = []
+            row_labels = []
+            time_periods_heatmap = []
+            
+            if show_historical:
+                historical_labels = [format_quarter_label(hq) for hq in selected_historical]
+                time_periods_heatmap.extend(historical_labels)
+            time_periods_heatmap.append('Current')
+            future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
+            time_periods_heatmap.extend(future_labels)
+            
+            # Add overall market trend
+            if show_overall_trend:
+                overall_prices_heatmap = []
+                # Historical
+                if show_historical and overall_historical_pivot:
+                    for hq in selected_historical:
+                        if hq in overall_historical_pivot:
+                            overall_prices_heatmap.append(overall_historical_pivot[hq])
+                # Current and future
+                overall_prices_heatmap.append(current_overall_median)
+                overall_prices_heatmap.extend(future_median_prices if 'future_median_prices' in locals() else [])
+                
+                if len(overall_prices_heatmap) == len(time_periods_heatmap):
+                    heatmap_data.append(overall_prices_heatmap)
+                    row_labels.append("Overall Market")
+            
+            # Add area trends
+            for area in selected_areas_forecast:
+                area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
+                if not area_data.empty:
+                    row = area_data.iloc[0]
+                    area_prices = []
+                    
+                    # Historical
+                    if show_historical:
+                        for hq in selected_historical:
+                            if hq in row and pd.notna(row[hq]):
+                                area_prices.append(row[hq])
+                            else:
+                                area_prices.append(np.nan)
+                    
+                    # Current and future
+                    area_prices.append(row['prediction'])
+                    for fq in future_quarter_cols:
+                        if fq in row and pd.notna(row[fq]):
+                            area_prices.append(row[fq])
+                        else:
+                            area_prices.append(np.nan)
+                    
+                    if len(area_prices) == len(time_periods_heatmap):
+                        heatmap_data.append(area_prices)
+                        row_labels.append(area)
+            
+            if heatmap_data:
+                heatmap_df = pd.DataFrame(
+                    heatmap_data,
+                    index=row_labels,
+                    columns=time_periods_heatmap
+                )
+                
+                fig_heat = px.imshow(
+                    heatmap_df,
+                    title="Price Comparison Heatmap (AED)",
+                    color_continuous_scale="Viridis",
+                    aspect="auto",
+                    labels=dict(x="Time Period", y="Area/Market", color="Price (AED)")
+                )
+                fig_heat.update_layout(height=500)
+                st.plotly_chart(fig_heat, use_container_width=True)
+            
+            # Download forecast results
+            csv_forecast = final_forecast.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Forecast Results",
+                data=csv_forecast,
+                file_name="dubai_forecast_results.csv",
+                mime="text/csv",
+                key="forecast_download")
 
     def create_feature_historical_chart(self, area, config_label, row, selected_grouping, 
                                       historical_feature_trends, previous_years, 
