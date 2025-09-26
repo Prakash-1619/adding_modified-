@@ -2001,34 +2001,51 @@ if sidebar_option == "📈 Model Results":
             st.error(f"❌ Error loading test data: {str(e)}")
     
 
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import plotly.graph_objects as go
+import plotly.express as px
+    
+    # =========================
+    # Tab setup
+    # =========================
+    #tab1, tab2 = st.tabs(["📊 Overall Forecast", "🧩 Feature-wise Forecast"])
+    
+    # =========================
+    # Tab 2: Price Forecasting
+    # =========================
     with tab2:
         st.header("🔮 Price Forecasting")
         st.markdown("Area-wise predictions with growth factor projections")
     
         # =========================
-        # 8️⃣ LOAD DATA FOR FORECASTING TAB
+        # Load Forecasting Data
         # =========================
         @st.cache_data
         def load_forecasting_data():
-            """Load forecasting-specific data"""
             try:
                 test_samples_forecast = pd.read_csv(file_path)
                 test_samples_forecast = test_samples_forecast.drop(
                     columns=[col for col in drop_col if col in test_samples_forecast.columns]
                 )
-                st.dataframe(test_samples_forecast)
+                # Show raw data for debugging
+                st.dataframe(test_samples_forecast.head())
     
-                # Remove unwanted columns
+                # Drop unnecessary columns
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
                 columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
                 X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
     
-                # Load train columns
+                # Load training columns
                 with open("train_columns.pkl", "rb") as f:
                     train_columns = pickle.load(f)
     
                 # Load growth factors
-                growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+                growth_df = pd.read_csv('arima_forecast_df_quarterly
+                .csv')
                 growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
                 growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
     
@@ -2037,25 +2054,25 @@ if sidebar_option == "📈 Model Results":
                 st.error(f"Error loading forecasting data: {str(e)}")
                 return None, None, None, None
     
-        # Load data for forecasting
+        # Load data
         with st.spinner("Loading forecasting data..."):
             test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot = load_forecasting_data()
-    
+        
         if test_samples_forecast is None:
             st.error("❌ Failed to load forecasting data")
             st.stop()
     
-        # Prepare test data for forecasting
+        # =========================
+        # Prepare test data
+        # =========================
         try:
             area_names_forecast = X_test_forecast_raw['area_name_en']
             X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
     
             cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
-    
             if cat_cols:
                 X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
                 X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_no_area.index)
-    
                 X_test_forecast = X_test_forecast_no_area.drop(columns=cat_cols)
                 X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
             else:
@@ -2071,7 +2088,7 @@ if sidebar_option == "📈 Model Results":
             st.stop()
     
         # =========================
-        # 9️⃣ FORECASTING CONTROLS
+        # Forecasting Controls
         # =========================
         st.sidebar.title("🔧 Forecast Controls")
     
@@ -2092,7 +2109,7 @@ if sidebar_option == "📈 Model Results":
         )
     
         # =========================
-        # 🔟 FORECASTING EXECUTION
+        # Generate Forecast
         # =========================
         if st.button("🚀 Generate Forecast", type="primary", key="forecast_button"):
             if len(selected_areas_forecast) == 0:
@@ -2130,10 +2147,8 @@ if sidebar_option == "📈 Model Results":
                     st.stop()
     
                 pred_df = pd.concat(pred_list)
-    
                 group_cols = ['area_name_en'] + grouping_features
                 median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
-    
                 forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
     
                 quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
@@ -2144,20 +2159,21 @@ if sidebar_option == "📈 Model Results":
                 final_forecast = forecast_df[group_cols + ['prediction'] + quarter_cols]
     
             # =========================
-            # 1️⃣1️⃣ FORECASTING VISUALIZATIONS (with Actuals)
+            # Show Forecast Table with Actuals
             # =========================
             st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
+            st.subheader("📋 Forecast Data with Actuals")
     
-            # Display forecast table
-            st.subheader("📋 Forecast Results")
             display_df = final_forecast.copy()
             for col in ['prediction'] + quarter_cols:
                 if col in display_df.columns:
                     display_df[col] = display_df[col].round(2)
-    
             st.dataframe(display_df, use_container_width=True)
     
-            # Helper function for quarter formatting
+            # =========================
+            # Area-wise Forecast Plots
+            # =========================
+            st.subheader("📈 Forecast Visualizations")
             def format_quarter_label(quarter_str):
                 if '-' in quarter_str:
                     parts = quarter_str.split('-')
@@ -2165,14 +2181,9 @@ if sidebar_option == "📈 Model Results":
                         return f"{parts[0]} {parts[1]}"
                 return quarter_str.replace('_', ' ').title()
     
-            # Area-wise forecast charts with Actuals
-            st.subheader("📈 Forecast Visualizations")
-    
             for area in selected_areas_forecast:
                 area_data = final_forecast[final_forecast['area_name_en'] == area]
-                actual_area_data = arima_forecast_df_quarterly[
-                    arima_forecast_df_quarterly['area_name_en'] == area
-                ]
+                actual_area_data = arima_forecast_df_quarterly[arima_forecast_df_quarterly['area_name_en'] == area]
     
                 if area_data.empty and actual_area_data.empty:
                     continue
@@ -2180,19 +2191,19 @@ if sidebar_option == "📈 Model Results":
                 st.markdown(f"### 📊 {area} Forecast vs Actual")
                 fig = go.Figure()
     
+                # Plot actual
                 if not actual_area_data.empty:
                     actual_df = actual_area_data[actual_area_data['type'] == 'fitted']
-                    fig.add_trace(
-                        go.Scatter(
-                            x=actual_df['ds'],
-                            y=actual_df['actual'],
-                            mode='lines+markers',
-                            name='Actual',
-                            line=dict(color='blue', width=3),
-                            marker=dict(size=6)
-                        )
-                    )
+                    fig.add_trace(go.Scatter(
+                        x=actual_df['ds'],
+                        y=actual_df['actual'],
+                        mode='lines+markers',
+                        name='Actual',
+                        line=dict(color='blue', width=3),
+                        marker=dict(size=6)
+                    ))
     
+                # Plot forecast
                 for idx, (_, row) in area_data.iterrows():
                     feature_label = ""
                     for gf in grouping_features:
@@ -2203,44 +2214,26 @@ if sidebar_option == "📈 Model Results":
                     quarters = ['Current'] + [format_quarter_label(q) for q in quarter_cols if q in row]
                     prices = [row['prediction']] + [row[q] for q in quarter_cols if q in row]
     
-                    fig.add_trace(
-                        go.Scatter(
-                            x=quarters,
-                            y=prices,
-                            mode='lines+markers',
-                            name=feature_label,
-                            line=dict(width=3),
-                            marker=dict(size=8)
-                        )
-                    )
+                    fig.add_trace(go.Scatter(
+                        x=quarters,
+                        y=prices,
+                        mode='lines+markers',
+                        name=feature_label,
+                        line=dict(width=3),
+                        marker=dict(size=8)
+                    ))
     
+                # Connect last actual to first forecast
                 if not actual_area_data.empty and not area_data.empty:
                     last_actual = actual_df['actual'].iloc[-1]
                     first_forecast = area_data['prediction'].iloc[0]
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[actual_df['ds'].iloc[-1], 'Current'],
-                            y=[last_actual, first_forecast],
-                            mode='lines',
-                            line=dict(color='green', dash='dash'),
-                            name='Connection'
-                        )
-                    )
-    
-                if not actual_area_data.empty and 'yhat_upper' in actual_area_data.columns and 'yhat_lower' in actual_area_data.columns:
-                    forecast_df = actual_area_data[actual_area_data['type'] == 'forecast']
-                    fig.add_trace(
-                        go.Scatter(
-                            x=forecast_df['ds'].tolist() + forecast_df['ds'][::-1].tolist(),
-                            y=forecast_df['yhat_upper'].tolist() + forecast_df['yhat_lower'][::-1].tolist(),
-                            fill='toself',
-                            fillcolor='rgba(255,165,0,0.2)',
-                            line=dict(color='rgba(255,255,255,0)'),
-                            hoverinfo="skip",
-                            showlegend=False,
-                            name='Confidence Interval'
-                        )
-                    )
+                    fig.add_trace(go.Scatter(
+                        x=[actual_df['ds'].iloc[-1], 'Current'],
+                        y=[last_actual, first_forecast],
+                        mode='lines',
+                        line=dict(color='green', dash='dash'),
+                        name='Connection'
+                    ))
     
                 fig.update_layout(
                     title=f"Price Forecast vs Actual - {area}",
@@ -2253,7 +2246,9 @@ if sidebar_option == "📈 Model Results":
     
                 st.plotly_chart(fig, use_container_width=True)
     
-            # Growth heatmap
+            # =========================
+            # Growth Heatmap
+            # =========================
             st.subheader("🔥 Growth Rate Heatmap")
             heatmap_data = []
             quarter_labels = [format_quarter_label(q) for q in quarter_cols]
@@ -2288,7 +2283,9 @@ if sidebar_option == "📈 Model Results":
                 fig_heat.update_layout(height=400)
                 st.plotly_chart(fig_heat, use_container_width=True)
     
-            # Download forecast results
+            # =========================
+            # Download Forecast Results
+            # =========================
             csv_forecast = final_forecast.to_csv(index=False)
             st.download_button(
                 label="📥 Download Forecast Results",
@@ -2297,6 +2294,7 @@ if sidebar_option == "📈 Model Results":
                 mime="text/csv",
                 key="forecast_download"
             )
+
 
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
