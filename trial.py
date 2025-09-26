@@ -2034,41 +2034,42 @@ if sidebar_option == "📈 Model Results":
                 growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
                 
                 # Load and prepare historical quarterly median prices from training data
-                train_data = pd.read_csv("df_trained_dataset_6000.csv")  # Assuming you have training data
+                train_data = pd.read_csv("df_trained_dataset_6000.csv")  # Using the same training data
+                
                 # Extract year-quarter from instance_date
                 train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
                 train_data['year_quarter'] = train_data['instance_date'].dt.year.astype(str) + '-Q' + train_data['instance_date'].dt.quarter.astype(str)
                 
-                # Calculate median prices per area per quarter with feature breakdown
+                # Calculate median prices per area per quarter
                 historical_median = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].median().reset_index()
                 historical_pivot = historical_median.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
                 
-                # Calculate feature-wise historical trends
+                # Calculate feature-wise historical trends USING THE SAME TRAINING DATA
                 feature_historical_data = {}
                 
-                # For rooms_en feature
+                # For rooms_en feature - using same training data
                 if 'rooms_en' in train_data.columns:
                     rooms_historical = train_data.groupby(['area_name_en', 'rooms_en', 'year_quarter'])['meter_sale_price'].median().reset_index()
                     feature_historical_data['rooms_en'] = rooms_historical
                 
-                # For floor_bin feature
+                # For floor_bin feature - using same training data
                 if 'floor_bin' in train_data.columns:
                     floor_historical = train_data.groupby(['area_name_en', 'floor_bin', 'year_quarter'])['meter_sale_price'].median().reset_index()
                     feature_historical_data['floor_bin'] = floor_historical
                 
-                # For binary features
+                # For binary features - using same training data
                 binary_features = ['swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
                 for feature in binary_features:
                     if feature in train_data.columns:
                         binary_historical = train_data.groupby(['area_name_en', feature, 'year_quarter'])['meter_sale_price'].median().reset_index()
                         feature_historical_data[feature] = binary_historical
                 
-                # Calculate overall historical trends (across all areas)
+                # Calculate overall historical trends (across all areas) - using same training data
                 overall_historical_median = train_data.groupby(['year_quarter'])['meter_sale_price'].median().reset_index()
                 overall_historical_pivot = overall_historical_median.set_index('year_quarter')['meter_sale_price'].to_dict()
                 
-                # Get the most recent 4 quarters for historical context
-                recent_quarters = sorted(historical_median['year_quarter'].unique())#[-12:]
+                # Get the most recent quarters for historical context - using same training data
+                recent_quarters = sorted(historical_median['year_quarter'].unique())
                 historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
                 
                 return (test_samples_forecast, X_test_forecast, train_columns, growth_pivot, 
@@ -2241,7 +2242,7 @@ if sidebar_option == "📈 Model Results":
                 forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
                 overall_forecast_df = overall_median.merge(growth_pivot, on='area_name_en', how='left')
                 
-                # Merge with historical data
+                # Merge with historical data (from same training data)
                 if historical_pivot is not None:
                     forecast_df = forecast_df.merge(historical_pivot, on='area_name_en', how='left')
                     overall_forecast_df = overall_forecast_df.merge(historical_pivot, on='area_name_en', how='left')
@@ -2270,6 +2271,9 @@ if sidebar_option == "📈 Model Results":
             # 1️⃣1️⃣ FORECASTING VISUALIZATIONS
             # =========================
             st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
+            
+            # Display information about data sources
+            st.info(f"📊 Using historical data from {len(train_data)} training samples for feature-wise trends")
             
             # Display forecast tables
             col1, col2 = st.columns(2)
@@ -2301,12 +2305,12 @@ if sidebar_option == "📈 Model Results":
                         return f"{parts[0]} {parts[1]}"
                 return quarter_str.replace('_', ' ').title()
             
-            # 1. OVERALL MARKET TREND (ACROSS ALL SELECTED AREAS)
+            # 1. OVERALL MARKET TREND (ACROSS ALL SELECTED AREAS) - using same training data
             if show_overall_trend:
-                st.markdown("### 🌐 Overall Market Trend")
+                st.markdown("### 🌐 Overall Market Trend (Based on Training Data)")
                 fig_overall = go.Figure()
                 
-                # Add overall historical trend line
+                # Add overall historical trend line from training data
                 if show_historical and overall_historical_pivot:
                     historical_quarters_sorted = sorted([q for q in overall_historical_pivot.keys() if q in selected_historical])
                     historical_prices = [overall_historical_pivot[q] for q in historical_quarters_sorted]
@@ -2316,7 +2320,7 @@ if sidebar_option == "📈 Model Results":
                         x=historical_labels,
                         y=historical_prices,
                         mode='lines+markers',
-                        name='Overall Market Historical',
+                        name='Overall Market Historical (Training Data)',
                         line=dict(color='blue', width=4, dash='solid'),
                         marker=dict(size=8)
                     ))
@@ -2375,7 +2379,7 @@ if sidebar_option == "📈 Model Results":
                 ))
                 
                 fig_overall.update_layout(
-                    title="Overall Market Price Trend & Forecast",
+                    title="Overall Market Price Trend & Forecast (Based on Training Data)",
                     xaxis_title="Time Period",
                     yaxis_title="Median Price (AED)",
                     height=500,
@@ -2394,7 +2398,7 @@ if sidebar_option == "📈 Model Results":
                 
                 st.plotly_chart(fig_overall, use_container_width=True)
             
-            # 2. AREA-WISE FORECAST CHARTS WITH FEATURE-WISE HISTORICAL TRENDS
+            # 2. AREA-WISE FORECAST CHARTS WITH FEATURE-WISE HISTORICAL TRENDS FROM TRAINING DATA
             for area in selected_areas_forecast:
                 area_data = final_forecast[final_forecast['area_name_en'] == area]
                 area_overall_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
@@ -2402,14 +2406,14 @@ if sidebar_option == "📈 Model Results":
                 if area_data.empty:
                     continue
                     
-                st.markdown(f"### 🏙️ {area} - Detailed Analysis")
+                st.markdown(f"### 🏙️ {area} - Detailed Analysis (Training Data Based)")
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     st.markdown(f"#### 📊 Feature-wise Forecast with Historical Trends")
                     fig_features = go.Figure()
                     
-                    # Get feature historical data for this area if available
+                    # Get feature historical data for this area from training data
                     area_feature_historical = None
                     if show_feature_historical and feature_column in feature_historical_data:
                         area_feature_historical = feature_historical_data[feature_column]
@@ -2435,26 +2439,27 @@ if sidebar_option == "📈 Model Results":
                         time_periods = []
                         prices = []
                         
-                        # Add feature-wise historical data if available
+                        # Add feature-wise historical data from training data
                         if (show_feature_historical and area_feature_historical is not None and 
                             feature_value is not None and not area_feature_historical.empty):
                             
-                            # Filter historical data for this specific feature value
+                            # Filter historical data for this specific feature value from training data
                             if feature_column == 'rooms_en' or feature_column == 'floor_bin':
                                 feature_hist = area_feature_historical[area_feature_historical[feature_column] == feature_value]
                             else:  # Binary features
                                 feature_hist = area_feature_historical[area_feature_historical[feature_column] == 1]
                             
                             if not feature_hist.empty:
-                                # Get recent historical quarters
+                                # Get recent historical quarters from training data
                                 historical_qs = sorted(feature_hist['year_quarter'].unique())[-num_historical_quarters:]
                                 for hq in historical_qs:
                                     hq_data = feature_hist[feature_hist['year_quarter'] == hq]
                                     if not hq_data.empty:
                                         time_periods.append(format_quarter_label(hq))
                                         prices.append(hq_data['meter_sale_price'].iloc[0])
+                                        st.sidebar.write(f"Training data point: {area}, {feature_value}, {hq}: AED {hq_data['meter_sale_price'].iloc[0]:,.0f}")
                         
-                        # Add area historical quarters (if feature historical not available)
+                        # Add area historical quarters from training data (if feature historical not available)
                         elif show_historical:
                             historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
                             for hq in historical_cols:
@@ -2485,7 +2490,7 @@ if sidebar_option == "📈 Model Results":
                         ))
                     
                     fig_features.update_layout(
-                        title=f"Feature-wise Forecast - {area}",
+                        title=f"Feature-wise Forecast - {area} (Training Data Based)",
                         xaxis_title="Time Period",
                         yaxis_title="Price (AED)",
                         height=500,
@@ -2501,7 +2506,7 @@ if sidebar_option == "📈 Model Results":
                             line_width=2, 
                             line_dash="dot", 
                             line_color="green",
-                            annotation_text="Historical → Forecast"
+                            annotation_text="Training Data → Forecast"
                         )
                     
                     st.plotly_chart(fig_features, use_container_width=True)
@@ -2516,7 +2521,7 @@ if sidebar_option == "📈 Model Results":
                         time_periods_area = []
                         prices_area = []
                         
-                        # Add historical data
+                        # Add historical data from training data
                         if show_historical:
                             historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
                             for hq in historical_cols:
@@ -2559,19 +2564,19 @@ if sidebar_option == "📈 Model Results":
                             line_width=2, 
                             line_dash="dot", 
                             line_color="green",
-                            annotation_text="Historical → Forecast"
+                            annotation_text="Training Data → Forecast"
                         )
                     
                     st.plotly_chart(fig_overall_area, use_container_width=True)
                     
-                    # Display feature-wise historical summary if available
+                    # Display feature-wise historical summary from training data
                     if show_feature_historical and feature_column in feature_historical_data:
-                        st.markdown(f"#### 📋 Feature-wise Historical Summary")
+                        st.markdown(f"#### 📋 Feature-wise Historical Summary (Training Data)")
                         area_feature_summary = feature_historical_data[feature_column]
                         area_feature_summary = area_feature_summary[area_feature_summary['area_name_en'] == area]
                         
                         if not area_feature_summary.empty:
-                            # Pivot to show feature values over time
+                            # Pivot to show feature values over time from training data
                             summary_pivot = area_feature_summary.pivot_table(
                                 index=feature_column, 
                                 columns='year_quarter', 
@@ -2579,13 +2584,14 @@ if sidebar_option == "📈 Model Results":
                                 aggfunc='median'
                             ).round(2)
                             
-                            # Show only recent quarters
+                            # Show only recent quarters from training data
                             recent_qs = sorted(summary_pivot.columns, reverse=True)[:num_historical_quarters]
                             if recent_qs:
                                 st.dataframe(summary_pivot[recent_qs], use_container_width=True)
+                                st.caption(f"Historical median prices from training data for {area}")
             
             # 3. COMPARISON HEATMAP
-            st.subheader("🔥 Market Comparison Heatmap")
+            st.subheader("🔥 Market Comparison Heatmap (Training Data Based)")
             
             # Prepare heatmap data
             heatmap_data = []
@@ -2599,10 +2605,10 @@ if sidebar_option == "📈 Model Results":
             future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
             time_periods_heatmap.extend(future_labels)
             
-            # Add overall market trend
+            # Add overall market trend from training data
             if show_overall_trend:
                 overall_prices_heatmap = []
-                # Historical
+                # Historical from training data
                 if show_historical and overall_historical_pivot:
                     for hq in selected_historical:
                         if hq in overall_historical_pivot:
@@ -2622,7 +2628,7 @@ if sidebar_option == "📈 Model Results":
                     row = area_data.iloc[0]
                     area_prices = []
                     
-                    # Historical
+                    # Historical from training data
                     if show_historical:
                         for hq in selected_historical:
                             if hq in row and pd.notna(row[hq]):
@@ -2651,7 +2657,7 @@ if sidebar_option == "📈 Model Results":
                 
                 fig_heat = px.imshow(
                     heatmap_df,
-                    title="Price Comparison Heatmap (AED)",
+                    title="Price Comparison Heatmap (AED) - Training Data Based",
                     color_continuous_scale="Viridis",
                     aspect="auto",
                     labels=dict(x="Time Period", y="Area/Market", color="Price (AED)"),
