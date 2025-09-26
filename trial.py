@@ -1749,7 +1749,7 @@ if sidebar_option == "📈 Model Results":
     #st.write("Area-wise model performance analysis")
     
     # Create tabs for different functionalities
-    tab1, tab2,tab3 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting",🔮 Forecasting_year_trends])
+    tab1, tab2,tab3 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting","🔮 Forecasting_year_trends"])
     
     with tab1:
         st.header("📊 Model Predictions & Performance Analysis")
