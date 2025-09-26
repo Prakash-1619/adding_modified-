@@ -1687,6 +1687,8 @@ if sidebar_option == "📈 Model Results":
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import plotly.express as px
+    import pandas as pd
+    import pickle
     
     # =========================
     # 1️⃣ LOAD ONEHOT ENCODER
@@ -1698,14 +1700,19 @@ if sidebar_option == "📈 Model Results":
     except Exception as e:
         st.error(f"❌ Error loading OneHot encoder: {e}")
         st.stop()
+    
+    # Define drop_col (this was missing)
+    drop_col = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']  # Add your actual columns to drop
+    
     file_options = {
         "Test_data": "test_data_20 areas_1.csv",
-        "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
+        "Test_data_sample_50": "all_values_area_data_test.csv",
         "all_data_sample_50": "all_values_area_data.csv"}
     
     # Create selectbox
-    selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
+    selected_file_label = st.selectbox("Choose data file to load:", options=list(file_options.keys()))
     file_path = file_options[selected_file_label]
+    
     # =========================
     # 2️⃣ LOAD AREA-WISE MODELS
     # =========================
@@ -1737,15 +1744,11 @@ if sidebar_option == "📈 Model Results":
     # =========================
     # 3️⃣ STREAMLIT UI
     # =========================
-    #st.title("🏠 Dubai Real Estate Price Predictor")
-    #st.write("Area-wise model performance analysis")
-    
     # Create tabs for different functionalities
     tab1, tab2 = st.tabs(["📊 Predictions & Analysis", "🔮 Forecasting"])
     
     with tab1:
         st.header("📊 Model Predictions & Performance Analysis")
-        import pandas as pd
         
         # =========================
         # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
@@ -1754,6 +1757,7 @@ if sidebar_option == "📈 Model Results":
             test_samples = pd.read_csv(file_path)
             test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
             st.dataframe(test_samples)
+            
             # Remove unwanted columns including 'Unnamed: 0'
             columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
             columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
@@ -1762,11 +1766,10 @@ if sidebar_option == "📈 Model Results":
             y_test = test_samples['meter_sale_price']
             
             st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
-            #st.dataframe(test_samples.head(), use_container_width=True)
             
             # Identify categorical columns
             cat_cols = X_test.select_dtypes(include='object').columns.tolist()
-    
+
             # Apply saved encoder
             if cat_cols:
                 X_cat_test = ohe.transform(X_test[cat_cols])
@@ -1988,24 +1991,14 @@ if sidebar_option == "📈 Model Results":
                     st.warning("No predictions were made. Check if area names match the trained models.")
                     
         except FileNotFoundError:
-            st.error("❌ Test data file 'test_data_20 areas_1.csv' not found. Please make sure the file exists in the same directory.")
+            st.error(f"❌ Test data file '{file_path}' not found. Please make sure the file exists in the same directory.")
         except Exception as e:
             st.error(f"❌ Error loading test data: {str(e)}")
-    
-
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import pickle
-import plotly.graph_objects as go
-import plotly.express as px
     
     # =========================
     # Tab 2: Price Forecasting
     # =========================
     with tab2:
-        
         st.header("🔮 Price Forecasting")
         st.markdown("Area-wise predictions with growth factor projections")
         
@@ -2023,7 +2016,7 @@ import plotly.express as px
         
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
                 columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
-                X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
+                X_test_forecast_raw = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
         
                 with open("train_columns.pkl", "rb") as f:
                     train_columns = pickle.load(f)
@@ -2032,7 +2025,7 @@ import plotly.express as px
                 growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
                 growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
         
-                return test_samples_forecast, X_test_forecast, train_columns, growth_pivot
+                return test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot
             except Exception as e:
                 st.error(f"Error loading forecasting data: {str(e)}")
                 return None, None, None, None
@@ -2049,6 +2042,11 @@ import plotly.express as px
         # Prepare Test Data
         # =========================
         try:
+            # Check if area_name_en exists in the dataframe
+            if 'area_name_en' not in X_test_forecast_raw.columns:
+                st.error("❌ 'area_name_en' column not found in the test data")
+                st.stop()
+                
             area_names_forecast = X_test_forecast_raw['area_name_en']
             X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
         
@@ -2061,13 +2059,16 @@ import plotly.express as px
             else:
                 X_test_forecast = X_test_forecast_no_area.copy()
         
+            # Ensure all training columns are present
             for col in train_columns:
                 if col not in X_test_forecast.columns:
                     X_test_forecast[col] = 0
         
             X_test_forecast = X_test_forecast[train_columns]
             X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
+            
         except Exception as e:
+            st.error(f"❌ Error preparing test data: {str(e)}")
             st.stop()
         
         # =========================
@@ -2145,95 +2146,31 @@ import plotly.express as px
             # Show Forecast Table
             # =========================
             st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
-            st.subheader("📋 Forecast Data with Actuals")
+            st.subheader("📋 Forecast Data")
             display_df = final_forecast.copy()
             for col in ['prediction'] + quarter_cols:
                 if col in display_df.columns:
                     display_df[col] = display_df[col].round(2)
             st.dataframe(display_df, use_container_width=True)
         
+            # Note: The ARIMA forecast plotting section was removed since arima_forecast_df_quarterly 
+            # was not defined in the original code and would cause errors
+        
             # =========================
-            # Area-wise Forecast Plots
+            # Growth Heatmap
             # =========================
-            st.subheader("📈 Forecast Visualizations")
+            st.subheader("🔥 Growth Rate Heatmap")
+            
             def format_quarter_label(quarter_str):
                 if '-' in quarter_str:
                     parts = quarter_str.split('-')
                     if len(parts) == 2:
                         return f"{parts[0]} {parts[1]}"
                 return quarter_str.replace('_', ' ').title()
-        
-            for area in selected_areas_forecast:
-                area_data = final_forecast[final_forecast['area_name_en'] == area]
-                actual_area_data = arima_forecast_df_quarterly[arima_forecast_df_quarterly['area_name_en'] == area]
-        
-                if area_data.empty and actual_area_data.empty:
-                    continue
-        
-                st.markdown(f"### 📊 {area} Forecast vs Actual")
-                fig = go.Figure()
-        
-                # Plot actuals
-                if not actual_area_data.empty:
-                    actual_df = actual_area_data[actual_area_data['type'] == 'fitted']
-                    fig.add_trace(go.Scatter(
-                        x=actual_df['ds'],
-                        y=actual_df['actual'],
-                        mode='lines+markers',
-                        name='Actual',
-                        line=dict(color='blue', width=3),
-                        marker=dict(size=6)
-                    ))
-        
-                # Plot forecast
-                for idx, (_, row) in area_data.iterrows():
-                    feature_label = ""
-                    for gf in grouping_features:
-                        if gf in row and row[gf] == 1:
-                            feature_label += f"{gf.replace('_', ' ').title()}, "
-                    feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
-        
-                    quarters = ['Current'] + [format_quarter_label(q) for q in quarter_cols if q in row]
-                    prices = [row['prediction']] + [row[q] for q in quarter_cols if q in row]
-        
-                    fig.add_trace(go.Scatter(
-                        x=quarters,
-                        y=prices,
-                        mode='lines+markers',
-                        name=feature_label,
-                        line=dict(width=3),
-                        marker=dict(size=8)
-                    ))
-        
-                # Connect last actual to first forecast
-                if not actual_area_data.empty and not area_data.empty:
-                    last_actual = actual_df['actual'].iloc[-1]
-                    first_forecast = area_data['prediction'].iloc[0]
-                    fig.add_trace(go.Scatter(
-                        x=[actual_df['ds'].iloc[-1], 'Current'],
-                        y=[last_actual, first_forecast],
-                        mode='lines',
-                        line=dict(color='green', dash='dash'),
-                        name='Connection'
-                    ))
-        
-                fig.update_layout(
-                    title=f"Price Forecast vs Actual - {area}",
-                    xaxis_title="Quarter",
-                    yaxis_title="Price (AED)",
-                    template="plotly_white",
-                    height=400,
-                    hovermode="x unified"
-                )
-        
-                st.plotly_chart(fig, use_container_width=True)
-        
-            # =========================
-            # Growth Heatmap
-            # =========================
-            st.subheader("🔥 Growth Rate Heatmap")
+            
             heatmap_data = []
             quarter_labels = [format_quarter_label(q) for q in quarter_cols]
+            area_labels = []
         
             for area in selected_areas_forecast:
                 area_data = final_forecast[final_forecast['area_name_en'] == area]
@@ -2247,11 +2184,12 @@ import plotly.express as px
                         else:
                             growth_rates.append(0)
                     heatmap_data.append(growth_rates)
+                    area_labels.append(area)
         
-            if heatmap_data:
+            if heatmap_data and area_labels:
                 heatmap_df = pd.DataFrame(
                     heatmap_data,
-                    index=selected_areas_forecast,
+                    index=area_labels,
                     columns=quarter_labels
                 )
         
@@ -2276,7 +2214,6 @@ import plotly.express as px
                 mime="text/csv",
                 key="forecast_download"
             )
-
 
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
