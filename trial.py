@@ -2551,94 +2551,64 @@ import numpy as np
 # TAB 3: Area-wise Prediction & Forecast
 # =====================
 if sidebar_option == "validation":
-    st.header("📊 Area-wise Prediction & Forecast")
-
-    # 1️⃣ Load test data
-    test_file = "test_data_2024-Q4.csv"  # keep your file
-    test_df = pd.read_csv(test_file)
+    # 1️⃣ Load test data (already loaded, no change)
+    test_df = pd.read_csv("df_test.csv")  # your test data
     
-    # 2️⃣ Select area
-    areas = test_df['area_name_en'].unique()
-    selected_area = st.selectbox("Select Area", areas)
+    # 2️⃣ Area selection
+    area_files = [
+        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
+        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
+        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
+        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
+        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
+        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
+        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
+        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
+        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
+        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
+    ]
     
-    # 3️⃣ Filter test data for selected area
+    # Dropdown with clean names
+    areas_clean = [f.split("dt_model_")[1].replace(".pkl","") for f in area_files]
+    selected_area = st.selectbox("Select Area", areas_clean)
+    
+    # 3️⃣ Get corresponding pickle file
+    model_file = area_files[areas_clean.index(selected_area)]
+    
+    # 4️⃣ Load the model
+    try:
+        with open(model_file, "rb") as f:
+            model = pickle.load(f)
+    except FileNotFoundError:
+        st.error(f"Model file not found: {model_file}")
+        st.stop()
+    
+    # 5️⃣ Filter test data for selected area
     area_test_df = test_df[test_df['area_name_en'] == selected_area].copy()
     
-    if area_test_df.empty:
-        st.warning("No data available for this area in test dataset.")
-    else:
-        st.subheader("Test Data for Selected Area")
-        st.dataframe(area_test_df)
-        
-        # 4️⃣ Load trained model, OHE, and train columns
-        model_file = f"dt_model_{selected_area}.pkl"
-        with open(model_file, "rb") as f:
-            area_model = pickle.load(f)
-            
-        with open("onehot_encoder.pkl", "rb") as f:
-            ohe = pickle.load(f)
-        
-        with open("train_columns.pkl", "rb") as f:
-            train_cols = pickle.load(f)
-        
-        # 5️⃣ Apply OHE to categorical columns (assuming 'area_name_en' already filtered)
-        cat_cols = area_test_df.select_dtypes(include='object').columns.tolist()
-        if 'price' in cat_cols:  # remove target if exists
-            cat_cols.remove('price')
-        if 'area_name_en' in cat_cols:  # remove area col
-            cat_cols.remove('area_name_en')
-        
-        area_test_encoded = area_test_df.copy()
-        if cat_cols:
-            cat_encoded = ohe.transform(area_test_df[cat_cols])
-            cat_encoded_df = pd.DataFrame(cat_encoded, columns=ohe.get_feature_names_out(cat_cols))
-            area_test_encoded = pd.concat([area_test_df.drop(columns=cat_cols), cat_encoded_df], axis=1)
-        
-        # 6️⃣ Align columns to training
-        missing_cols = set(train_cols) - set(area_test_encoded.columns)
-        for col in missing_cols:
-            area_test_encoded[col] = 0  # add missing columns
-        
-        area_test_encoded = area_test_encoded[train_cols]  # ensure same order
-        
-        # 7️⃣ Predict price
-        predictions = area_model.predict(area_test_encoded)
-        area_test_df['predicted_price'] = predictions
-        
-        st.subheader("Predicted Prices")
-        st.dataframe(area_test_df[['instance_date', 'price', 'predicted_price']])
-        
-        # 8️⃣ Plot historical + predicted + forecast
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=area_test_df['instance_date'],
-            y=area_test_df['price'],
-            mode='lines+markers',
-            name='Actual Price'
-        ))
-        fig.add_trace(go.Scatter(
-            x=area_test_df['instance_date'],
-            y=area_test_df['predicted_price'],
-            mode='lines+markers',
-            name='Predicted Price'
-        ))
-        
-        # Optional simple forecast: linear extrapolation
-        last_date = pd.to_datetime(area_test_df['instance_date']).max()
-        forecast_dates = pd.date_range(last_date + pd.Timedelta(days=1), periods=10, freq='D')
-        if len(predictions) >= 2:
-            slope = (predictions[-1] - predictions[-2])
-            forecast_values = [predictions[-1] + slope * (i+1) for i in range(len(forecast_dates))]
-            fig.add_trace(go.Scatter(
-                x=forecast_dates,
-                y=forecast_values,
-                mode='lines+markers',
-                name='Forecast'
-            ))
-        
-        fig.update_layout(title=f"Price Trend & Prediction for {selected_area}",
-                          xaxis_title="Date", yaxis_title="Price")
-        st.plotly_chart(fig, use_container_width=True)
+    # 6️⃣ Load OHE and transformed columns pickles (replace with your actual file names)
+    with open("ohe.pkl", "rb") as f:
+        ohe = pickle.load(f)
+    with open("transformed_columns.pkl", "rb") as f:
+        transformed_columns = pickle.load(f)
+    
+    # Apply OHE to area_test_df
+    area_test_ohe = pd.DataFrame(ohe.transform(area_test_df).toarray(), columns=transformed_columns)
+    
+    # 7️⃣ Predict
+    area_test_df['predicted_price'] = model.predict(area_test_ohe)
+    
+    # 8️⃣ Plot actual vs predicted
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=area_test_df['instance_date'], y=area_test_df['price'], mode='lines+markers', name='Actual Price'))
+    fig.add_trace(go.Scatter(x=area_test_df['instance_date'], y=area_test_df['predicted_price'], mode='lines+markers', name='Predicted Price'))
+    
+    # 9️⃣ Optional: Forecast trend (using last predicted value)
+    future_dates = pd.date_range(area_test_df['instance_date'].max(), periods=5, freq='M')
+    future_values = np.linspace(area_test_df['predicted_price'].iloc[-1], area_test_df['predicted_price'].iloc[-1]*1.05, len(future_dates))
+    fig.add_trace(go.Scatter(x=future_dates, y=future_values, mode='lines', name='Forecast'))
+    
+    st.plotly_chart(fig)
 
 
 
