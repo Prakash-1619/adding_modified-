@@ -1687,848 +1687,139 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.express as px
 if sidebar_option == "📈 Model Results":
-    # =========================
-    # 0️⃣ IMPORT REQUIRED LIBRARIES
-    # =========================
-    from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-    import numpy as np
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    import plotly.express as px
-    
-    # =========================
-    # 1️⃣ LOAD ONEHOT ENCODER
-    # =========================
-    try:
-        with open("onehot_encoder.pkl", "rb") as f:
-            ohe = pickle.load(f)
-        #st.sidebar.success("✅ OneHot Encoder loaded")
-    except Exception as e:
-        st.error(f"❌ Error loading OneHot encoder: {e}")
-        st.stop()
-    file_options = {
-        "Test_data": "test_data_20 areas_1.csv",
-        "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
-        "all_data_sample_50": "all_values_area_data.csv"}
-    
-    # Create selectbox
-    selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
-    file_path = file_options[selected_file_label]
-    # =========================
-    # 2️⃣ LOAD AREA-WISE MODELS
-    # =========================
-    area_models = {}
-    area_files = [
-        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
-        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
-        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
-        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
-        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
-        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
-        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
-        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
-        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
-        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
-    ]
-    
-    for model_file in area_files:
-        try:
-            area_name = model_file.split("dt_model_")[1].replace(".pkl", "").replace("_", " ")
-            with open(model_file, "rb") as f:
-                area_models[area_name] = pickle.load(f)
-            #st.sidebar.success(f"✅ {area_name}")
-        except FileNotFoundError:
-            st.sidebar.warning(f"⚠️ {model_file} not found")
-        except Exception as e:
-            st.sidebar.error(f"❌ {model_file}: {str(e)}")
-    
-    # =========================
-    # 3️⃣ STREAMLIT UI
-    # =========================
-    #st.title("🏠 Dubai Real Estate Price Predictor")
-    #st.write("Area-wise model performance analysis")
-    
-    # Create tabs for different functionalities
-    tab1, tab2,tab3 = st.tabs(["📊 Predictions & Analysis","🔮 Forecasting_year_trends","validation"])
-    
-    with tab1:
-        st.header("📊 Model Predictions & Performance Analysis")
-        import pandas as pd
-        
-        # =========================
-        # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
-        # =========================
-        try:
-            test_samples = pd.read_csv(file_path)
-            test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
-            st.dataframe(test_samples)
-            # Remove unwanted columns including 'Unnamed: 0'
-            columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
-            columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
-            
-            X_test = test_samples.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
-            y_test = test_samples['meter_sale_price']
-            
-            st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
-            #st.dataframe(test_samples.head(), use_container_width=True)
-            
-            # Identify categorical columns
-            cat_cols = X_test.select_dtypes(include='object').columns.tolist()
-    
-            # Apply saved encoder
-            if cat_cols:
-                X_cat_test = ohe.transform(X_test[cat_cols])
-                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test.index)
-                X_test = X_test.drop(columns=cat_cols)
-                X_test = pd.concat([X_test, X_cat_test], axis=1)
-            
-            # Ensure we only have numeric columns
-            X_test = X_test.select_dtypes(include=[np.number])
-            
-            # =========================
-            # 5️⃣ PREDICTION & METRICS
-            # =========================
-            if st.button("🚀 Run Predictions", type="primary", key="predict_btn"):
-                if len(area_models) == 0:
-                    st.error("❌ No models loaded. Please check model files.")
-                    st.stop()
-                
-                y_pred_total = pd.Series(index=test_samples.index, dtype=float)
-                test_metrics = {}
-                area_predictions = {}
-        
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-        
-                areas = test_samples['area_name_en'].unique()
-                for i, area in enumerate(areas):
-                    status_text.text(f"Processing {area}... ({i+1}/{len(areas)})")
-                    progress_bar.progress((i + 1) / len(areas))
-                    
-                    if area not in area_models:
-                        st.warning(f"⚠️ Skipping area '{area}' (model not available)")
-                        continue
-        
-                    model = area_models[area]
-                    mask = test_samples['area_name_en'] == area
-                    X_area_test = X_test.loc[mask]
-                    y_area_test = y_test.loc[mask]
-        
-                    if len(X_area_test) > 0:
-                        try:
-                            y_pred = model.predict(X_area_test)
-                            y_pred_total.loc[mask] = y_pred
-        
-                            # Metrics
-                            r2 = r2_score(y_area_test, y_pred)
-                            rmse = np.sqrt(mean_squared_error(y_area_test, y_pred))
-                            mae = mean_absolute_error(y_area_test, y_pred)
-        
-                            test_metrics[area] = {
-                                'R2': round(r2, 4), 
-                                'RMSE': round(rmse, 2), 
-                                'MAE': round(mae, 2),
-                                'Samples': len(y_area_test),
-                                'Avg_Actual_Price': round(y_area_test.mean(), 2),
-                                'Avg_Predicted_Price': round(y_pred.mean(), 2)
-                            }
-                            
-                            # Store predictions for plotting
-                            area_predictions[area] = {
-                                'actual': y_area_test,
-                                'predicted': y_pred
-                            }
-                        except Exception as e:
-                            st.error(f"❌ Error predicting for {area}: {e}")
-                            continue
-        
-                status_text.text("✅ Prediction completed!")
-                progress_bar.empty()
-        
-                # =========================
-                # 6️⃣ DISPLAY RESULTS
-                # =========================
-                if test_metrics:
-                    test_metrics_df = pd.DataFrame(test_metrics).T
-                    test_metrics_df = test_metrics_df.sort_values(by='R2', ascending=False)
-                    
-                    # Display metrics table
-                    st.subheader("📈 Prediction Results")
-                    st.dataframe(test_metrics_df.style.format({
-                        'R2': '{:.4f}',
-                        'RMSE': '{:.2f}',
-                        'MAE': '{:.2f}',
-                        'Avg_Actual_Price': '{:,.2f}',
-                        'Avg_Predicted_Price': '{:,.2f}'
-                    }), use_container_width=True)
-                    
-                    # Summary statistics
-                    st.subheader("📊 Summary Statistics")
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Areas Processed", len(test_metrics))
-                    with col2:
-                        avg_r2 = test_metrics_df['R2'].mean()
-                        st.metric("Average R² Score", f"{avg_r2:.4f}")
-                    with col3:
-                        total_samples = test_metrics_df['Samples'].sum()
-                        st.metric("Total Samples", total_samples)
-                    with col4:
-                        avg_rmse = test_metrics_df['RMSE'].mean()
-                        st.metric("Average RMSE", f"{avg_rmse:.2f}")
-                    
-                    # Best and worst performing areas
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        best_area = test_metrics_df.loc[test_metrics_df['R2'].idxmax()]
-                        st.metric("Best R² Score", 
-                                 f"{best_area['R2']:.4f}", 
-                                 f"{test_metrics_df['R2'].idxmax()}")
-                    
-                    with col2:
-                        worst_area = test_metrics_df.loc[test_metrics_df['R2'].idxmin()]
-                        st.metric("Worst R² Score", 
-                                 f"{worst_area['R2']:.4f}", 
-                                 f"{test_metrics_df['R2'].idxmin()}")
-                    
-                    # =========================
-                    # 7️⃣ VISUALIZATIONS FOR PREDICTIONS TAB
-                    # =========================
-                    st.subheader("📊 Prediction Visualizations")
-                    
-                    # Tab for different visualizations
-                    viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📈 Performance Metrics", "🔍 Actual vs Predicted", "📊 Area Comparison"])
-                    
-                    with viz_tab1:
-                        # R2 Score Bar Chart
-                        fig_r2 = px.bar(
-                            x=test_metrics_df.index,
-                            y=test_metrics_df['R2'],
-                            title="R² Scores by Area",
-                            labels={'x': 'Area', 'y': 'R² Score'},
-                            color=test_metrics_df['R2'],
-                            color_continuous_scale="RdYlGn"
-                        )
-                        fig_r2.update_layout(height=500)
-                        st.plotly_chart(fig_r2, use_container_width=True)
-                        
-                        # RMSE and MAE comparison
-                        fig_errors = go.Figure()
-                        fig_errors.add_trace(go.Bar(name='RMSE', x=test_metrics_df.index, y=test_metrics_df['RMSE']))
-                        fig_errors.add_trace(go.Bar(name='MAE', x=test_metrics_df.index, y=test_metrics_df['MAE']))
-                        fig_errors.update_layout(title="Error Metrics by Area", barmode='group', height=500)
-                        st.plotly_chart(fig_errors, use_container_width=True)
-                    
-                    with viz_tab2:
-                        # Scatter plots for actual vs predicted
-                        selected_area = st.selectbox("Select Area for Detailed Analysis", list(area_predictions.keys()))
-                        
-                        if selected_area in area_predictions:
-                            actual = area_predictions[selected_area]['actual']
-                            predicted = area_predictions[selected_area]['predicted']
-                            
-                            fig_scatter = px.scatter(
-                                x=actual, y=predicted,
-                                title=f"Actual vs Predicted Prices - {selected_area}",
-                                labels={'x': 'Actual Price', 'y': 'Predicted Price'},
-                                trendline="ols"
-                            )
-                            
-                            # Add perfect prediction line
-                            max_val = max(actual.max(), predicted.max())
-                            min_val = min(actual.min(), predicted.min())
-                            fig_scatter.add_trace(go.Scatter(
-                                x=[min_val, max_val], y=[min_val, max_val],
-                                mode='lines', name='Perfect Prediction',
-                                line=dict(dash='dash', color='red')
-                            ))
-                            
-                            fig_scatter.update_layout(height=500)
-                            st.plotly_chart(fig_scatter, use_container_width=True)
-                            
-                            # Residual plot
-                            residuals = actual - predicted
-                            fig_residual = px.scatter(
-                                x=predicted, y=residuals,
-                                title=f"Residual Plot - {selected_area}",
-                                labels={'x': 'Predicted Price', 'y': 'Residuals'}
-                            )
-                            fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
-                            fig_residual.update_layout(height=400)
-                            #st.plotly_chart(fig_residual, use_container_width=True)
-                    
-                    with viz_tab3:
-                        # Price comparison chart
-                        fig_prices = go.Figure()
-                        fig_prices.add_trace(go.Bar(name='Actual Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Actual_Price']))
-                        fig_prices.add_trace(go.Bar(name='Predicted Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Predicted_Price']))
-                        fig_prices.update_layout(title="Average Actual vs Predicted Prices by Area", barmode='group', height=500)
-                        st.plotly_chart(fig_prices, use_container_width=True)
-                        
-                        # Error percentage by area
-                        error_percentage = ((test_metrics_df['Avg_Actual_Price'] - test_metrics_df['Avg_Predicted_Price']) / test_metrics_df['Avg_Actual_Price'] * 100).abs()
-                        fig_error_pct = px.bar(
-                            x=error_percentage.index,
-                            y=error_percentage.values,
-                            title="Absolute Error Percentage by Area",
-                            labels={'x': 'Area', 'y': 'Error %'},
-                            color=error_percentage.values,
-                            color_continuous_scale="Reds"
-                        )
-                        fig_error_pct.update_layout(height=400)
-                        st.plotly_chart(fig_error_pct, use_container_width=True)
-                    
-                    # Download results
-                    results_df = test_samples.copy()
-                    results_df['predicted_price'] = y_pred_total
-                    results_df['prediction_error'] = results_df['meter_sale_price'] - results_df['predicted_price']
-                    results_df['error_percentage'] = (results_df['prediction_error'] / results_df['meter_sale_price'] * 100).round(2)
-                    
-                    csv = results_df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Full Predictions CSV",
-                        data=csv,
-                        file_name="dubai_real_estate_predictions.csv",
-                        mime="text/csv"
-                    )
-                        
-                else:
-                    st.warning("No predictions were made. Check if area names match the trained models.")
-                    
-        except FileNotFoundError:
-            st.error("❌ Test data file 'test_data_20 areas_1.csv' not found. Please make sure the file exists in the same directory.")
-        except Exception as e:
-            st.error(f"❌ Error loading test data: {str(e)}")
-    
+import streamlit as st
+import pandas as pd
+import numpy as np
+import pickle
+import glob
+import os
+import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
-####################################################################________________________>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>______________________________________################################################
-    with tab2:
-         #st.header("🔮 Price Forecasting")
-        #st.markdown("Area-wise predictions with growth factor projections")
-        
-        # =========================
-        # 8️⃣ LOAD DATA FOR FORECASTING TAB
-        # =========================
-        @st.cache_data
-        def load_forecasting_data():
-            """Load forecasting-specific data"""
-            try:
-                # Load test data for forecasting
-                #test_samples_forecast = pd.read_csv(selected_file_label)
-                
-                test_samples_forecast = pd.read_csv(file_path)
-                test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
-                st.dataframe(test_samples_forecast)
-                # Remove unwanted columns
-                columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
-                columns_to_drop = [col for col in columns_to_drop if col in test_samples_forecast.columns]
-                X_test_forecast = test_samples_forecast.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
-                
-                # Load train columns
-                with open("train_columns.pkl", "rb") as f:
-                    train_columns = pickle.load(f)
-                
-                # Load growth factors
-                growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-                growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-                growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
-                
-                # Load and prepare historical quarterly median prices from training data
-                train_data = pd.read_csv("df_trained_dataset_6000.csv")  # Assuming you have training data
-                # Extract year-quarter from instance_date
-                train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
-                train_data['year_quarter'] = train_data['instance_date'].dt.year.astype(str) + '-Q' + train_data['instance_date'].dt.quarter.astype(str)
-                
-                # Calculate median prices per area per quarter
-                historical_median = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].median().reset_index()
-                historical_pivot = historical_median.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
-                
-                # Calculate overall historical trends (across all areas)
-                overall_historical_median = train_data.groupby(['year_quarter'])['meter_sale_price'].median().reset_index()
-                overall_historical_pivot = overall_historical_median.set_index('year_quarter')['meter_sale_price'].to_dict()
-                
-                # Get the most recent 4 quarters for historical context
-                recent_quarters = sorted(historical_median['year_quarter'].unique())#[-12:]
-                historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
-                
-                return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot
-            except Exception as e:
-                st.error(f"Error loading forecasting data: {str(e)}")
-                return None, None, None, None, None, None, None
+# =========================
+# HEADER
+# =========================
+st.set_page_config(page_title="Area Price Forecast Dashboard", layout="wide")
+st.title("🏢 Area-wise Real Estate Forecast Dashboard")
+st.markdown("### Predict, Visualize, and Validate Area-wise Prices")
 
-        # Load data for forecasting
-        with st.spinner("Loading forecasting data..."):
-            test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, historical_pivot, historical_quarters, overall_historical_pivot = load_forecasting_data()
+# =========================
+# SIDEBAR
+# =========================
+st.sidebar.header("Upload & Filters")
 
-        if test_samples_forecast is None:
-            st.error("❌ Failed to load forecasting data")
-            st.stop()
-        
-        # Prepare test data for forecasting
-        try:
-            # Separate area_name_en column for later use
-            area_names_forecast = X_test_forecast_raw['area_name_en']
-            X_test_forecast_no_area = X_test_forecast_raw.drop(columns=['area_name_en'], errors='ignore')
-            
-            # Identify categorical columns (excluding area_name_en)
-            cat_cols = X_test_forecast_no_area.select_dtypes(include='object').columns.tolist()
-            
-            # Apply one-hot encoding
-            if cat_cols:
-                X_cat_test = ohe.transform(X_test_forecast_no_area[cat_cols])
-                X_cat_test = pd.DataFrame(X_cat_test, columns=ohe.get_feature_names_out(cat_cols), index=X_test_forecast_no_area.index)
-                
-                X_test_forecast = X_test_forecast_no_area.drop(columns=cat_cols)
-                X_test_forecast = pd.concat([X_test_forecast, X_cat_test], axis=1)
-            else:
-                X_test_forecast = X_test_forecast_no_area.copy()
-            
-            # Ensure we have all training columns
-            for col in train_columns:
-                if col not in X_test_forecast.columns:
-                    X_test_forecast[col] = 0
-            
-            X_test_forecast = X_test_forecast[train_columns]
-            X_test_forecast = X_test_forecast.select_dtypes(include=[np.number])
-            
-        except Exception as e:
-            st.error(f"❌ Error preparing forecasting data: {str(e)}")
-            st.stop()
-        
-        # =========================
-        # 9️⃣ FORECASTING CONTROLS
-        # =========================
-        st.sidebar.title("🔧 Forecast Controls")
-        
-        # Area selection
-        available_areas = list(area_models.keys())
-        selected_areas_forecast = st.sidebar.multiselect(
-            "Select Areas for Forecasting",
-            options=available_areas,
-            default=available_areas[:4] if len(available_areas) > 4 else available_areas,
-            key="forecast_areas_sidebar"
-        )
-        
-        # Feature grouping options
-        grouping_options = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
-        selected_grouping = st.sidebar.selectbox(
-            "Group by Feature",
-            options=grouping_options,
-            index=0,
-            key="grouping_feature_sidebar"
-        )
-        
-        # Display options
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📊 Display Options")
-        show_historical = st.sidebar.checkbox("Show Historical Quarterly Trends", value=True, key="show_historical")
-        show_overall_trend = st.sidebar.checkbox("Show Overall Market Trend", value=True, key="show_overall")
-        num_historical_quarters = st.sidebar.slider("Number of Historical Quarters to Show", 
-                                                  min_value=1, max_value=12, value=4, key="hist_quarters")
-        
-        # =========================
-        # 🔟 FORECASTING EXECUTION
-        # =========================
-        if st.button("🚀 Generate Forecast", type="primary", key="forecast_button"):
-            if len(selected_areas_forecast) == 0:
-                st.warning("Please select at least one area for forecasting")
-                st.stop()
-                
-            with st.spinner("Generating forecasts..."):
-                # Dynamic grouping features
-                if selected_grouping == 'rooms_en':
-                    grouping_features = [col for col in X_test_forecast.columns if col.startswith("rooms_en_")]
-                elif selected_grouping == 'floor_bin':
-                    grouping_features = [col for col in X_test_forecast.columns if col.startswith("floor_bin_")]
-                else:
-                    grouping_features = [selected_grouping]
-            
-                pred_list = []
-                overall_predictions = []
-            
-                for area in selected_areas_forecast:
-                    if area not in area_models:
-                        continue
-            
-                    model = area_models[area]
-                    mask = test_samples_forecast['area_name_en'] == area
-                    X_area_test = X_test_forecast.loc[mask]
-            
-                    if len(X_area_test) > 0:
-                        y_pred = model.predict(X_area_test)
-            
-                        # Collect predictions for feature-wise analysis
-                        df_area_pred = X_area_test[grouping_features].copy()
-                        df_area_pred['area_name_en'] = area
-                        df_area_pred['prediction'] = y_pred
-                        pred_list.append(df_area_pred)
-                        
-                        # Collect predictions for overall trend
-                        overall_df = pd.DataFrame({
-                            'area_name_en': [area] * len(y_pred),
-                            'prediction': y_pred
-                        })
-                        overall_predictions.append(overall_df)
-            
-                if not pred_list:
-                    st.error("No predictions generated. Check area selection.")
-                    st.stop()
-                    
-                pred_df = pd.concat(pred_list)
-                overall_pred_df = pd.concat(overall_predictions)
-            
-                # Feature-wise grouping
-                group_cols = ['area_name_en'] + grouping_features
-                median_pred_group = pred_df.groupby(group_cols)['prediction'].median().reset_index()
-                
-                # Overall trend (across all selected areas and features)
-                overall_median = overall_pred_df.groupby(['area_name_en'])['prediction'].median().reset_index()
-            
-                # Merge with growth factors
-                forecast_df = median_pred_group.merge(growth_pivot, on='area_name_en', how='left')
-                overall_forecast_df = overall_median.merge(growth_pivot, on='area_name_en', how='left')
-                
-                # Merge with historical data
-                if historical_pivot is not None:
-                    forecast_df = forecast_df.merge(historical_pivot, on='area_name_en', how='left')
-                    overall_forecast_df = overall_forecast_df.merge(historical_pivot, on='area_name_en', how='left')
-            
-                # Apply growth factors to future quarters
-                future_quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
-                for q in future_quarter_cols:
-                    if q in forecast_df.columns:
-                        forecast_df[q] = forecast_df['prediction'] * forecast_df[q]
-                    if q in overall_forecast_df.columns:
-                        overall_forecast_df[q] = overall_forecast_df['prediction'] * overall_forecast_df[q]
-            
-                # Final forecast with historical data
-                all_quarter_cols = []
-                if show_historical and historical_pivot is not None:
-                    available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
-                    selected_historical = available_historical[-num_historical_quarters:]
-                    all_quarter_cols = selected_historical + ['prediction'] + future_quarter_cols
-                else:
-                    all_quarter_cols = ['prediction'] + future_quarter_cols
-                
-                final_forecast = forecast_df[group_cols + all_quarter_cols]
-                final_overall_forecast = overall_forecast_df[['area_name_en'] + all_quarter_cols]
-            
-            # =========================
-            # 1️⃣1️⃣ FORECASTING VISUALIZATIONS
-            # =========================
-            st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
-            
-            # Display forecast tables
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.subheader("📋 Feature-wise Forecast")
-                display_df = final_forecast.copy()
-                for col in all_quarter_cols:
-                    if col in display_df.columns:
-                        display_df[col] = display_df[col].round(2)
-                st.dataframe(display_df, use_container_width=True)
-            
-            with col2:
-                st.subheader("📊 Overall Area Forecast")
-                overall_display_df = final_overall_forecast.copy()
-                for col in all_quarter_cols:
-                    if col in overall_display_df.columns:
-                        overall_display_df[col] = overall_display_df[col].round(2)
-                st.dataframe(overall_display_df, use_container_width=True)
-            
-            # Visualizations
-            st.subheader("📈 Forecast Visualizations")
-            
-            # Helper function for quarter formatting
-            def format_quarter_label(quarter_str):
-                if '-' in quarter_str:
-                    parts = quarter_str.split('-')
-                    if len(parts) == 2:
-                        return f"{parts[0]} {parts[1]}"
-                return quarter_str.replace('_', ' ').title()
-            
-            # 1. OVERALL MARKET TREND (ACROSS ALL SELECTED AREAS)
-            if show_overall_trend:
-                st.markdown("### 🌐 Overall Market Trend")
-                fig_overall = go.Figure()
-                
-                # Add overall historical trend line
-                if show_historical and overall_historical_pivot:
-                    historical_quarters_sorted = sorted([q for q in overall_historical_pivot.keys() if q in selected_historical])
-                    historical_prices = [overall_historical_pivot[q] for q in historical_quarters_sorted]
-                    historical_labels = [format_quarter_label(q) for q in historical_quarters_sorted]
-                    
-                    fig_overall.add_trace(go.Scatter(
-                        x=historical_labels,
-                        y=historical_prices,
-                        mode='lines+markers',
-                        name='Overall Market Historical',
-                        line=dict(color='blue', width=4, dash='solid'),
-                        marker=dict(size=8)
-                    ))
-                
-                # Add current overall prediction
-                current_overall_median = overall_pred_df['prediction'].median()
-                time_periods = []
-                overall_prices = []
-                
-                if show_historical:
-                    time_periods.extend(historical_labels)
-                    overall_prices.extend(historical_prices)
-                
-                time_periods.append('Current')
-                overall_prices.append(current_overall_median)
-                
-                # Add future overall forecast
-                future_prices = []
-                valid_future_quarters = []
-                
-                for area in selected_areas_forecast:
-                    area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
-                    if not area_data.empty:
-                        area_future_prices = []
-                        for q in future_quarter_cols:
-                            if q in area_data.columns and pd.notna(area_data[q].iloc[0]):
-                                area_future_prices.append(area_data[q].iloc[0])
-                                if q not in valid_future_quarters:
-                                    valid_future_quarters.append(q)
-                        if area_future_prices:  # Only add if we have future prices for this area
-                            future_prices.append(area_future_prices)
-                
-                if future_prices:
-                    # Calculate median future prices across all areas
-                    # Ensure all arrays are the same length by padding with NaN if necessary
-                    max_len = max(len(prices) for prices in future_prices)
-                    padded_prices = []
-                    for prices in future_prices:
-                        if len(prices) < max_len:
-                            padded_prices.append(prices + [np.nan] * (max_len - len(prices)))
-                        else:
-                            padded_prices.append(prices)
-                    
-                    future_median_prices = np.nanmedian(padded_prices, axis=0)
-                    future_labels = [format_quarter_label(q) for q in valid_future_quarters]
-                    
-                    time_periods.extend(future_labels)
-                    overall_prices.extend(future_median_prices)
-                
-                fig_overall.add_trace(go.Scatter(
-                    x=time_periods,
-                    y=overall_prices,
-                    mode='lines+markers',
-                    name='Overall Market Forecast',
-                    line=dict(color='red', width=4, dash='dash'),
-                    marker=dict(size=10)
-                ))
-                
-                fig_overall.update_layout(
-                    title="Overall Market Price Trend & Forecast",
-                    xaxis_title="Time Period",
-                    yaxis_title="Median Price (AED)",
-                    height=500,
-                    template="plotly_white",
-                    showlegend=True
-                )
-                
-                if show_historical:
-                    fig_overall.add_vline(
-                        x=len(historical_labels) - 0.5, 
-                        line_width=2, 
-                        line_dash="dot", 
-                        line_color="green",
-                        annotation_text="Historical → Forecast"
-                    )
-                
-                st.plotly_chart(fig_overall, use_container_width=True)
-            
-            # 2. AREA-WISE FORECAST CHARTS (FEATURE-WISE AND OVERALL)
-            for area in selected_areas_forecast:
-                area_data = final_forecast[final_forecast['area_name_en'] == area]
-                area_overall_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
-                
-                if area_data.empty:
-                    continue
-                    
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown(f"### 📊 {area} - Feature-wise Forecast")
-                    fig_features = go.Figure()
-                    
-                    for idx, (_, row) in enumerate(area_data.iterrows()):
-                        # Create feature label
-                        feature_label = ""
-                        for gf in grouping_features:
-                            if gf in row and row[gf] == 1:
-                                feature_label += f"{gf.replace('_', ' ').title()}, "
-                        feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
-                        
-                        # Prepare data for plotting
-                        time_periods = []
-                        prices = []
-                        
-                        # Add historical quarters
-                        if show_historical:
-                            historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
-                            for hq in historical_cols:
-                                time_periods.append(format_quarter_label(hq))
-                                prices.append(row[hq])
-                        
-                        # Add current prediction
-                        time_periods.append('Current')
-                        prices.append(row['prediction'])
-                        
-                        # Add future quarters
-                        for fq in future_quarter_cols:
-                            if fq in row and pd.notna(row[fq]):
-                                time_periods.append(format_quarter_label(fq))
-                                prices.append(row[fq])
-                        
-                        # Plot feature-wise trend
-                        fig_features.add_trace(go.Scatter(
-                            x=time_periods, y=prices,
-                            mode='lines+markers',
-                            name=feature_label,
-                            line=dict(width=3),
-                            marker=dict(size=6)
-                        ))
-                    
-                    fig_features.update_layout(
-                        title=f"Feature-wise Forecast - {area}",
-                        xaxis_title="Time Period",
-                        yaxis_title="Price (AED)",
-                        height=400,
-                        template="plotly_white"
-                    )
-                    st.plotly_chart(fig_features, use_container_width=True)
-                
-                with col2:
-                    st.markdown(f"### 📈 {area} - Overall Trend")
-                    fig_overall_area = go.Figure()
-                    
-                    if not area_overall_data.empty:
-                        row = area_overall_data.iloc[0]
-                        
-                        time_periods_area = []
-                        prices_area = []
-                        
-                        # Add historical data
-                        if show_historical:
-                            historical_cols = [col for col in selected_historical if col in row and pd.notna(row[col])]
-                            for hq in historical_cols:
-                                time_periods_area.append(format_quarter_label(hq))
-                                prices_area.append(row[hq])
-                        
-                        # Add current and future
-                        time_periods_area.append('Current')
-                        prices_area.append(row['prediction'])
-                        
-                        for fq in future_quarter_cols:
-                            if fq in row and pd.notna(row[fq]):
-                                time_periods_area.append(format_quarter_label(fq))
-                                prices_area.append(row[fq])
-                        
-                        fig_overall_area.add_trace(go.Scatter(
-                            x=time_periods_area, y=prices_area,
-                            mode='lines+markers',
-                            name=f'{area} Overall',
-                            line=dict(color='orange', width=4),
-                            marker=dict(size=8)
-                        ))
-                    
-                    fig_overall_area.update_layout(
-                        title=f"Overall Area Forecast - {area}",
-                        xaxis_title="Time Period",
-                        yaxis_title="Price (AED)",
-                        height=400,
-                        template="plotly_white"
-                    )
-                    st.plotly_chart(fig_overall_area, use_container_width=True)
-            
-            # 3. COMPARISON HEATMAP
-            st.subheader("🔥 Market Comparison Heatmap")
-            
-            # Prepare heatmap data
-            heatmap_data = []
-            row_labels = []
-            time_periods_heatmap = []
-            
-            if show_historical:
-                historical_labels = [format_quarter_label(hq) for hq in selected_historical]
-                time_periods_heatmap.extend(historical_labels)
-            time_periods_heatmap.append('Current')
-            future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
-            time_periods_heatmap.extend(future_labels)
-            
-            # Add overall market trend
-            if show_overall_trend:
-                overall_prices_heatmap = []
-                # Historical
-                if show_historical and overall_historical_pivot:
-                    for hq in selected_historical:
-                        if hq in overall_historical_pivot:
-                            overall_prices_heatmap.append(overall_historical_pivot[hq])
-                # Current and future
-                overall_prices_heatmap.append(current_overall_median)
-                overall_prices_heatmap.extend(future_median_prices if 'future_median_prices' in locals() else [])
-                
-                if len(overall_prices_heatmap) == len(time_periods_heatmap):
-                    heatmap_data.append(overall_prices_heatmap)
-                    row_labels.append("Overall Market")
-            
-            # Add area trends
-            for area in selected_areas_forecast:
-                area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
-                if not area_data.empty:
-                    row = area_data.iloc[0]
-                    area_prices = []
-                    
-                    # Historical
-                    if show_historical:
-                        for hq in selected_historical:
-                            if hq in row and pd.notna(row[hq]):
-                                area_prices.append(row[hq])
-                            else:
-                                area_prices.append(np.nan)
-                    
-                    # Current and future
-                    area_prices.append(row['prediction'])
-                    for fq in future_quarter_cols:
-                        if fq in row and pd.notna(row[fq]):
-                            area_prices.append(row[fq])
-                        else:
-                            area_prices.append(np.nan)
-                    
-                    if len(area_prices) == len(time_periods_heatmap):
-                        heatmap_data.append(area_prices)
-                        row_labels.append(area)
-            
-            if heatmap_data:
-                heatmap_df = pd.DataFrame(
-                    heatmap_data,
-                    index=row_labels,
-                    columns=time_periods_heatmap
-                )
-                
-                fig_heat = px.imshow(
-                    heatmap_df,
-                    title="Price Comparison Heatmap (AED)",
-                    color_continuous_scale="Viridis",
-                    aspect="auto",
-                    labels=dict(x="Time Period", y="Area/Market", color="Price (AED)")
-                )
-                fig_heat.update_layout(height=500)
-                st.plotly_chart(fig_heat, use_container_width=True)
-            
-            # Download forecast results
-            csv_forecast = final_forecast.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Forecast Results",
-                data=csv_forecast,
-                file_name="dubai_forecast_results.csv",
-                mime="text/csv",
-                key="forecast_download")
+uploaded_file = st.sidebar.file_uploader("Upload Test CSV", type=["csv"])
+selected_areas = st.sidebar.multiselect("Select Areas", [], default=[])
+
+# Optional Date filter
+start_date = st.sidebar.date_input("Start Date")
+end_date = st.sidebar.date_input("End Date")
+
+# =========================
+# LOAD ENCODER, TRAIN COLUMNS, MODELS
+# =========================
+with open("onehot_encoder.pkl", "rb") as f:
+    ohe = pickle.load(f)
+
+with open("train_columns.pkl", "rb") as f:
+    train_columns = pickle.load(f)
+
+# Load all models
+area_models = {}
+for f in glob.glob("dt_model_*.pkl"):
+    area_name = os.path.basename(f).replace("dt_model_", "").replace(".pkl", "").replace("_", " ")
+    with open(f, "rb") as file:
+        area_models[area_name] = pickle.load(file)
+
+if not uploaded_file:
+    st.warning("Please upload a test CSV to proceed.")
+    st.stop()
+
+# Load test data
+test_samples = pd.read_csv(uploaded_file)
+
+# Apply date filter if columns exist
+if 'instance_date' in test_samples.columns:
+    test_samples['instance_date'] = pd.to_datetime(test_samples['instance_date'])
+    test_samples = test_samples[(test_samples['instance_date'] >= pd.to_datetime(start_date)) &
+                                (test_samples['instance_date'] <= pd.to_datetime(end_date))]
+
+# Update area choices if not manually selected
+if not selected_areas:
+    selected_areas = list(area_models.keys())[:3]
+
+# =========================
+# TABS
+# =========================
+tab1, tab2, tab3 = st.tabs(["📈 Model Results", "🔮 Forecasting / Trends", "🧪 Validation"])
+
+# =========================
+# TAB 1: Model Results
+# =========================
+with tab1:
+    st.subheader("Predictions & Metrics")
+    area_choice = st.selectbox("Choose Area to View Predictions", selected_areas)
+    model = area_models[area_choice]
+
+    # Prepare test features
+    X_test = test_samples.drop(columns=['meter_sale_price', 'instance_date'], errors='ignore')
+    for col in train_columns:
+        if col not in X_test.columns:
+            X_test[col] = 0
+    X_test = X_test[train_columns]
+
+    predictions = model.predict(X_test)
+    st.dataframe(pd.DataFrame({"Predicted Price": predictions}))
+
+    # Performance Metrics
+    if 'meter_sale_price' in test_samples.columns:
+        y_true = test_samples['meter_sale_price']
+        col1, col2, col3 = st.columns(3)
+        col1.metric("R2 Score", round(r2_score(y_true, predictions), 3))
+        col2.metric("MAE", round(mean_absolute_error(y_true, predictions), 2))
+        col3.metric("MSE", round(mean_squared_error(y_true, predictions), 2))
+
+    # Download Predictions
+    result_df = test_samples.copy()
+    result_df['Predicted_Price'] = predictions
+    csv = result_df.to_csv(index=False).encode()
+    st.download_button("Download Predictions CSV", csv, "predictions.csv", "text/csv")
+
+# =========================
+# TAB 2: Forecasting / Trends
+# =========================
+with tab2:
+    st.subheader("Forecasting Trends per Area")
+    fig = go.Figure()
+    for area in selected_areas:
+        model = area_models[area]
+        preds = model.predict(X_test)
+        fig.add_trace(go.Scatter(x=test_samples['instance_date'], y=preds,
+                                 mode='lines+markers', name=f"{area} Forecast"))
+    fig.update_layout(title="Area-wise Price Forecast",
+                      xaxis_title="Date", yaxis_title="Predicted Price",
+                      legend_title="Areas", hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
+
+# =========================
+# TAB 3: Validation / Actual vs Predicted
+# =========================
+with tab3:
+    st.subheader("Actual vs Predicted Comparison")
+    for area in selected_areas:
+        model = area_models[area]
+        preds = model.predict(X_test)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=test_samples['instance_date'], y=test_samples.get('meter_sale_price', [0]*len(test_samples)),
+                                 mode='lines+markers', name='Actual'))
+        fig.add_trace(go.Scatter(x=test_samples['instance_date'], y=preds,
+                                 mode='lines+markers', name='Predicted'))
+        fig.update_layout(title=f"Actual vs Predicted - {area}",
+                          xaxis_title="Date", yaxis_title="Price",
+                          legend_title="Legend", hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
+
     ###############################################################################################################################################################################################################################
     with tab3:
         import streamlit as st
