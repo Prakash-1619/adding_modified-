@@ -2558,12 +2558,11 @@ if sidebar_option == "validation":
     @st.cache_data
     def load_data():
         test_df = pd.read_csv("test_data_2024-Q4.csv")
-        train_df = pd.read_csv("df_trained_dataset_6000.csv") # Assuming you have train data
+        train_df = pd.read_csv("df_trained_dataset_6000.csv")  # Assuming you have train data
         forecast_df = pd.read_csv("quarterly_forecasts_with_CI.csv")  # Your forecast file with growth factors
         
         # Clean column names
         drop_col = ['Unnamed: 0'] 
-        drop_cols = ['Unnamed: 0','instance_date'] 
         test_df = test_df.drop(columns=[col for col in drop_col if col in test_df.columns])
         train_df = train_df.drop(columns=[col for col in drop_col if col in train_df.columns])
         if forecast_df is not None:
@@ -2639,7 +2638,10 @@ if sidebar_option == "validation":
         st.warning(f"No test data available for {selected_area}")
         st.stop()
     
-    # Ensure instance_date is datetime
+    # Drop instance_date from test_df before encoding
+    test_df_for_encoding = area_test_df.drop(columns=['instance_date'], errors='ignore')
+    
+    # Ensure instance_date is datetime for plotting
     area_test_df['instance_date'] = pd.to_datetime(area_test_df['instance_date'])
     area_test_df = area_test_df.sort_values('instance_date')
     
@@ -2653,27 +2655,30 @@ if sidebar_option == "validation":
             expected_features = ohe.feature_names_in_ if hasattr(ohe, 'feature_names_in_') else list(ohe.categories_.keys())
         
         # Select only the columns that the encoder was trained on
-        missing_cols = set(expected_features) - set(area_test_df.columns)
-        extra_cols = set(area_test_df.columns) - set(expected_features)
+        missing_cols = set(expected_features) - set(test_df_for_encoding.columns)
+        extra_cols = set(test_df_for_encoding.columns) - set(expected_features)
         
         if missing_cols:
             st.warning(f"Missing columns in test data: {missing_cols}. Adding with default values.")
             for col in missing_cols:
-                area_test_df[col] = 0  # or appropriate default value
+                test_df_for_encoding[col] = 0  # or appropriate default value
         
         if extra_cols:
             st.warning(f"Extra columns in test data: {extra_cols}. They will be ignored.")
-        
-        # Keep only the columns that the encoder expects, in the correct order
-        area_test_encoded = area_test_df[expected_features].copy()
+            test_df_for_encoding = test_df_for_encoding[expected_features]
         
         # Handle categorical columns - ensure they are string type
-        for col in area_test_encoded.select_dtypes(include=['object']).columns:
-            area_test_encoded[col] = area_test_encoded[col].astype(str)
+        for col in test_df_for_encoding.select_dtypes(include=['object']).columns:
+            test_df_for_encoding[col] = test_df_for_encoding[col].astype(str)
         
-        # Apply the encoder
-        area_test_ohe = pd.DataFrame(ohe.transform(area_test_encoded).toarray(), 
-                                    columns=transformed_columns)
+        # Apply the encoder - handle both sparse matrix and numpy array outputs
+        encoded_result = ohe.transform(test_df_for_encoding)
+        
+        # Convert to array if it's a sparse matrix, otherwise use as-is
+        if hasattr(encoded_result, 'toarray'):
+            area_test_ohe = pd.DataFrame(encoded_result.toarray(), columns=transformed_columns)
+        else:
+            area_test_ohe = pd.DataFrame(encoded_result, columns=transformed_columns)
         
         # Ensure all required columns are present for the model
         if hasattr(model, 'feature_names_in_'):
@@ -2732,8 +2737,8 @@ if sidebar_option == "validation":
         area_train_df['instance_date'] = pd.to_datetime(area_train_df['instance_date'])
         area_train_df = area_train_df.sort_values('instance_date')
         
-        # Quarterly aggregation
-        area_train_df['quarter'] = area_test_df['instance_date'].dt.to_period('Q')
+        # Quarterly aggregation - FIX: Use area_train_df instead of area_test_df
+        area_train_df['quarter'] = area_train_df['instance_date'].dt.to_period('Q')
         quarterly_trend = area_train_df.groupby('quarter')['price'].agg(['mean', 'std', 'count']).reset_index()
         quarterly_trend['quarter'] = quarterly_trend['quarter'].astype(str)
         quarterly_trend = quarterly_trend.sort_values('quarter')
@@ -2795,7 +2800,7 @@ if sidebar_option == "validation":
             )
     
     # Plot 2: Quarterly trend from train data
-    if not area_train_df.empty and len(quarterly_trend) > 1:
+    if not area_train_df.empty and 'quarterly_trend' in locals() and len(quarterly_trend) > 1:
         fig.add_trace(
             go.Scatter(
                 x=quarterly_trend['quarter'], 
@@ -2916,7 +2921,7 @@ if sidebar_option == "validation":
     # Historical context
     st.subheader("📚 Historical Context")
     
-    if not area_train_df.empty:
+    if not area_train_df.empty and 'quarterly_trend' in locals():
         tab1, tab2 = st.tabs(["Trend Analysis", "Data Summary"])
         
         with tab1:
@@ -2972,9 +2977,6 @@ if sidebar_option == "validation":
         - Min Growth Factor: {area_forecast_df['growth_factor_upper'].min():.4f}
         - Max Growth Factor: {area_forecast_df['growth_factor_upper'].max():.4f}
         """)
-
-
-
 
 
 
