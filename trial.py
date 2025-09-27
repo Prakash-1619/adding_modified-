@@ -2532,6 +2532,7 @@ if sidebar_option == "📈 Model Results":
     ###############################################################################################################################################################################################################################
     with tab3:
         import streamlit as st
+        import streamlit as st
         import pandas as pd
         import numpy as np
         import pickle
@@ -2542,31 +2543,27 @@ if sidebar_option == "📈 Model Results":
         st.title("🔮 Area-wise Price Forecasting")
         
         # =========================
-        # 1️⃣ Load list of test datasets
+        # 1️⃣ Load single test dataset
         # =========================
-        test_data_path = os.path.join(os.getcwd(), "test_data_2024-Q4")  # folder containing test CSVs
-        test_files = glob.glob(os.path.join(test_data_path, "*.csv"))
-        test_file_names = [os.path.basename(f) for f in test_files]
+        file_path = "test_data_2024-Q4.csv"  # <-- put your CSV path here
         
-        if not test_files:
-            st.error("No test CSV files found in the folder!")
+        try:
+            test_df = pd.read_csv(file_path)
+        except Exception as e:
+            st.error(f"Error loading test data: {e}")
             st.stop()
         
-        selected_test_file = st.sidebar.selectbox("Select Test Dataset", options=test_file_names)
-        file_path = [f for f in test_files if f.endswith(selected_test_file)][0]
+        drop_cols = ['Unnamed: 0', 'quarter', 'Year']
+        test_df = test_df.drop(columns=[c for c in drop_cols if c in test_df.columns], errors='ignore')
         
         # =========================
         # 2️⃣ Load pickles
         # =========================
-        try:
-            with open("onehot_encoder.pkl", "rb") as f:
-                ohe = pickle.load(f)
+        with open("onehot_encoder.pkl", "rb") as f:
+            ohe = pickle.load(f)
         
-            with open("train_columns.pkl", "rb") as f:
-                train_columns = pickle.load(f)
-        except Exception as e:
-            st.error(f"Error loading pickles: {e}")
-            st.stop()
+        with open("train_columns.pkl", "rb") as f:
+            train_columns = pickle.load(f)
         
         # =========================
         # 3️⃣ Load area models
@@ -2578,10 +2575,6 @@ if sidebar_option == "📈 Model Results":
             area_name = os.path.basename(f).replace("dt_model_", "").replace(".pkl", "")
             with open(f, "rb") as file:
                 area_models[area_name] = pickle.load(file)
-        
-        if not area_models:
-            st.error("No area model pickle files found!")
-            st.stop()
         
         available_areas = list(area_models.keys())
         selected_areas = st.sidebar.multiselect(
@@ -2595,43 +2588,23 @@ if sidebar_option == "📈 Model Results":
             st.stop()
         
         # =========================
-        # 4️⃣ Load test data
+        # 4️⃣ Load growth factors
         # =========================
-        try:
-            test_df = pd.read_csv(file_path)
-        except Exception as e:
-            st.error(f"Error loading test data: {e}")
-            st.stop()
-        
-        drop_cols = ['Unnamed: 0', 'quarter', 'Year']
-        test_df = test_df.drop(columns=[c for c in drop_cols if c in test_df.columns], errors='ignore')
+        growth_df = pd.read_csv('quarterly_forecasts_with_CI.csv')
+        growth_df = growth_df[['forecast_quarter', 'area_name_en', 'growth_factor_upper']]
+        growth_pivot = growth_df.pivot(index='area_name_en', columns='forecast_quarter', values='growth_factor_upper').reset_index()
         
         # =========================
-        # 5️⃣ Load growth factors
+        # 5️⃣ Load historical median from training data
         # =========================
-        try:
-            growth_df = pd.read_csv('quarterly_forecasts_with_CI.csv')
-            growth_df = growth_df[['forecast_quarter', 'area_name_en', 'growth_factor_upper']]
-            growth_pivot = growth_df.pivot(index='area_name_en', columns='forecast_quarter', values='growth_factor_upper').reset_index()
-        except Exception as e:
-            st.error(f"Error loading growth factors: {e}")
-            growth_pivot = pd.DataFrame()
+        train_data = pd.read_csv("df_trained_dataset_6000.csv")
+        train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
+        train_data['year_quarter'] = train_data['instance_date'].dt.year.astype(str) + '-Q' + train_data['instance_date'].dt.quarter.astype(str)
+        historical_median = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].median().reset_index()
+        historical_pivot = historical_median.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
         
         # =========================
-        # 6️⃣ Load historical median from training data
-        # =========================
-        try:
-            train_data = pd.read_csv("df_trained_dataset_6000.csv")
-            train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
-            train_data['year_quarter'] = train_data['instance_date'].dt.year.astype(str) + '-Q' + train_data['instance_date'].dt.quarter.astype(str)
-            historical_median = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].median().reset_index()
-            historical_pivot = historical_median.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
-        except Exception as e:
-            st.error(f"Error loading training data: {e}")
-            historical_pivot = pd.DataFrame()
-        
-        # =========================
-        # 7️⃣ Prediction + Forecast per area
+        # 6️⃣ Prediction + Forecast per area
         # =========================
         for area in selected_areas:
             st.subheader(f"📊 {area} - Historical + Prediction + Forecast")
@@ -2671,7 +2644,7 @@ if sidebar_option == "📈 Model Results":
             median_pred = np.median(preds)
         
             # Forecast
-            if not growth_pivot.empty and area in growth_pivot['area_name_en'].values:
+            if area in growth_pivot['area_name_en'].values:
                 area_growth = growth_pivot[growth_pivot['area_name_en'] == area].iloc[0].drop('area_name_en')
                 forecast_values = median_pred * area_growth.values
                 forecast_quarters = area_growth.index.tolist()
