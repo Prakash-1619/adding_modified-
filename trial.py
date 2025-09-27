@@ -2553,18 +2553,20 @@ warnings.filterwarnings('ignore')
 # TAB 3: Area-wise Prediction & Forecast
 # =====================
 if sidebar_option == "validation":
+    
     # 1️⃣ Load test, train, and forecast data
     @st.cache_data
     def load_data():
         test_df = pd.read_csv("test_data_2024-Q4.csv")
-        train_df = pd.read_csv("df_trained_dataset_6000.csv")  # Assuming you have train data
+        train_df = pd.read_csv("df_trained_dataset_6000.csv  # Assuming you have train data
         forecast_df = pd.read_csv("quarterly_forecasts_with_CI.csv")  # Your forecast file with growth factors
         
         # Clean column names
         drop_col = ['Unnamed: 0'] 
         test_df = test_df.drop(columns=[col for col in drop_col if col in test_df.columns])
         train_df = train_df.drop(columns=[col for col in drop_col if col in train_df.columns])
-        forecast_df = forecast_df.drop(columns=[col for col in drop_col if col in forecast_df.columns])
+        if forecast_df is not None:
+            forecast_df = forecast_df.drop(columns=[col for col in drop_col if col in forecast_df.columns])
         
         return test_df, train_df, forecast_df
     
@@ -2572,25 +2574,26 @@ if sidebar_option == "validation":
         test_df, train_df, forecast_df = load_data()
         
         # Validate forecast dataframe has required columns
-        required_forecast_cols = ['area_name_en', 'forecast_quarter', 'growth_factor_upper']
-        missing_cols = set(required_forecast_cols) - set(forecast_df.columns)
-        if missing_cols:
-            st.error(f"Forecast file missing required columns: {missing_cols}")
-            st.stop()
+        if forecast_df is not None:
+            required_forecast_cols = ['area_name_en', 'forecast_quarter', 'growth_factor_upper']
+            missing_cols = set(required_forecast_cols) - set(forecast_df.columns)
+            if missing_cols:
+                st.error(f"Forecast file missing required columns: {missing_cols}")
+                st.stop()
             
-    except FileNotFoundError:
-        st.error("Data files not found. Please ensure 'test_data_2024-Q4.csv', 'train_data.csv', and 'forecast_data.csv' are in the correct directory.")
+    except FileNotFoundError as e:
+        st.error(f"Data files not found: {e}")
         st.stop()
     
     # 2️⃣ Area selection
     st.sidebar.header("🔧 Configuration")
-    #st.title("🏠 Real Estate Price Prediction & Forecasting Dashboard")
+    st.title("🏠 Real Estate Price Prediction & Forecasting Dashboard")
     
-    # Get unique areas from test data that also exist in forecast data
-    available_areas = sorted(list(set(test_df['area_name_en'].unique()) & set(forecast_df['area_name_en'].unique())))
+    # Get unique areas from test data
+    available_areas = sorted(test_df['area_name_en'].unique())
     
     if not available_areas:
-        st.error("No common areas found between test data and forecast data.")
+        st.error("No areas found in test data.")
         st.stop()
     
     selected_area = st.sidebar.selectbox("Select Area", available_areas)
@@ -2599,16 +2602,14 @@ if sidebar_option == "validation":
         st.warning("Please select an area from the dropdown.")
         st.stop()
     
-    # 3️⃣ Get forecast data for selected area
-    area_forecast_df = forecast_df[forecast_df['area_name_en'] == selected_area].copy()
-    
-    if area_forecast_df.empty:
-        st.warning(f"No forecast data available for {selected_area}")
-        st.stop()
-    
-    # Ensure forecast_quarter is properly formatted
-    area_forecast_df['forecast_quarter'] = pd.to_datetime(area_forecast_df['forecast_quarter'])
-    area_forecast_df = area_forecast_df.sort_values('forecast_quarter')
+    # 3️⃣ Get forecast data for selected area (if available)
+    area_forecast_df = None
+    if forecast_df is not None:
+        area_forecast_df = forecast_df[forecast_df['area_name_en'] == selected_area].copy()
+        if not area_forecast_df.empty:
+            # Ensure forecast_quarter is properly formatted
+            area_forecast_df['forecast_quarter'] = pd.to_datetime(area_forecast_df['forecast_quarter'])
+            area_forecast_df = area_forecast_df.sort_values('forecast_quarter')
     
     # 4️⃣ Load models and encoders
     try:
@@ -2641,17 +2642,46 @@ if sidebar_option == "validation":
     area_test_df['instance_date'] = pd.to_datetime(area_test_df['instance_date'])
     area_test_df = area_test_df.sort_values('instance_date')
     
-    # Apply OHE
+    # Apply OHE with proper error handling
     try:
-        area_test_ohe = pd.DataFrame(ohe.transform(area_test_df).toarray(), columns=transformed_columns)
+        # Get the feature names the encoder expects
+        if hasattr(ohe, 'feature_names_in_'):
+            expected_features = ohe.feature_names_in_
+        else:
+            # For older sklearn versions, use categories_
+            expected_features = ohe.feature_names_in_ if hasattr(ohe, 'feature_names_in_') else list(ohe.categories_.keys())
         
-        # Ensure all required columns are present
+        # Select only the columns that the encoder was trained on
+        missing_cols = set(expected_features) - set(area_test_df.columns)
+        extra_cols = set(area_test_df.columns) - set(expected_features)
+        
+        if missing_cols:
+            st.warning(f"Missing columns in test data: {missing_cols}. Adding with default values.")
+            for col in missing_cols:
+                area_test_df[col] = 0  # or appropriate default value
+        
+        if extra_cols:
+            st.warning(f"Extra columns in test data: {extra_cols}. They will be ignored.")
+        
+        # Keep only the columns that the encoder expects, in the correct order
+        area_test_encoded = area_test_df[expected_features].copy()
+        
+        # Handle categorical columns - ensure they are string type
+        for col in area_test_encoded.select_dtypes(include=['object']).columns:
+            area_test_encoded[col] = area_test_encoded[col].astype(str)
+        
+        # Apply the encoder
+        area_test_ohe = pd.DataFrame(ohe.transform(area_test_encoded).toarray(), 
+                                    columns=transformed_columns)
+        
+        # Ensure all required columns are present for the model
         if hasattr(model, 'feature_names_in_'):
-            missing_cols = set(model.feature_names_in_) - set(area_test_ohe.columns)
-            if missing_cols:
-                for col in missing_cols:
+            model_expected_features = model.feature_names_in_
+            missing_model_cols = set(model_expected_features) - set(area_test_ohe.columns)
+            if missing_model_cols:
+                for col in missing_model_cols:
                     area_test_ohe[col] = 0
-                area_test_ohe = area_test_ohe[model.feature_names_in_]
+                area_test_ohe = area_test_ohe[model_expected_features]
             
     except Exception as e:
         st.error(f"Error in one-hot encoding: {e}")
@@ -2670,23 +2700,19 @@ if sidebar_option == "validation":
     
     def generate_forecast_from_file(last_date, last_price, forecast_data):
         """Generate forecast using growth factors from the forecast file"""
+        if forecast_data is None or forecast_data.empty:
+            return [], []
         
         # Use the growth factors from the file sequentially
         forecast_dates = forecast_data['forecast_quarter'].tolist()
         growth_factors = forecast_data['growth_factor_upper'].tolist()
         
         # Calculate forecast values
-        forecast_values = [last_price]
-        for i, factor in enumerate(growth_factors):
-            if i == 0:
-                # First forecast: apply to last price
-                forecast_values.append(last_price * factor)
-            else:
-                # Subsequent forecasts: apply to previous forecast
-                forecast_values.append(forecast_values[-1] * factor)
-        
-        # Remove the first element (last_price) since we want only future forecasts
-        forecast_values = forecast_values[1:]
+        forecast_values = []
+        current_price = last_price
+        for factor in growth_factors:
+            current_price = current_price * factor
+            forecast_values.append(current_price)
         
         return forecast_dates, forecast_values
     
@@ -2706,7 +2732,7 @@ if sidebar_option == "validation":
         area_train_df = area_train_df.sort_values('instance_date')
         
         # Quarterly aggregation
-        area_train_df['quarter'] = area_train_df['instance_date'].dt.to_period('Q')
+        area_train_df['quarter'] = area_test_df['instance_date'].dt.to_period('Q')
         quarterly_trend = area_train_df.groupby('quarter')['price'].agg(['mean', 'std', 'count']).reset_index()
         quarterly_trend['quarter'] = quarterly_trend['quarter'].astype(str)
         quarterly_trend = quarterly_trend.sort_values('quarter')
@@ -2751,20 +2777,21 @@ if sidebar_option == "validation":
             row=1, col=1
         )
         
-        # Forecast values
-        fig.add_trace(
-            go.Scatter(
-                x=future_dates, 
-                y=forecast_values, 
-                mode='lines+markers', 
-                name='Forecast (Upper Growth Factor)',
-                line=dict(color='green', width=4),
-                marker=dict(size=10, symbol='star'),
-                hovertemplate='<b>Forecast</b><br>Quarter: %{x}<br>Price: AED %{y:,.0f}<br>Growth Factor: %{customdata}<extra></extra>',
-                customdata=area_forecast_df['growth_factor_upper'].round(3)
-            ),
-            row=1, col=1
-        )
+        # Forecast values (if available)
+        if future_dates and forecast_values:
+            fig.add_trace(
+                go.Scatter(
+                    x=future_dates, 
+                    y=forecast_values, 
+                    mode='lines+markers', 
+                    name='Forecast (Upper Growth Factor)',
+                    line=dict(color='green', width=4),
+                    marker=dict(size=10, symbol='star'),
+                    hovertemplate='<b>Forecast</b><br>Quarter: %{x}<br>Price: AED %{y:,.0f}<br>Growth Factor: %{customdata}<extra></extra>',
+                    customdata=area_forecast_df['growth_factor_upper'].round(3) if area_forecast_df is not None else []
+                ),
+                row=1, col=1
+            )
     
     # Plot 2: Quarterly trend from train data
     if not area_train_df.empty and len(quarterly_trend) > 1:
@@ -2848,40 +2875,42 @@ if sidebar_option == "validation":
             st.metric("Prediction Accuracy", f"{accuracy:.1f}%")
     
     with col4:
-        st.metric("Forecast Quarters", len(area_forecast_df))
+        forecast_quarters = len(area_forecast_df) if area_forecast_df is not None else 0
+        st.metric("Forecast Quarters", forecast_quarters)
     
-    # Forecast details
-    st.subheader("🔍 Forecast Details")
-    
-    # Display forecast data table
-    forecast_display_df = area_forecast_df.copy()
-    forecast_display_df['forecast_price'] = forecast_values
-    forecast_display_df['forecast_quarter'] = forecast_display_df['forecast_quarter'].dt.strftime('%Y-Q%q')
-    forecast_display_df['growth_factor_upper'] = forecast_display_df['growth_factor_upper'].round(4)
-    forecast_display_df['forecast_price'] = forecast_display_df['forecast_price'].round(0)
-    
-    st.dataframe(forecast_display_df[['forecast_quarter', 'growth_factor_upper', 'forecast_price']], 
-                 use_container_width=True)
-    
-    # Forecast summary statistics
-    st.subheader("📈 Forecast Summary")
-    
-    summary_col1, summary_col2, summary_col3 = st.columns(3)
-    
-    with summary_col1:
-        total_growth = (forecast_values[-1] / last_price - 1) * 100
-        st.metric("Total Forecast Growth", f"{total_growth:+.1f}%")
-        st.write(f"From AED {last_price:,.0f} to AED {forecast_values[-1]:,.0f}")
-    
-    with summary_col2:
-        avg_growth_factor = area_forecast_df['growth_factor_upper'].mean()
-        st.metric("Average Growth Factor", f"{avg_growth_factor:.4f}")
-        st.write("Per quarter")
-    
-    with summary_col3:
-        max_growth_quarter = forecast_display_df.loc[forecast_display_df['growth_factor_upper'].idxmax()]
-        st.metric("Highest Growth Quarter", max_growth_quarter['forecast_quarter'])
-        st.write(f"Factor: {max_growth_quarter['growth_factor_upper']:.4f}")
+    # Forecast details (if available)
+    if area_forecast_df is not None and not area_forecast_df.empty:
+        st.subheader("🔍 Forecast Details")
+        
+        # Display forecast data table
+        forecast_display_df = area_forecast_df.copy()
+        forecast_display_df['forecast_price'] = forecast_values
+        forecast_display_df['forecast_quarter'] = forecast_display_df['forecast_quarter'].dt.strftime('%Y-Q%q')
+        forecast_display_df['growth_factor_upper'] = forecast_display_df['growth_factor_upper'].round(4)
+        forecast_display_df['forecast_price'] = forecast_display_df['forecast_price'].round(0)
+        
+        st.dataframe(forecast_display_df[['forecast_quarter', 'growth_factor_upper', 'forecast_price']], 
+                     use_container_width=True)
+        
+        # Forecast summary statistics
+        st.subheader("📈 Forecast Summary")
+        
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+        
+        with summary_col1:
+            total_growth = (forecast_values[-1] / last_price - 1) * 100
+            st.metric("Total Forecast Growth", f"{total_growth:+.1f}%")
+            st.write(f"From AED {last_price:,.0f} to AED {forecast_values[-1]:,.0f}")
+        
+        with summary_col2:
+            avg_growth_factor = area_forecast_df['growth_factor_upper'].mean()
+            st.metric("Average Growth Factor", f"{avg_growth_factor:.4f}")
+            st.write("Per quarter")
+        
+        with summary_col3:
+            max_growth_quarter = forecast_display_df.loc[forecast_display_df['growth_factor_upper'].idxmax()]
+            st.metric("Highest Growth Quarter", max_growth_quarter['forecast_quarter'])
+            st.write(f"Factor: {max_growth_quarter['growth_factor_upper']:.4f}")
     
     # Historical context
     st.subheader("📚 Historical Context")
@@ -2912,31 +2941,36 @@ if sidebar_option == "validation":
     # Investment insights
     st.subheader("💡 Investment Insights")
     
-    # Simple recommendation based on forecast
-    if total_growth > 10:
-        st.success("🚀 **Positive Outlook**: Strong growth forecasted across all quarters")
-    elif total_growth > 5:
-        st.info("📈 **Moderate Outlook**: Steady growth expected")
-    elif total_growth > 0:
-        st.warning("⚖️ **Neutral Outlook**: Mild growth with some uncertainty")
+    if area_forecast_df is not None and not area_forecast_df.empty:
+        total_growth = (forecast_values[-1] / last_price - 1) * 100 if forecast_values else 0
+        
+        # Simple recommendation based on forecast
+        if total_growth > 10:
+            st.success("🚀 **Positive Outlook**: Strong growth forecasted across all quarters")
+        elif total_growth > 5:
+            st.info("📈 **Moderate Outlook**: Steady growth expected")
+        elif total_growth > 0:
+            st.warning("⚖️ **Neutral Outlook**: Mild growth with some uncertainty")
+        else:
+            st.error("📉 **Cautious Outlook**: Negative or flat growth forecasted")
+        
+        st.write(f"**Key Factors:**")
+        st.write(f"- Forecast uses growth_factor_upper from provided data")
+        st.write(f"- Based on {len(area_forecast_df)} quarters of forecast data")
+        st.write(f"- Current to forecast price change: {total_growth:+.1f}%")
     else:
-        st.error("📉 **Cautious Outlook**: Negative or flat growth forecasted")
-    
-    st.write(f"**Key Factors:**")
-    st.write(f"- Forecast uses growth_factor_upper from provided data")
-    st.write(f"- Based on {len(area_forecast_df)} quarters of forecast data")
-    st.write(f"- Current to forecast price change: {total_growth:+.1f}%")
+        st.info("📊 **Analysis Ready**: Forecast data not available for this area")
     
     # Footer
     st.sidebar.markdown("---")
-    st.sidebar.info(f"""
-    **Forecast Data Summary for {selected_area}:
-    - Quarters: {len(area_forecast_df)}
-    - Avg Growth Factor: {area_forecast_df['growth_factor_upper'].mean():.4f}
-    - Min Growth Factor: {area_forecast_df['growth_factor_upper'].min():.4f}
-    - Max Growth Factor: {area_forecast_df['growth_factor_upper'].max():.4f}
-    """)
-
+    if area_forecast_df is not None and not area_forecast_df.empty:
+        st.sidebar.info(f"""
+        **Forecast Data Summary for {selected_area}:
+        - Quarters: {len(area_forecast_df)}
+        - Avg Growth Factor: {area_forecast_df['growth_factor_upper'].mean():.4f}
+        - Min Growth Factor: {area_forecast_df['growth_factor_upper'].min():.4f}
+        - Max Growth Factor: {area_forecast_df['growth_factor_upper'].max():.4f}
+        """)
 
 
 
