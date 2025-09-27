@@ -2589,7 +2589,7 @@ if sidebar_option == "📈 Model Results":
         # =========================
         growth_df = pd.read_csv('quarterly_forecasts_with_CI.csv')
         growth_df = growth_df[['forecast_quarter', 'area_name_en', 'growth_factor_upper']]
-        growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
+        growth_pivot = growth_df.pivot(index='area_name_en', columns='forecast_quarter', values='growth_factor_upper').reset_index()
         
         # =========================
         # 6️⃣ Load historical median from training data
