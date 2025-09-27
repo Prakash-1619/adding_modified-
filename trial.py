@@ -2822,10 +2822,8 @@ def calculate_loess_trend(train_data, area_name, current_year):
 st.sidebar.title("🏠 Property Price Predictor")
 
 # Define sidebar options
-sidebar_option = st.sidebar.radio(
-    "Navigation",
-    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
-    index=0  # Default to first option)
+#sidebar_option = st.sidebar.radio("Navigation", ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
+    #index=0  # Default to first option)
 
 # =========================
 # MAIN APP
