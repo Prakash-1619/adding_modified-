@@ -2732,14 +2732,14 @@ def load_training_data():
     """Load training data with selected features for LOESS trend analysis"""
     try:
         # Load your training data - adjust the filename as needed
-        train_data = pd.read_csv('train_data_selected_features.csv')  # Update with your actual file
+        train_data = pd.read_csv('df_trained_dataset_6000.csv')  # Update with your actual file
         
         # Ensure we have the necessary columns for trend analysis
-        required_cols = ['area_name_en', 'procedure_date', 'procedure_value']
+        required_cols = ['area_name_en', 'instance_date', 'meter_sale_price']
         if all(col in train_data.columns for col in required_cols):
             # Convert date column to datetime and extract year
-            train_data['procedure_date'] = pd.to_datetime(train_data['procedure_date'])
-            train_data['year'] = train_data['procedure_date'].dt.year
+            train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
+            train_data['year'] = train_data['instance_date'].dt.year
             return train_data
         else:
             st.warning("Training data missing required columns for trend analysis")
@@ -2995,11 +2995,11 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             
                             # Plot original yearly averages
                             area_data = train_data[train_data['area_name_en'] == area_name]
-                            yearly_avg = area_data.groupby('year')['procedure_value'].mean().reset_index()
+                            yearly_avg = area_data.groupby('year')['meter_sale_price'].mean().reset_index()
                             
                             fig_trend.add_trace(go.Scatter(
                                 x=yearly_avg['year'],
-                                y=yearly_avg['procedure_value'],
+                                y=yearly_avg['meter_sale_price'],
                                 mode='markers',
                                 name='Yearly Average Price',
                                 marker=dict(color='blue', size=8)
@@ -3047,7 +3047,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
                         'metro': 'Near Metro',
                         'has_parking': 'Parking',
                         'area_name_en': 'Area',
-                        'procedure_area': 'Area (sqft)'
+                        'procedure_area': 'Area (sqft)(less than 340)'
                     }
                     
                     input_display['Feature'] = input_display['Feature'].map(feature_display_map)
