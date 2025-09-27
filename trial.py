@@ -2544,7 +2544,7 @@ if sidebar_option == "📈 Model Results":
         # =========================
         # 1️⃣ Load single test dataset
         # =========================
-        file_path = "test_data_2024-Q4/test_data_sample.csv"  # <-- update your CSV path
+        file_path = "test_data_2024-Q4.csv"  # <-- update your CSV path
         
         try:
             test_df = pd.read_csv(file_path)
