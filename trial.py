@@ -2777,17 +2777,7 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, forecast_da
     
     return fig
 
-# =========================
-# SIDEBAR NAVIGATION
-# =========================
-st.sidebar.title("🏠 Property Price Predictor")
 
-# Define sidebar options
-sidebar_option = st.sidebar.radio(
-    "Navigation", 
-    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
-    index=0
-)
 
 # =========================
 # MAIN APP
