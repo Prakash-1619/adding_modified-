@@ -2532,127 +2532,10 @@ if sidebar_option == "📈 Model Results":
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
 
-# =========================
-# 🤖 MODEL INPUT / PREDICTION SECTION
-# =========================
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import pickle
-import os
-
-# =========================
-# INITIALIZATION & MODEL LOADING
-# =========================
-@st.cache_resource
-def load_area_models():
-    """Load all area-specific models"""
-    area_models = {}
-    area_files = [
-        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
-        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
-        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
-        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
-        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
-        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
-        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
-        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
-        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
-        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
-    ]
-    
-    loaded_models = {}
-    missing_models = []
-    
-    for model_file in area_files:
-        try:
-            # Extract area name from filename
-            area_name = model_file.replace('dt_model_', '').replace('.pkl', '').replace('_', ' ')
-            
-            # Load the model
-            with open(model_file, 'rb') as f:
-                model = pickle.load(f)
-            
-            loaded_models[area_name] = model
-            #st.sidebar.success(f"✅ Loaded: {area_name}")
-            
-        except FileNotFoundError:
-            missing_models.append(model_file)
-        except Exception as e:
-            st.sidebar.error(f"❌ Error loading {model_file}: {str(e)}")
-    
-    if missing_models:
-        st.sidebar.warning(f"Missing models: {len(missing_models)} files")
-    
-    return loaded_models
-
-# =========================
-# LOAD ENCODER AND TRAIN COLUMNS
-# =========================
-@st.cache_resource
-def load_encoder_and_columns():
-    """Load the encoder and training columns"""
-    try:
-        with open('onehot_encoder.pkl', 'rb') as f:
-            ohe = pickle.load(f)
-        with open('train_columns.pkl', 'rb') as f:
-            train_columns = pickle.load(f)
-        return ohe, train_columns
-    except Exception as e:
-        st.error(f"Error loading encoder/columns: {str(e)}")
-        return None, None
-
-# =========================
-# LOAD FORECASTING DATA
-# =========================
-@st.cache_data
-def load_forecasting_data():
-    """Load forecasting-specific data"""
-    try:
-        # Load test data for forecasting
-        test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
-        # Remove unnecessary columns if needed
-        test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
-        
-        # Load growth factors
-        growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-        growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-        growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
-        
-        return test_samples_forecast, growth_pivot
-    except Exception as e:
-        #st.error(f"Error loading forecasting data: {str(e)}")
-        return None, None
-
-# =========================
-# MAIN APP
-# =========================
-#st.sidebar.title("🏠 Property Price Predictor")
-
-# Load models and data
-with st.spinner("Loading models and data..."):
-    area_models = load_area_models()
-    ohe, train_columns = load_encoder_and_columns()
-    test_samples_forecast, growth_pivot = load_forecasting_data()
-
-# Check if essential components are loaded
-if not area_models:
-    st.error("❌ No area models were loaded. Please check your model files.")
-    st.stop()
-
-if ohe is None or train_columns is None:
-    st.error("❌ Encoder or training columns not loaded properly.")
-    st.stop()
 
 
 # =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
-# =========================
-# =========================
-# INITIALIZATION & MODEL LOADING
 # =========================
 import streamlit as st
 import pandas as pd
@@ -2662,6 +2545,7 @@ import plotly.graph_objects as go
 import pickle
 import os
 from statsmodels.nonparametric.smoothers_lowess import lowess
+from datetime import datetime, timedelta
 
 # =========================
 # INITIALIZATION & MODEL LOADING
@@ -2696,7 +2580,6 @@ def load_area_models():
                 model = pickle.load(f)
             
             loaded_models[area_name] = model
-            #st.sidebar.success(f"✅ Loaded: {area_name}")
             
         except FileNotFoundError:
             missing_models.append(model_file)
@@ -2732,7 +2615,7 @@ def load_training_data():
     """Load training data with selected features for LOESS trend analysis"""
     try:
         # Load your training data - adjust the filename as needed
-        train_data = pd.read_csv('df_trained_dataset_6000.csv')  # Update with your actual file
+        train_data = pd.read_csv('df_trained_dataset_6000.csv')
         
         # Ensure we have the necessary columns for trend analysis
         required_cols = ['area_name_en', 'instance_date', 'meter_sale_price']
@@ -2740,6 +2623,7 @@ def load_training_data():
             # Convert date column to datetime and extract year
             train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
             train_data['year'] = train_data['instance_date'].dt.year
+            train_data['quarter'] = train_data['instance_date'].dt.to_period('Q').astype(str)
             return train_data
         else:
             st.warning("Training data missing required columns for trend analysis")
@@ -2756,7 +2640,7 @@ def load_forecasting_data():
     """Load forecasting-specific data"""
     try:
         # Load test data for forecasting
-        test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')  # Update with your file path
+        test_samples_forecast = pd.read_csv('test_data_20 areas_1.csv')
         
         # Load growth factors
         growth_df = pd.read_csv('arima_areas_growth_6M.csv')
@@ -2777,20 +2661,19 @@ def calculate_loess_trend(train_data, area_name, current_year):
         # Filter data for the specific area
         area_data = train_data[train_data['area_name_en'] == area_name].copy()
         
-        if len(area_data) < 3:  # Need at least 3 data points for meaningful trend
-            return None, None
+        if len(area_data) < 3:
+            return None, None, None
         
         # Group by year and calculate average price
         yearly_avg = area_data.groupby('year')['meter_sale_price'].median().reset_index()
         
         if len(yearly_avg) < 3:
-            return None, None
+            return None, None, None
         
         # Apply LOESS smoothing
         y_values = yearly_avg['meter_sale_price'].values
         x_values = yearly_avg['year'].values
         
-        # Use LOESS to smooth the trend (frac=0.7 provides good smoothing)
         loess_smoothed = lowess(y_values, x_values, frac=0.7, it=3)
         
         # Create trend DataFrame
@@ -2799,22 +2682,100 @@ def calculate_loess_trend(train_data, area_name, current_year):
             'smoothed_price': loess_smoothed[:, 1]
         })
         
-        # Calculate trend factor (current year vs previous year)
-        recent_years = trend_df[trend_df['year'] >= current_year - 3]  # Last 3 years
+        # Calculate trend factor
+        recent_years = trend_df[trend_df['year'] >= current_year - 3]
         if len(recent_years) >= 2:
-            # Calculate annual growth rate based on trend
             recent_years = recent_years.sort_values('year')
             latest_year = recent_years.iloc[-1]
             prev_year = recent_years.iloc[-2]
-            
             trend_growth = (latest_year['smoothed_price'] - prev_year['smoothed_price']) / prev_year['smoothed_price']
-            return trend_df, trend_growth
+            return trend_df, trend_growth, yearly_avg
         else:
-            return trend_df, 0.0
+            return trend_df, 0.0, yearly_avg
             
     except Exception as e:
         st.warning(f"Could not calculate LOESS trend for {area_name}: {str(e)}")
-        return None, None
+        return None, None, None
+
+# =========================
+# CREATE COMBINED TREND AND FORECAST PLOT
+# =========================
+def create_combined_trend_forecast_plot(historical_data, trend_data, forecast_data, area_name, current_price):
+    """Create a combined plot showing historical trend and future forecast"""
+    
+    fig = go.Figure()
+    
+    # Add historical data points
+    if historical_data is not None and len(historical_data) > 0:
+        fig.add_trace(go.Scatter(
+            x=historical_data['year'],
+            y=historical_data['meter_sale_price'],
+            mode='markers',
+            name='Historical Data',
+            marker=dict(color='blue', size=6, opacity=0.6),
+            hovertemplate='Year: %{x}<br>Price: AED %{y:,.0f}<extra></extra>'
+        ))
+    
+    # Add LOESS trend line
+    if trend_data is not None and len(trend_data) > 0:
+        fig.add_trace(go.Scatter(
+            x=trend_data['year'],
+            y=trend_data['smoothed_price'],
+            mode='lines',
+            name='Historical Trend (LOESS)',
+            line=dict(color='red', width=3),
+            hovertemplate='Year: %{x}<br>Trend Price: AED %{y:,.0f}<extra></extra>'
+        ))
+    
+    # Add current prediction point
+    current_year = datetime.now().year
+    fig.add_trace(go.Scatter(
+        x=[current_year],
+        y=[current_price],
+        mode='markers',
+        name='Current Prediction',
+        marker=dict(color='green', size=12, symbol='star'),
+        hovertemplate='Current<br>Price: AED %{y:,.0f}<extra></extra>'
+    ))
+    
+    # Add forecast data
+    if forecast_data is not None and len(forecast_data) > 0:
+        # Convert period names to sequential years for plotting
+        forecast_periods = list(range(current_year, current_year + len(forecast_data)))
+        
+        fig.add_trace(go.Scatter(
+            x=forecast_periods,
+            y=forecast_data['Price'].values,
+            mode='lines+markers',
+            name='Future Forecast',
+            line=dict(color='orange', width=3, dash='dash'),
+            marker=dict(color='orange', size=8),
+            hovertemplate='Year: %{x}<br>Forecast: AED %{y:,.0f}<extra></extra>'
+        ))
+        
+        # Add confidence interval (simplified)
+        fig.add_trace(go.Scatter(
+            x=forecast_periods + forecast_periods[::-1],
+            y=list(forecast_data['Price'] * 1.1) + list(forecast_data['Price'] * 0.9)[::-1],
+            fill='toself',
+            fillcolor='rgba(255,165,0,0.2)',
+            line=dict(color='rgba(255,255,255,0)'),
+            name='Forecast Range',
+            hoverinfo='skip'
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title=f"Complete Price Timeline - {area_name}",
+        xaxis_title="Year",
+        yaxis_title="Price (AED)",
+        height=600,
+        template="plotly_white",
+        hovermode='closest',
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    return fig
 
 # =========================
 # SIDEBAR NAVIGATION
@@ -2822,8 +2783,11 @@ def calculate_loess_trend(train_data, area_name, current_year):
 st.sidebar.title("🏠 Property Price Predictor")
 
 # Define sidebar options
-#sidebar_option = st.sidebar.radio("Navigation", ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
-    #index=0  # Default to first option)
+sidebar_option = st.sidebar.radio(
+    "Navigation", 
+    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
+    index=0
+)
 
 # =========================
 # MAIN APP
@@ -2833,7 +2797,7 @@ st.sidebar.title("🏠 Property Price Predictor")
 with st.spinner("Loading models and data..."):
     area_models = load_area_models()
     ohe, train_columns = load_encoder_and_columns()
-    train_data = load_training_data()  # Load training data for trend analysis
+    train_data = load_training_data()
     test_samples_forecast, growth_pivot = load_forecasting_data()
 
 # Check if essential components are loaded
@@ -2870,11 +2834,10 @@ if sidebar_option == "🤖 Model Input / Prediction":
     # Property features input
     st.sidebar.subheader("Property Features")
     
-    # Define available options for categorical features
     rooms_options = ['1 B/R', 'Studio', '2 B/R', '3 B/R', 'PENTHOUSE', 'More than 3B/R']
     floor_bin_options = ['1-10', '11-20', '41-50', '21-30', 'Below 1st floor', '31-40',
-   '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
-   '71-80', 'Duplex']
+                       '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
+                       '71-80', 'Duplex']
     
     col1, col2 = st.sidebar.columns(2)
     
@@ -2896,7 +2859,6 @@ if sidebar_option == "🤖 Model Input / Prediction":
     def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
         """Prepare user input for prediction"""
         
-        # Create a DataFrame with the input values
         input_data = pd.DataFrame({
             'rooms_en': [rooms],
             'floor_bin': [floor],
@@ -2912,19 +2874,14 @@ if sidebar_option == "🤖 Model Input / Prediction":
         st.write("📊 Input Data Prepared:")
         st.dataframe(input_data)
         
-        # Separate area name for later use
         area_name = input_data['area_name_en'].iloc[0]
         input_no_area = input_data.drop(columns=['area_name_en'])
         
-        # Apply one-hot encoding to categorical columns
         cat_cols = ['rooms_en', 'floor_bin']
         
         try:
-            # Transform using the fitted OHE
             X_cat = ohe.transform(input_no_area[cat_cols])
             X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
-            
-            # Combine with numerical features
             X_numerical = input_no_area.drop(columns=cat_cols)
             X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
             
@@ -2935,12 +2892,10 @@ if sidebar_option == "🤖 Model Input / Prediction":
             st.error(f"Error in encoding: {str(e)}")
             return None, None, None
         
-        # Ensure we have all training columns
         for col in train_columns:
             if col not in X_processed.columns:
                 X_processed[col] = 0
         
-        # Select only the columns that were used during training
         X_processed = X_processed[train_columns]
         X_processed = X_processed.select_dtypes(include=[np.number])
         
@@ -2964,7 +2919,6 @@ if sidebar_option == "🤖 Model Input / Prediction":
                 st.error("❌ Failed to prepare input data")
                 st.stop()
             
-            # Get the model for the selected area
             if area_name in area_models:
                 model = area_models[area_name]
                 
@@ -2975,56 +2929,61 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     # =========================
                     # APPLY LOESS TREND ADJUSTMENT
                     # =========================
-                    current_year = pd.Timestamp.now().year
+                    current_year = datetime.now().year
                     adjusted_price = base_predicted_price
                     trend_adjustment = 0.0
+                    trend_df = None
+                    historical_avg = None
                     
                     if train_data is not None:
-                        trend_df, trend_growth = calculate_loess_trend(train_data, area_name, current_year)
+                        trend_df, trend_growth, historical_avg = calculate_loess_trend(train_data, area_name, current_year)
                         
                         if trend_df is not None and trend_growth is not None:
-                            # Apply trend adjustment
                             trend_adjustment = trend_growth
                             adjusted_price = base_predicted_price * (1 + trend_growth)
+                    
+                    # =========================
+                    # PREPARE FORECAST DATA
+                    # =========================
+                    forecast_df = None
+                    if growth_pivot is not None:
+                        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
+                        
+                        if not area_growth.empty:
+                            forecast_data = []
+                            current_price = adjusted_price
+                            cumulative_growth = 1.0
                             
-                            # Display trend information
-                            st.subheader("📈 Historical Trend Analysis")
+                            quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
                             
-                            # Create trend visualization
-                            fig_trend = go.Figure()
+                            for quarter in quarter_cols:
+                                if quarter in area_growth.columns:
+                                    growth_factor = area_growth[quarter].iloc[0]
+                                    cumulative_growth *= growth_factor
+                                    forecast_price = current_price * cumulative_growth
+                                    
+                                    forecast_data.append({
+                                        'Period': quarter.replace('_', ' ').title(),
+                                        'Price': forecast_price,
+                                        'Growth_Rate': (growth_factor - 1) * 100
+                                    })
                             
-                            # Plot original yearly averages
-                            area_data = train_data[train_data['area_name_en'] == area_name]
-                            yearly_avg = area_data.groupby('year')['meter_sale_price'].mean().reset_index()
-                            
-                            fig_trend.add_trace(go.Scatter(
-                                x=yearly_avg['year'],
-                                y=yearly_avg['meter_sale_price'],
-                                mode='markers',
-                                name='Yearly Average Price',
-                                marker=dict(color='blue', size=8)
-                            ))
-                            
-                            # Plot LOESS trend line
-                            fig_trend.add_trace(go.Scatter(
-                                x=trend_df['year'],
-                                y=trend_df['smoothed_price'],
-                                mode='lines',
-                                name='LOESS Trend',
-                                line=dict(color='red', width=3)
-                            ))
-                            
-                            fig_trend.update_layout(
-                                title=f"Historical Price Trend - {area_name}",
-                                xaxis_title="Year",
-                                yaxis_title="Price (AED)",
-                                height=400,
-                                template="plotly_white"
-                            )
-                            
-                            st.plotly_chart(fig_trend, use_container_width=True)
-                            
-                            st.info(f"**Trend Analysis:** Based on historical data, {area_name} shows a {'growth' if trend_growth > 0 else 'decline'} trend of {trend_growth*100:.2f}% per year")
+                            forecast_df = pd.DataFrame(forecast_data)
+                    
+                    # =========================
+                    # CREATE COMBINED PLOT
+                    # =========================
+                    st.subheader("📊 Complete Price Timeline")
+                    
+                    combined_fig = create_combined_trend_forecast_plot(
+                        historical_avg, 
+                        trend_df, 
+                        forecast_df, 
+                        area_name, 
+                        adjusted_price
+                    )
+                    
+                    st.plotly_chart(combined_fig, use_container_width=True)
                     
                     # =========================
                     # DISPLAY PREDICTION RESULTS
@@ -3037,7 +2996,6 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     input_display = input_display.T.reset_index()
                     input_display.columns = ['Feature', 'Value']
                     
-                    # Format the display
                     feature_display_map = {
                         'rooms_en': 'Number of Rooms',
                         'floor_bin': 'Floor Level',
@@ -3047,7 +3005,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
                         'metro': 'Near Metro',
                         'has_parking': 'Parking',
                         'area_name_en': 'Area',
-                        'procedure_area': 'Area (sqft)(less than 340)'
+                        'procedure_area': 'Area (sqft)'
                     }
                     
                     input_display['Feature'] = input_display['Feature'].map(feature_display_map)
@@ -3088,85 +3046,21 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             )
                     
                     # =========================
-                    # FORECASTING WITH GROWTH FACTORS
+                    # DETAILED FORECAST TABLE
                     # =========================
-                    if growth_pivot is not None:
-                        st.subheader("📈 Price Forecast")
+                    if forecast_df is not None and len(forecast_df) > 0:
+                        st.subheader("📈 Detailed Forecast")
                         
-                        # Get growth factors for the selected area
-                        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
+                        display_forecast = forecast_df.copy()
+                        display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
+                        display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
                         
-                        if not area_growth.empty:
-                            # Prepare forecast data starting from trend-adjusted price
-                            forecast_data = []
-                            current_price = adjusted_price
-                            
-                            # Current quarter
-                            forecast_data.append({
-                                'Period': 'Current',
-                                'Price': current_price,
-                                'Growth_Rate': 0,
-                                'Cumulative_Growth': 0
-                            })
-                            
-                            # Future quarters
-                            quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
-                            cumulative_growth = 1.0
-                            
-                            for quarter in quarter_cols:
-                                if quarter in area_growth.columns:
-                                    growth_factor = area_growth[quarter].iloc[0]
-                                    cumulative_growth *= growth_factor
-                                    forecast_price = current_price * cumulative_growth
-                                    total_growth_rate = ((forecast_price - current_price) / current_price) * 100
-                                    
-                                    forecast_data.append({
-                                        'Period': quarter.replace('_', ' ').title(),
-                                        'Price': forecast_price,
-                                        'Growth_Rate': (growth_factor - 1) * 100,
-                                        'Cumulative_Growth': (cumulative_growth - 1) * 100
-                                    })
-                            
-                            forecast_df = pd.DataFrame(forecast_data)
-                            
-                            # Display forecast table
-                            st.write("**Forecast Table:**")
-                            display_forecast = forecast_df.copy()
-                            display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
-                            display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
-                            display_forecast['Cumulative_Growth'] = display_forecast['Cumulative_Growth'].round(2)
-                            st.dataframe(display_forecast, use_container_width=True)
-                            
-                            # Create forecast chart
-                            fig_forecast = go.Figure()
-                            
-                            fig_forecast.add_trace(go.Scatter(
-                                x=forecast_df['Period'],
-                                y=forecast_df['Price'],
-                                mode='lines+markers+text',
-                                line=dict(color='#1f77b4', width=4),
-                                marker=dict(size=10, color='#ff7f0e'),
-                                text=[f"AED {x:,.0f}" for x in forecast_df['Price']],
-                                textposition="top center",
-                                name='Forecasted Price'
-                            ))
-                            
-                            fig_forecast.update_layout(
-                                title=f"Price Forecast - {area_name}",
-                                xaxis_title="Time Period",
-                                yaxis_title="Predicted Price (AED)",
-                                height=500,
-                                template="plotly_white",
-                                showlegend=False
-                            )
-                            
-                            st.plotly_chart(fig_forecast, use_container_width=True)
-                            
-                        else:
-                            st.warning(f"No growth factors available for {area_name}")
-                    else:
-                        st.warning("Growth factors data not available")
+                        st.dataframe(display_forecast, use_container_width=True)
                         
+                        # Display trend analysis if available
+                        if trend_df is not None:
+                            st.info(f"**Trend Analysis:** {area_name} shows a {'growth' if trend_growth > 0 else 'decline'} trend of {trend_growth*100:.2f}% per year based on historical data")
+                    
                 except Exception as e:
                     st.error(f"❌ Prediction error: {str(e)}")
                 
@@ -3175,7 +3069,6 @@ if sidebar_option == "🤖 Model Input / Prediction":
     
     else:
         st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
-
 
 # =========================
 # DEBUG INFORMATION
