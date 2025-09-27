@@ -2537,6 +2537,8 @@ if sidebar_option == "📈 Model Results":
 # =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
 # =========================
+
+from datetime import datetime, timedelta
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -2740,27 +2742,45 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, forecast_da
     
     # Add forecast data
     if forecast_data is not None and len(forecast_data) > 0:
-        # Convert period names to sequential years for plotting
-        forecast_periods = list(range(current_year, current_year + len(forecast_data)))
+        # Convert period names to sequential quarters/years for plotting
+        current_date = datetime.now()
+        forecast_dates = []
+        
+        # Parse the quarter strings and create proper dates
+        for i, period in enumerate(forecast_data['Period']):
+            # Convert period like "2024Q1" to proper date
+            if 'Q' in period:
+                year = int(period.split('Q')[0])
+                quarter = int(period.split('Q')[1])
+                # Approximate quarter to month (Q1=Mar, Q2=Jun, Q3=Sep, Q4=Dec)
+                month = quarter * 3
+                forecast_dates.append(datetime(year, month, 1))
+            else:
+                # If not quarter format, use sequential years
+                forecast_dates.append(datetime(current_year + i + 1, 1, 1))
+        
+        # Convert to years for plotting (with fractional years for quarters)
+        forecast_years = [date.year + (date.month - 1) / 12 for date in forecast_dates]
         
         fig.add_trace(go.Scatter(
-            x=forecast_periods,
+            x=forecast_years,
             y=forecast_data['Price'].values,
             mode='lines+markers',
             name='Future Forecast',
             line=dict(color='orange', width=3, dash='dash'),
             marker=dict(color='orange', size=8),
-            hovertemplate='Year: %{x}<br>Forecast: AED %{y:,.0f}<extra></extra>'
+            hovertemplate='Period: %{x:.2f}<br>Forecast: AED %{y:,.0f}<br>Growth Factor: %{customdata:.3f}<extra></extra>',
+            customdata=forecast_data['Growth_Factor'].values
         ))
         
-        # Add confidence interval (simplified)
+        # Add confidence interval based on growth factor uncertainty
         fig.add_trace(go.Scatter(
-            x=forecast_periods + forecast_periods[::-1],
-            y=list(forecast_data['Price'] * 1.1) + list(forecast_data['Price'] * 0.9)[::-1],
+            x=forecast_years + forecast_years[::-1],
+            y=list(forecast_data['Price'] * 1.05) + list(forecast_data['Price'] * 0.95)[::-1],
             fill='toself',
             fillcolor='rgba(255,165,0,0.2)',
             line=dict(color='rgba(255,255,255,0)'),
-            name='Forecast Range',
+            name='Forecast Range (±5%)',
             hoverinfo='skip'
         ))
     
@@ -2772,12 +2792,23 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, forecast_da
         height=600,
         template="plotly_white",
         hovermode='closest',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(tickformat=".1f")
     )
     
     return fig
 
+# =========================
+# SIDEBAR NAVIGATION
+# =========================
+st.sidebar.title("🏠 Property Price Predictor")
 
+# Define sidebar options
+sidebar_option = st.sidebar.radio(
+    "Navigation", 
+    ["🤖 Model Input / Prediction", "📂 Data Files", "📊 EDA & Feature Engineering", "📈 Model Results"],
+    index=0
+)
 
 # =========================
 # MAIN APP
@@ -2841,7 +2872,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
         elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
         metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
         has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        procedure_area = st.number_input("Area (sqMt)", min_value=1, max_value=350, value=150, step=1)
+        procedure_area = st.number_input("Area (sqft)", min_value=100, max_value=10000, value=1000, step=100)
     
     # =========================
     # PREPARE INPUT DATA FUNCTION
@@ -2933,7 +2964,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             adjusted_price = base_predicted_price * (1 + trend_growth)
                     
                     # =========================
-                    # PREPARE FORECAST DATA
+                    # PREPARE FORECAST DATA WITH GROWTH FACTORS
                     # =========================
                     forecast_df = None
                     if growth_pivot is not None:
@@ -2944,18 +2975,20 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             current_price = adjusted_price
                             cumulative_growth = 1.0
                             
-                            quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                            # Get growth factor columns (excluding area name)
+                            growth_columns = [col for col in growth_pivot.columns if col != 'area_name_en']
                             
-                            for quarter in quarter_cols:
-                                if quarter in area_growth.columns:
-                                    growth_factor = area_growth[quarter].iloc[0]
+                            for i, quarter_col in enumerate(growth_columns):
+                                if quarter_col in area_growth.columns:
+                                    growth_factor = area_growth[quarter_col].iloc[0]
                                     cumulative_growth *= growth_factor
                                     forecast_price = current_price * cumulative_growth
                                     
                                     forecast_data.append({
-                                        'Period': quarter.replace('_', ' ').title(),
+                                        'Period': quarter_col,
                                         'Price': forecast_price,
-                                        'Growth_Rate': (growth_factor - 1) * 100
+                                        'Growth_Factor': growth_factor,
+                                        'Cumulative_Growth_Factor': cumulative_growth
                                     })
                             
                             forecast_df = pd.DataFrame(forecast_data)
@@ -3019,7 +3052,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             st.metric(
                                 label="Trend-Adjusted Price",
                                 value=f"AED {adjusted_price:,.0f}",
-                                delta=f"{trend_adjustment*100:+.2f}%",
+                                delta=f"Trend: {trend_adjustment*100:+.2f}%",
                                 delta_color="normal"
                             )
                         with col3:
@@ -3036,20 +3069,35 @@ if sidebar_option == "🤖 Model Input / Prediction":
                             )
                     
                     # =========================
-                    # DETAILED FORECAST TABLE
+                    # DETAILED FORECAST TABLE WITH GROWTH FACTORS
                     # =========================
                     if forecast_df is not None and len(forecast_df) > 0:
-                        st.subheader("📈 Detailed Forecast")
+                        st.subheader("📈 Detailed Forecast with Growth Factors")
                         
                         display_forecast = forecast_df.copy()
                         display_forecast['Price'] = display_forecast['Price'].round(0).astype(int)
-                        display_forecast['Growth_Rate'] = display_forecast['Growth_Rate'].round(2)
+                        display_forecast['Growth_Factor'] = display_forecast['Growth_Factor'].round(4)
+                        display_forecast['Cumulative_Growth_Factor'] = display_forecast['Cumulative_Growth_Factor'].round(4)
+                        
+                        # Rename columns for better display
+                        display_forecast = display_forecast.rename(columns={
+                            'Period': 'Forecast Period',
+                            'Price': 'Predicted Price (AED)',
+                            'Growth_Factor': 'Quarterly Growth Factor',
+                            'Cumulative_Growth_Factor': 'Cumulative Growth Factor'
+                        })
                         
                         st.dataframe(display_forecast, use_container_width=True)
                         
+                        # Display growth factor explanation
+                        st.info("**Growth Factors Explanation:**\n"
+                               "- **Quarterly Growth Factor**: Multiplier applied each quarter\n"
+                               "- **Cumulative Growth Factor**: Total multiplier from current price\n"
+                               "- Example: Growth Factor of 1.02 = 2% increase per quarter")
+                        
                         # Display trend analysis if available
                         if trend_df is not None:
-                            st.info(f"**Trend Analysis:** {area_name} shows a {'growth' if trend_growth > 0 else 'decline'} trend of {trend_growth*100:.2f}% per year based on historical data")
+                            st.info(f"**Historical Trend Analysis:** {area_name} shows a {'growth' if trend_growth > 0 else 'decline'} trend of {trend_growth*100:.2f}% per year based on historical data")
                     
                 except Exception as e:
                     st.error(f"❌ Prediction error: {str(e)}")
