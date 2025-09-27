@@ -2563,7 +2563,8 @@ if sidebar_option == "validation":
         
         # Clean column names
         drop_col = ['Unnamed: 0'] 
-        test_df = test_df.drop(columns=[col for col in drop_col if col in test_df.columns])
+        drop_cols = ['Unnamed: 0','instance_date'] 
+        test_df = test_df.drop(columns=[col for col in drop_cols if col in test_df.columns])
         train_df = train_df.drop(columns=[col for col in drop_col if col in train_df.columns])
         if forecast_df is not None:
             forecast_df = forecast_df.drop(columns=[col for col in drop_col if col in forecast_df.columns])
