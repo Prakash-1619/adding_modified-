@@ -2851,7 +2851,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
         elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
         metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
         has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        procedure_area = st.number_input("Area (sqft)", min_value=100, max_value=10000, value=1000, step=100)
+        procedure_area = st.number_input("Area (sqMt)", min_value=1, max_value=350, value=150, step=1)
     
     # =========================
     # PREPARE INPUT DATA FUNCTION
