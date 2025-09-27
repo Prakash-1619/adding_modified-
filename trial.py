@@ -2781,13 +2781,13 @@ def calculate_loess_trend(train_data, area_name, current_year):
             return None, None
         
         # Group by year and calculate average price
-        yearly_avg = area_data.groupby('year')['procedure_value'].mean().reset_index()
+        yearly_avg = area_data.groupby('year')['meter_sale_price'].median().reset_index()
         
         if len(yearly_avg) < 3:
             return None, None
         
         # Apply LOESS smoothing
-        y_values = yearly_avg['procedure_value'].values
+        y_values = yearly_avg['meter_sale_price'].values
         x_values = yearly_avg['year'].values
         
         # Use LOESS to smooth the trend (frac=0.7 provides good smoothing)
