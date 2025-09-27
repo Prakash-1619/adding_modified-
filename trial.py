@@ -2553,7 +2553,8 @@ import numpy as np
 if sidebar_option == "validation":
     # 1️⃣ Load test data (already loaded, no change)
     test_df = pd.read_csv("test_data_2024-Q4.csv")  # your test data
-    
+    drop_col =  ['Unnamed: 0'] 
+    test_df = test_df.drop(columns=[col for col in drop_col if col in test_df.columns])
     # 2️⃣ Area selection
     area_files = [
         "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
@@ -2587,9 +2588,9 @@ if sidebar_option == "validation":
     area_test_df = test_df[test_df['area_name_en'] == selected_area].copy()
     
     # 6️⃣ Load OHE and transformed columns pickles (replace with your actual file names)
-    with open("ohe.pkl", "rb") as f:
+    with open("onehot_encoder.pkl", "rb") as f:
         ohe = pickle.load(f)
-    with open("transformed_columns.pkl", "rb") as f:
+    with open("train_columns.pkl", "rb") as f:
         transformed_columns = pickle.load(f)
     
     # Apply OHE to area_test_df
