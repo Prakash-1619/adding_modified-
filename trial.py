@@ -2532,7 +2532,6 @@ if sidebar_option == "📈 Model Results":
     ###############################################################################################################################################################################################################################
     with tab3:
         import streamlit as st
-        import streamlit as st
         import pandas as pd
         import numpy as np
         import pickle
@@ -2545,7 +2544,7 @@ if sidebar_option == "📈 Model Results":
         # =========================
         # 1️⃣ Load single test dataset
         # =========================
-        file_path = "test_data_2024-Q4.csv"  # <-- put your CSV path here
+        file_path = "test_data_2024-Q4/test_data_sample.csv"  # <-- update your CSV path
         
         try:
             test_df = pd.read_csv(file_path)
@@ -2568,15 +2567,20 @@ if sidebar_option == "📈 Model Results":
         # =========================
         # 3️⃣ Load area models
         # =========================
-        area_model_path = os.path.join(os.getcwd(), "area_models", "*.pkl")
-        area_model_files = glob.glob(area_model_path)
+        area_model_files = glob.glob(os.path.join("area_models", "*.pkl"))
         area_models = {}
         for f in area_model_files:
             area_name = os.path.basename(f).replace("dt_model_", "").replace(".pkl", "")
             with open(f, "rb") as file:
                 area_models[area_name] = pickle.load(file)
         
-        available_areas = list(area_models.keys())
+        # =========================
+        # 4️⃣ Get areas available in the test dataset and models
+        # =========================
+        areas_in_test = test_df['area_name_en'].unique().tolist()
+        available_areas = [a for a in areas_in_test if a in area_models]
+        
+        # Sidebar: select areas dynamically
         selected_areas = st.sidebar.multiselect(
             "Select Areas",
             options=available_areas,
@@ -2584,18 +2588,18 @@ if sidebar_option == "📈 Model Results":
         )
         
         if not selected_areas:
-            st.warning("Please select at least one area.")
+            st.warning("No areas available in test dataset or no model found.")
             st.stop()
         
         # =========================
-        # 4️⃣ Load growth factors
+        # 5️⃣ Load growth factors
         # =========================
         growth_df = pd.read_csv('quarterly_forecasts_with_CI.csv')
         growth_df = growth_df[['forecast_quarter', 'area_name_en', 'growth_factor_upper']]
         growth_pivot = growth_df.pivot(index='area_name_en', columns='forecast_quarter', values='growth_factor_upper').reset_index()
         
         # =========================
-        # 5️⃣ Load historical median from training data
+        # 6️⃣ Load historical median from training data
         # =========================
         train_data = pd.read_csv("df_trained_dataset_6000.csv")
         train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
@@ -2604,16 +2608,15 @@ if sidebar_option == "📈 Model Results":
         historical_pivot = historical_median.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
         
         # =========================
-        # 6️⃣ Prediction + Forecast per area
+        # 7️⃣ Prediction + Forecast per area
         # =========================
         for area in selected_areas:
             st.subheader(f"📊 {area} - Historical + Prediction + Forecast")
         
-            if area not in area_models:
+            model = area_models.get(area)
+            if model is None:
                 st.warning(f"No model found for {area}")
                 continue
-        
-            model = area_models[area]
         
             # Prepare test data for this area
             X_test_area = test_df[test_df['area_name_en'] == area].copy()
@@ -2669,45 +2672,16 @@ if sidebar_option == "📈 Model Results":
         
             # Plot
             fig = go.Figure()
-        
-            # Historical
             if historical_values:
-                fig.add_trace(go.Scatter(
-                    x=historical_quarters,
-                    y=historical_values,
-                    mode='lines+markers',
-                    name='Historical Median',
-                    line=dict(color='blue', width=3),
-                    marker=dict(size=8)
-                ))
-        
-            # Prediction (current)
-            fig.add_trace(go.Scatter(
-                x=['Current'],
-                y=[median_pred],
-                mode='markers',
-                name='Prediction (Median)',
-                marker=dict(color='red', size=10, symbol='diamond')
-            ))
-        
-            # Forecast
+                fig.add_trace(go.Scatter(x=historical_quarters, y=historical_values, mode='lines+markers',
+                                         name='Historical Median', line=dict(color='blue', width=3), marker=dict(size=8)))
+            fig.add_trace(go.Scatter(x=['Current'], y=[median_pred], mode='markers',
+                                     name='Prediction (Median)', marker=dict(color='red', size=10, symbol='diamond')))
             if forecast_values:
-                fig.add_trace(go.Scatter(
-                    x=forecast_quarters,
-                    y=forecast_values,
-                    mode='lines+markers',
-                    name='Forecast',
-                    line=dict(color='green', width=3, dash='dash'),
-                    marker=dict(size=8)
-                ))
-        
-            fig.update_layout(
-                title=f"{area} - Historical, Prediction & Forecast",
-                xaxis_title="Quarter",
-                yaxis_title="Price (AED)",
-                template="plotly_white",
-                height=450
-            )
+                fig.add_trace(go.Scatter(x=forecast_quarters, y=forecast_values, mode='lines+markers',
+                                         name='Forecast', line=dict(color='green', width=3, dash='dash'), marker=dict(size=8)))
+            fig.update_layout(title=f"{area} - Historical, Prediction & Forecast",
+                              xaxis_title="Quarter", yaxis_title="Price (AED)", template="plotly_white", height=450)
             st.plotly_chart(fig, use_container_width=True)
 
 
