@@ -2558,52 +2558,49 @@ if sidebar_option == "validation":
     import plotly.express as px
     
     # =========================
-    # Load your forecast dataframe
+    # 1️⃣ Load combined trends CSV
     # =========================
-    df_forecast = pd.read_csv("combined_median_trends.csv")  # or already in memory
-    # Columns: area_name_en, forecast_quarter, y_pred, y_pred_forecast
+    df_forecast = pd.read_csv("combined_median_trends.csv")
+    
+    # Ensure columns: area_name_en, quarter, median_price, type
+    st.write("Columns in dataframe:", df_forecast.columns)
     
     # =========================
-    # Streamlit UI
+    # 2️⃣ Streamlit UI: Select Area
     # =========================
-    st.title("Area-wise Prediction & Forecast Viewer")
+    st.title("Area-wise Median Price Trend Viewer")
     
-    # Select area
     areas = df_forecast['area_name_en'].unique()
     selected_area = st.selectbox("Select Area:", areas)
     
-    # Filter dataframe for selected area
+    # Filter for selected area
     df_area = df_forecast[df_forecast['area_name_en'] == selected_area]
     
-    # Convert to long format for plotting
-    df_long = df_area.melt(
-        id_vars=['area_name_en','forecast_quarter'],
-        value_vars=['y_pred','y_pred_forecast'],
-        var_name='type',
-        value_name='median_price'
-    )
-    df_long.rename(columns={'forecast_quarter':'quarter'}, inplace=True)
+    if df_area.empty:
+        st.warning(f"No data available for area: {selected_area}")
+    else:
+        # =========================
+        # 3️⃣ Plot Historical + Prediction + Forecast
+        # =========================
+        fig = px.line(
+            df_area,
+            x='quarter',
+            y='median_price',
+            color='area_name_en',
+            line_dash='type',   # Solid for Historical, dashed for Prediction/Forecast
+            markers=True,
+            title=f"Area-wise Median Price Trend for {selected_area}"
+        )
     
-    # =========================
-    # Plot
-    # =========================
-    fig = px.line(
-        df_long,
-        x='quarter',
-        y='median_price',
-        color='type',          # Prediction vs Forecast
-        markers=True,
-        title=f"Prediction & Forecast Trend for {selected_area}"
-    )
+        fig.update_layout(
+            xaxis_title="Quarter",
+            yaxis_title="Median Price",
+            legend_title="Type",
+            xaxis=dict(type='category')
+        )
     
-    fig.update_layout(
-        xaxis_title="Quarter",
-        yaxis_title="Median Price",
-        legend_title="Type",
-        xaxis=dict(type='category')
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
+
 
 
 ###########################################################################################################################################################################################################################
