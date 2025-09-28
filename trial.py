@@ -2560,7 +2560,7 @@ if sidebar_option == "validation":
     # =========================
     # Load your forecast dataframe
     # =========================
-    # df_forecast = pd.read_csv("combined_median_trends.csv")  # or already in memory
+    df_forecast = pd.read_csv("combined_median_trends.csv")  # or already in memory
     # Columns: area_name_en, forecast_quarter, y_pred, y_pred_forecast
     
     # =========================
