@@ -2553,433 +2553,57 @@ warnings.filterwarnings('ignore')
 # TAB 3: Area-wise Prediction & Forecast
 # =====================
 if sidebar_option == "validation":
+    import streamlit as st
+    import pandas as pd
+    import plotly.express as px
     
-    # 1️⃣ Load test, train, and forecast data
-    @st.cache_data
-    def load_data():
-        test_df = pd.read_csv("test_data_24_Q4.csv")
-        train_df = pd.read_csv("df_trained_dataset_6000.csv")  # Assuming you have train data
-        forecast_df = pd.read_csv("quarterly_forecasts_with_CI.csv")  # Your forecast file with growth factors
-        
-        # Clean column names
-        drop_col = ['Unnamed: 0'] 
-        test_df = test_df.drop(columns=[col for col in drop_col if col in test_df.columns])
-        train_df = train_df.drop(columns=[col for col in drop_col if col in train_df.columns])
-        if forecast_df is not None:
-            forecast_df = forecast_df.drop(columns=[col for col in drop_col if col in forecast_df.columns])
-        
-        return test_df, train_df, forecast_df
+    # =========================
+    # Load your forecast dataframe
+    # =========================
+    # df_forecast = pd.read_csv("combined_median_trends.csv")  # or already in memory
+    # Columns: area_name_en, forecast_quarter, y_pred, y_pred_forecast
     
-    try:
-        test_df, train_df, forecast_df = load_data()
-        
-        # Validate forecast dataframe has required columns
-        if forecast_df is not None:
-            required_forecast_cols = ['area_name_en', 'forecast_quarter', 'growth_factor_upper']
-            missing_cols = set(required_forecast_cols) - set(forecast_df.columns)
-            if missing_cols:
-                st.error(f"Forecast file missing required columns: {missing_cols}")
-                st.stop()
-            
-    except FileNotFoundError as e:
-        st.error(f"Data files not found: {e}")
-        st.stop()
+    # =========================
+    # Streamlit UI
+    # =========================
+    st.title("Area-wise Prediction & Forecast Viewer")
     
-    # 2️⃣ Area selection
-    st.sidebar.header("🔧 Configuration")
-    st.title("🏠 Real Estate Price Prediction & Forecasting Dashboard")
+    # Select area
+    areas = df_forecast['area_name_en'].unique()
+    selected_area = st.selectbox("Select Area:", areas)
     
-    # Get unique areas from test data
-    available_areas = sorted(test_df['area_name_en'].unique())
+    # Filter dataframe for selected area
+    df_area = df_forecast[df_forecast['area_name_en'] == selected_area]
     
-    if not available_areas:
-        st.error("No areas found in test data.")
-        st.stop()
+    # Convert to long format for plotting
+    df_long = df_area.melt(
+        id_vars=['area_name_en','forecast_quarter'],
+        value_vars=['y_pred','y_pred_forecast'],
+        var_name='type',
+        value_name='median_price'
+    )
+    df_long.rename(columns={'forecast_quarter':'quarter'}, inplace=True)
     
-    selected_area = st.sidebar.selectbox("Select Area", available_areas)
-    
-    if not selected_area:
-        st.warning("Please select an area from the dropdown.")
-        st.stop()
-    
-    # 3️⃣ Get forecast data for selected area (if available)
-    area_forecast_df = None
-    if forecast_df is not None:
-        area_forecast_df = forecast_df[forecast_df['area_name_en'] == selected_area].copy()
-        if not area_forecast_df.empty:
-            # Ensure forecast_quarter is properly formatted
-            area_forecast_df['forecast_quarter'] = pd.to_datetime(area_forecast_df['forecast_quarter'])
-            area_forecast_df = area_forecast_df.sort_values('forecast_quarter')
-    
-    # 4️⃣ Load models and encoders
-    try:
-        # Load OHE and transformed columns
-        with open("onehot_encoder.pkl", "rb") as f:
-            ohe = pickle.load(f)
-        with open("train_columns.pkl", "rb") as f:
-            transformed_columns = pickle.load(f)
-        
-        # Load area-specific model
-        model_filename = f"dt_model_{selected_area.replace(' ', '_').replace('-', '_')}.pkl"
-        with open(model_filename, "rb") as f:
-            model = pickle.load(f)
-            
-    except FileNotFoundError as e:
-        st.error(f"Model or encoder file not found: {e}")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error loading files: {e}")
-        st.stop()
-    
-    # 5️⃣ Process test data for selected area
-    area_test_df = test_df[test_df['area_name_en'] == selected_area].copy()
-    
-    if area_test_df.empty:
-        st.warning(f"No test data available for {selected_area}")
-        st.stop()
-    
-    # Drop instance_date from test_df before encoding
-    test_df_for_encoding = area_test_df.drop(columns=['instance_date'], errors='ignore')
-    
-    # Ensure instance_date is datetime for plotting
-    area_test_df['instance_date'] = pd.to_datetime(area_test_df['instance_date'])
-    area_test_df = area_test_df.sort_values('instance_date')
-    
-    # Apply OHE with proper error handling
-    try:
-        # Get the feature names the encoder expects
-        if hasattr(ohe, 'feature_names_in_'):
-            expected_features = ohe.feature_names_in_
-        else:
-            # For older sklearn versions, use categories_
-            expected_features = ohe.feature_names_in_ if hasattr(ohe, 'feature_names_in_') else list(ohe.categories_.keys())
-        
-        # Select only the columns that the encoder was trained on
-        missing_cols = set(expected_features) - set(test_df_for_encoding.columns)
-        extra_cols = set(test_df_for_encoding.columns) - set(expected_features)
-        
-        if missing_cols:
-            st.warning(f"Missing columns in test data: {missing_cols}. Adding with default values.")
-            for col in missing_cols:
-                test_df_for_encoding[col] = 0  # or appropriate default value
-        
-        if extra_cols:
-            st.warning(f"Extra columns in test data: {extra_cols}. They will be ignored.")
-            test_df_for_encoding = test_df_for_encoding[expected_features]
-        
-        # Handle categorical columns - ensure they are string type
-        for col in test_df_for_encoding.select_dtypes(include=['object']).columns:
-            test_df_for_encoding[col] = test_df_for_encoding[col].astype(str)
-        
-        # Apply the encoder - handle both sparse matrix and numpy array outputs
-        encoded_result = ohe.transform(test_df_for_encoding)
-        
-        # Convert to array if it's a sparse matrix, otherwise use as-is
-        if hasattr(encoded_result, 'toarray'):
-            area_test_ohe = pd.DataFrame(encoded_result.toarray(), columns=transformed_columns)
-        else:
-            area_test_ohe = pd.DataFrame(encoded_result, columns=transformed_columns)
-        
-        # Ensure all required columns are present for the model
-        if hasattr(model, 'feature_names_in_'):
-            model_expected_features = model.feature_names_in_
-            missing_model_cols = set(model_expected_features) - set(area_test_ohe.columns)
-            if missing_model_cols:
-                for col in missing_model_cols:
-                    area_test_ohe[col] = 0
-                area_test_ohe = area_test_ohe[model_expected_features]
-            
-    except Exception as e:
-        st.error(f"Error in one-hot encoding: {e}")
-        st.stop()
-    
-    # 6️⃣ Predict prices
-    try:
-        area_test_df['predicted_price'] = model.predict(area_test_ohe)
-    except Exception as e:
-        st.error(f"Error in prediction: {e}")
-        st.stop()
-    
-    # 7️⃣ Generate forecast using growth_factor_upper from the forecast file
-    st.sidebar.subheader("Forecast Settings")
-    show_confidence = st.sidebar.checkbox("Show Confidence Intervals", value=True)
-    
-    def generate_forecast_from_file(last_date, last_price, forecast_data):
-        """Generate forecast using growth factors from the forecast file"""
-        if forecast_data is None or forecast_data.empty:
-            return [], []
-        
-        # Use the growth factors from the file sequentially
-        forecast_dates = forecast_data['forecast_quarter'].tolist()
-        growth_factors = forecast_data['growth_factor_upper'].tolist()
-        
-        # Calculate forecast values
-        forecast_values = []
-        current_price = last_price
-        for factor in growth_factors:
-            current_price = current_price * factor
-            forecast_values.append(current_price)
-        
-        return forecast_dates, forecast_values
-    
-    # Generate forecast using the file data
-    last_date = area_test_df['instance_date'].max()
-    last_price = area_test_df['predicted_price'].iloc[-1]
-    
-    future_dates, forecast_values = generate_forecast_from_file(
-        last_date, last_price, area_forecast_df
+    # =========================
+    # Plot
+    # =========================
+    fig = px.line(
+        df_long,
+        x='quarter',
+        y='median_price',
+        color='type',          # Prediction vs Forecast
+        markers=True,
+        title=f"Prediction & Forecast Trend for {selected_area}"
     )
     
-    # 8️⃣ Process train data for historical trend
-    area_train_df = train_df[train_df['area_name_en'] == selected_area].copy()
-    
-    if not area_train_df.empty:
-        area_train_df['instance_date'] = pd.to_datetime(area_train_df['instance_date'])
-        area_train_df = area_train_df.sort_values('instance_date')
-        
-        # Quarterly aggregation - FIX: Use area_train_df instead of area_test_df
-        area_train_df['quarter'] = area_train_df['instance_date'].dt.to_period('Q')
-        quarterly_trend = area_train_df.groupby('quarter')['price'].agg(['mean', 'std', 'count']).reset_index()
-        quarterly_trend['quarter'] = quarterly_trend['quarter'].astype(str)
-        quarterly_trend = quarterly_trend.sort_values('quarter')
-    
-    # 9️⃣ Create comprehensive visualization
-    fig = make_subplots(
-        rows=2, cols=1,
-        subplot_titles=(
-            f'Price Prediction & Forecast for {selected_area}', 
-            f'Historical Quarterly Trend for {selected_area}'
-        ),
-        vertical_spacing=0.15
-    )
-    
-    # Plot 1: Test predictions and forecast
-    if not area_test_df.empty:
-        # Actual prices
-        fig.add_trace(
-            go.Scatter(
-                x=area_test_df['instance_date'], 
-                y=area_test_df['price'], 
-                mode='lines+markers', 
-                name='Actual Price',
-                line=dict(color='blue', width=4),
-                marker=dict(size=8, symbol='circle'),
-                hovertemplate='<b>Actual</b><br>Date: %{x}<br>Price: AED %{y:,.0f}<extra></extra>'
-            ),
-            row=1, col=1
-        )
-        
-        # Predicted prices
-        fig.add_trace(
-            go.Scatter(
-                x=area_test_df['instance_date'], 
-                y=area_test_df['predicted_price'], 
-                mode='lines+markers', 
-                name='Predicted Price',
-                line=dict(color='red', width=4, dash='dash'),
-                marker=dict(size=8, symbol='square'),
-                hovertemplate='<b>Predicted</b><br>Date: %{x}<br>Price: AED %{y:,.0f}<extra></extra>'
-            ),
-            row=1, col=1
-        )
-        
-        # Forecast values (if available)
-        if future_dates and forecast_values:
-            fig.add_trace(
-                go.Scatter(
-                    x=future_dates, 
-                    y=forecast_values, 
-                    mode='lines+markers', 
-                    name='Forecast (Upper Growth Factor)',
-                    line=dict(color='green', width=4),
-                    marker=dict(size=10, symbol='star'),
-                    hovertemplate='<b>Forecast</b><br>Quarter: %{x}<br>Price: AED %{y:,.0f}<br>Growth Factor: %{customdata}<extra></extra>',
-                    customdata=area_forecast_df['growth_factor_upper'].round(3) if area_forecast_df is not None else []
-                ),
-                row=1, col=1
-            )
-    
-    # Plot 2: Quarterly trend from train data
-    if not area_train_df.empty and 'quarterly_trend' in locals() and len(quarterly_trend) > 1:
-        fig.add_trace(
-            go.Scatter(
-                x=quarterly_trend['quarter'], 
-                y=quarterly_trend['mean'], 
-                mode='lines+markers', 
-                name='Quarterly Average Price',
-                line=dict(color='purple', width=4),
-                marker=dict(size=8, symbol='diamond'),
-                hovertemplate='<b>Historical</b><br>Quarter: %{x}<br>Avg Price: AED %{y:,.0f}<extra></extra>'
-            ),
-            row=2, col=1
-        )
-        
-        # Add volatility area
-        if show_confidence:
-            fig.add_trace(
-                go.Scatter(
-                    x=quarterly_trend['quarter'],
-                    y=quarterly_trend['mean'] + quarterly_trend['std'],
-                    mode='lines',
-                    line=dict(width=0),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ),
-                row=2, col=1
-            )
-            
-            fig.add_trace(
-                go.Scatter(
-                    x=quarterly_trend['quarter'],
-                    y=quarterly_trend['mean'] - quarterly_trend['std'],
-                    mode='lines',
-                    line=dict(width=0),
-                    fill='tonexty',
-                    fillcolor='rgba(128, 0, 128, 0.2)',
-                    name='Price Volatility (±1 STD)',
-                    hovertemplate='<b>Volatility Range</b><br>Quarter: %{x}<br>Price Range: ±AED %{customdata:,.0f}<extra></extra>',
-                    customdata=quarterly_trend['std']
-                ),
-                row=2, col=1
-            )
-    
-    # Update layout
     fig.update_layout(
-        height=800,
-        title_text=f"Real Estate Analysis: {selected_area}",
-        showlegend=True,
-        template='plotly_white',
-        hovermode='x unified'
+        xaxis_title="Quarter",
+        yaxis_title="Median Price",
+        legend_title="Type",
+        xaxis=dict(type='category')
     )
-    
-    fig.update_xaxes(title_text="Date", row=1, col=1)
-    fig.update_yaxes(title_text="Price (AED)", row=1, col=1)
-    fig.update_xaxes(title_text="Quarter", row=2, col=1)
-    fig.update_yaxes(title_text="Price (AED)", row=2, col=1)
     
     st.plotly_chart(fig, use_container_width=True)
-    
-    # 🔟 Display metrics and insights
-    st.subheader("📊 Forecast Analysis")
-    
-    # Create columns for key metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        if not area_test_df.empty:
-            current_price = area_test_df['price'].iloc[-1]
-            st.metric("Current Actual Price", f"AED {current_price:,.0f}")
-    
-    with col2:
-        if not area_test_df.empty:
-            predicted_price = area_test_df['predicted_price'].iloc[-1]
-            st.metric("Current Predicted Price", f"AED {predicted_price:,.0f}")
-    
-    with col3:
-        if not area_test_df.empty:
-            accuracy = (1 - abs(current_price - predicted_price) / current_price) * 100
-            st.metric("Prediction Accuracy", f"{accuracy:.1f}%")
-    
-    with col4:
-        forecast_quarters = len(area_forecast_df) if area_forecast_df is not None else 0
-        st.metric("Forecast Quarters", forecast_quarters)
-    
-    # Forecast details (if available)
-    if area_forecast_df is not None and not area_forecast_df.empty:
-        st.subheader("🔍 Forecast Details")
-        
-        # Display forecast data table
-        forecast_display_df = area_forecast_df.copy()
-        forecast_display_df['forecast_price'] = forecast_values
-        forecast_display_df['forecast_quarter'] = forecast_display_df['forecast_quarter'].dt.strftime('%Y-Q%q')
-        forecast_display_df['growth_factor_upper'] = forecast_display_df['growth_factor_upper'].round(4)
-        forecast_display_df['forecast_price'] = forecast_display_df['forecast_price'].round(0)
-        
-        st.dataframe(forecast_display_df[['forecast_quarter', 'growth_factor_upper', 'forecast_price']], 
-                     use_container_width=True)
-        
-        # Forecast summary statistics
-        st.subheader("📈 Forecast Summary")
-        
-        summary_col1, summary_col2, summary_col3 = st.columns(3)
-        
-        with summary_col1:
-            total_growth = (forecast_values[-1] / last_price - 1) * 100
-            st.metric("Total Forecast Growth", f"{total_growth:+.1f}%")
-            st.write(f"From AED {last_price:,.0f} to AED {forecast_values[-1]:,.0f}")
-        
-        with summary_col2:
-            avg_growth_factor = area_forecast_df['growth_factor_upper'].mean()
-            st.metric("Average Growth Factor", f"{avg_growth_factor:.4f}")
-            st.write("Per quarter")
-        
-        with summary_col3:
-            max_growth_quarter = forecast_display_df.loc[forecast_display_df['growth_factor_upper'].idxmax()]
-            st.metric("Highest Growth Quarter", max_growth_quarter['forecast_quarter'])
-            st.write(f"Factor: {max_growth_quarter['growth_factor_upper']:.4f}")
-    
-    # Historical context
-    st.subheader("📚 Historical Context")
-    
-    if not area_train_df.empty and 'quarterly_trend' in locals():
-        tab1, tab2 = st.tabs(["Trend Analysis", "Data Summary"])
-        
-        with tab1:
-            # Calculate historical trends
-            if len(quarterly_trend) > 1:
-                historical_growth = (quarterly_trend['mean'].iloc[-1] / quarterly_trend['mean'].iloc[0] - 1) * 100
-                avg_historical_price = quarterly_trend['mean'].mean()
-                
-                hist_col1, hist_col2, hist_col3 = st.columns(3)
-                with hist_col1:
-                    st.metric("Historical Quarters", len(quarterly_trend))
-                with hist_col2:
-                    st.metric("Total Historical Growth", f"{historical_growth:+.1f}%")
-                with hist_col3:
-                    st.metric("Avg Quarterly Price", f"AED {avg_historical_price:,.0f}")
-        
-        with tab2:
-            st.write("**Recent Historical Data:**")
-            recent_data = area_train_df[['instance_date', 'price']].tail(10)
-            st.dataframe(recent_data.sort_values('instance_date', ascending=False), 
-                        use_container_width=True)
-    
-    # Investment insights
-    st.subheader("💡 Investment Insights")
-    
-    if area_forecast_df is not None and not area_forecast_df.empty:
-        total_growth = (forecast_values[-1] / last_price - 1) * 100 if forecast_values else 0
-        
-        # Simple recommendation based on forecast
-        if total_growth > 10:
-            st.success("🚀 **Positive Outlook**: Strong growth forecasted across all quarters")
-        elif total_growth > 5:
-            st.info("📈 **Moderate Outlook**: Steady growth expected")
-        elif total_growth > 0:
-            st.warning("⚖️ **Neutral Outlook**: Mild growth with some uncertainty")
-        else:
-            st.error("📉 **Cautious Outlook**: Negative or flat growth forecasted")
-        
-        st.write(f"**Key Factors:**")
-        st.write(f"- Forecast uses growth_factor_upper from provided data")
-        st.write(f"- Based on {len(area_forecast_df)} quarters of forecast data")
-        st.write(f"- Current to forecast price change: {total_growth:+.1f}%")
-    else:
-        st.info("📊 **Analysis Ready**: Forecast data not available for this area")
-    
-    # Footer
-    st.sidebar.markdown("---")
-    if area_forecast_df is not None and not area_forecast_df.empty:
-        st.sidebar.info(f"""
-        **Forecast Data Summary for {selected_area}:
-        - Quarters: {len(area_forecast_df)}
-        - Avg Growth Factor: {area_forecast_df['growth_factor_upper'].mean():.4f}
-        - Min Growth Factor: {area_forecast_df['growth_factor_upper'].min():.4f}
-        - Max Growth Factor: {area_forecast_df['growth_factor_upper'].max():.4f}
-        """)
-
-
-
 
 
 ###########################################################################################################################################################################################################################
