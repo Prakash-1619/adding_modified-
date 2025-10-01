@@ -2720,7 +2720,6 @@ if sidebar_option == "validation":
 ###########################################################################################################################################################################################################################
 
 # =========================
-# =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
 # =========================
 from datetime import datetime, timedelta
@@ -2845,31 +2844,34 @@ def load_forecasting_data():
         return None
 
 # =========================
-# FILTER TRAINING DATA BY SELECTED FEATURES
+# FILTER TRAINING DATA BY EXACT SELECTED FEATURES
 # =========================
-def filter_training_data_by_features(train_data, selected_features):
-    """Filter training data to show only properties with similar features"""
+def filter_training_data_by_exact_features(train_data, selected_features, area_name):
+    """Filter training data to show only properties with EXACT same features in the same area"""
     try:
         filtered_data = train_data.copy()
         
-        # Apply filters based on selected features
+        # First filter by area
+        filtered_data = filtered_data[filtered_data['area_name_en'] == area_name]
+        
+        # Apply filters based on EXACT selected features
         if 'rooms_en' in selected_features and selected_features['rooms_en']:
             filtered_data = filtered_data[filtered_data['rooms_en'] == selected_features['rooms_en']]
         
         if 'floor_bin' in selected_features and selected_features['floor_bin']:
             filtered_data = filtered_data[filtered_data['floor_bin'] == selected_features['floor_bin']]
         
-        # Filter binary features
+        # Filter binary features EXACTLY
         binary_features = ['swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
         for feature in binary_features:
             if feature in selected_features and selected_features[feature] is not None:
                 filtered_data = filtered_data[filtered_data[feature] == selected_features[feature]]
         
-        # Filter area within a reasonable range (±20%)
+        # Filter area within a reasonable range (±10% for exact matching)
         if 'procedure_area' in selected_features and selected_features['procedure_area']:
             area_value = selected_features['procedure_area']
-            lower_bound = area_value * 0.8
-            upper_bound = area_value * 1.2
+            lower_bound = area_value * 0.9
+            upper_bound = area_value * 1.1
             filtered_data = filtered_data[
                 (filtered_data['procedure_area'] >= lower_bound) & 
                 (filtered_data['procedure_area'] <= upper_bound)
@@ -2879,29 +2881,27 @@ def filter_training_data_by_features(train_data, selected_features):
         
     except Exception as e:
         st.warning(f"Error filtering training data: {str(e)}")
-        return train_data  # Return original data if filtering fails
+        return train_data[train_data['area_name_en'] == area_name]  # Return area data if filtering fails
 
 # =========================
-# LOESS TREND ANALYSIS FUNCTION
+# CALCULATE TREND FOR EXACT SAME FEATURES
 # =========================
-def calculate_loess_trend(filtered_data, area_name, current_year):
-    """Calculate LOESS trend for filtered data of specific area and features"""
+def calculate_trend_for_exact_features(filtered_data, current_year):
+    """Calculate trend for properties with exact same features"""
     try:
-        # Filter data for the specific area
-        area_data = filtered_data[filtered_data['area_name_en'] == area_name].copy()
-        
-        if len(area_data) < 2:  # Need at least 2 data points for trend
+        if len(filtered_data) < 2:  # Need at least 2 data points for trend
             return None, None, None
         
-        # Group by year and calculate median price (more robust than mean)
-        yearly_avg = area_data.groupby('year')['meter_sale_price'].median().reset_index()
+        # Group by year and calculate median price
+        yearly_data = filtered_data.groupby('year')['meter_sale_price'].agg(['median', 'count']).reset_index()
+        yearly_data = yearly_data.rename(columns={'median': 'meter_sale_price', 'count': 'data_points'})
         
-        if len(yearly_avg) < 2:
+        if len(yearly_data) < 2:
             return None, None, None
         
         # Apply LOESS smoothing
-        y_values = yearly_avg['meter_sale_price'].values
-        x_values = yearly_avg['year'].values
+        y_values = yearly_data['meter_sale_price'].values
+        x_values = yearly_data['year'].values
         
         loess_smoothed = lowess(y_values, x_values, frac=0.8, it=3)
         
@@ -2915,129 +2915,43 @@ def calculate_loess_trend(filtered_data, area_name, current_year):
         if len(trend_df) >= 2:
             trend_df = trend_df.sort_values('year')
             latest_trend = trend_df.iloc[-1]['smoothed_price']
-            return trend_df, latest_trend, yearly_avg
+            return trend_df, latest_trend, yearly_data
         else:
-            return trend_df, None, yearly_avg
+            return trend_df, None, yearly_data
             
     except Exception as e:
-        st.warning(f"Could not calculate LOESS trend for {area_name}: {str(e)}")
+        st.warning(f"Could not calculate trend for exact features: {str(e)}")
         return None, None, None
-
-# =========================
-# CREATE FEATURE-WISE TREND PLOTS
-# =========================
-def create_feature_wise_trend_plots(train_data, selected_features, area_name):
-    """Create individual trend plots for each feature"""
-    
-    feature_plots = {}
-    
-    # Room-wise trend
-    if 'rooms_en' in selected_features and selected_features['rooms_en']:
-        try:
-            room_data = train_data[train_data['area_name_en'] == area_name].copy()
-            room_trend = room_data.groupby(['year', 'rooms_en'])['meter_sale_price'].median().reset_index()
-            
-            fig_rooms = px.line(room_trend, x='year', y='meter_sale_price', color='rooms_en',
-                               title=f'Price Trends by Room Count - {area_name}',
-                               labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
-                               height=400)
-            fig_rooms.update_layout(template="plotly_white")
-            feature_plots['rooms'] = fig_rooms
-        except Exception as e:
-            st.warning(f"Could not create room-wise trend: {str(e)}")
-    
-    # Floor-wise trend
-    if 'floor_bin' in selected_features and selected_features['floor_bin']:
-        try:
-            floor_data = train_data[train_data['area_name_en'] == area_name].copy()
-            floor_trend = floor_data.groupby(['year', 'floor_bin'])['meter_sale_price'].median().reset_index()
-            
-            fig_floors = px.line(floor_trend, x='year', y='meter_sale_price', color='floor_bin',
-                                title=f'Price Trends by Floor Level - {area_name}',
-                                labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
-                                height=400)
-            fig_floors.update_layout(template="plotly_white")
-            feature_plots['floors'] = fig_floors
-        except Exception as e:
-            st.warning(f"Could not create floor-wise trend: {str(e)}")
-    
-    # Area size trend (binned)
-    if 'procedure_area' in selected_features and selected_features['procedure_area']:
-        try:
-            area_data = train_data[train_data['area_name_en'] == area_name].copy()
-            # Create area bins
-            area_data['area_bin'] = pd.cut(area_data['procedure_area'], 
-                                         bins=[0, 50, 100, 150, 200, 300, 500],
-                                         labels=['0-50', '51-100', '101-150', '151-200', '201-300', '300+'])
-            
-            area_trend = area_data.groupby(['year', 'area_bin'])['meter_sale_price'].median().reset_index()
-            
-            fig_area = px.line(area_trend, x='year', y='meter_sale_price', color='area_bin',
-                              title=f'Price Trends by Area Size (sqMt) - {area_name}',
-                              labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
-                              height=400)
-            fig_area.update_layout(template="plotly_white")
-            feature_plots['area'] = fig_area
-        except Exception as e:
-            st.warning(f"Could not create area-wise trend: {str(e)}")
-    
-    # Amenities impact over time
-    try:
-        amenities_data = train_data[train_data['area_name_en'] == area_name].copy()
-        
-        # Calculate premium for each amenity over time
-        amenity_cols = ['swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
-        amenity_trends = []
-        
-        for amenity in amenity_cols:
-            amenity_effect = amenities_data.groupby(['year', amenity])['meter_sale_price'].median().reset_index()
-            amenity_effect_pivot = amenity_effect.pivot(index='year', columns=amenity, values='meter_sale_price').reset_index()
-            
-            if 1 in amenity_effect_pivot.columns and 0 in amenity_effect_pivot.columns:
-                amenity_effect_pivot['premium'] = ((amenity_effect_pivot[1] - amenity_effect_pivot[0]) / amenity_effect_pivot[0]) * 100
-                amenity_effect_pivot['amenity'] = amenity.replace('_', ' ').title()
-                amenity_trends.append(amenity_effect_pivot[['year', 'amenity', 'premium']].dropna())
-        
-        if amenity_trends:
-            amenities_df = pd.concat(amenity_trends, ignore_index=True)
-            fig_amenities = px.line(amenities_df, x='year', y='premium', color='amenity',
-                                   title=f'Amenity Premium Over Time - {area_name}',
-                                   labels={'premium': 'Price Premium (%)', 'year': 'Year'},
-                                   height=400)
-            fig_amenities.update_layout(template="plotly_white")
-            feature_plots['amenities'] = fig_amenities
-    except Exception as e:
-        st.warning(f"Could not create amenities trend: {str(e)}")
-    
-    return feature_plots
 
 # =========================
 # CREATE COMBINED TREND AND FORECAST PLOT WITH ALL GROWTH FACTORS
 # =========================
-def create_combined_trend_forecast_plot(historical_data, trend_data, current_price, forecast_data, area_name):
-    """Create a combined plot showing historical trend and future forecast with confidence intervals"""
+def create_combined_trend_forecast_plot(historical_data, trend_data, current_price, forecast_data, area_name, selected_features):
+    """Create a combined plot showing historical trend for exact features and future forecast with confidence intervals"""
     
     fig = go.Figure()
     current_year = datetime.now().year
     
-    # Add historical data points (filtered by features)
+    # Add historical data points (EXACT same features)
     if historical_data is not None and len(historical_data) > 0:
+        # Add individual data points
         fig.add_trace(go.Scatter(
             x=historical_data['year'],
             y=historical_data['meter_sale_price'],
             mode='markers',
-            name='Historical Properties (Similar Features)',
-            marker=dict(color='blue', size=6, opacity=0.6),
-            hovertemplate='Year: %{x}<br>Price: AED %{y:,.0f}<extra></extra>'
+            name=f'Historical Properties (Exact Features)',
+            marker=dict(color='blue', size=8, opacity=0.7),
+            hovertemplate='Year: %{x}<br>Price: AED %{y:,.0f}<br>Data Points: %{customdata}<extra></extra>',
+            customdata=historical_data['data_points']
         ))
     
-    # Add LOESS trend line
+    # Add LOESS trend line for exact features
     if trend_data is not None and len(trend_data) > 0:
         fig.add_trace(go.Scatter(
             x=trend_data['year'],
             y=trend_data['smoothed_price'],
             mode='lines',
-            name='Historical Trend (LOESS)',
+            name='Historical Trend (Exact Features)',
             line=dict(color='red', width=3),
             hovertemplate='Year: %{x}<br>Trend Price: AED %{y:,.0f}<extra></extra>'
         ))
@@ -3048,7 +2962,7 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, current_pri
         y=[current_price],
         mode='markers',
         name='Current Prediction',
-        marker=dict(color='green', size=12, symbol='star'),
+        marker=dict(color='green', size=15, symbol='star'),
         hovertemplate='Current Prediction<br>Price: AED %{y:,.0f}<extra></extra>'
     ))
     
@@ -3116,9 +3030,12 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, current_pri
             hovertemplate='Year: %{x:.2f}<br>Lower Bound: AED %{y:,.0f}<extra></extra>'
         ))
     
+    # Create feature description for title
+    feature_desc = f"{selected_features['rooms_en']}, {selected_features['floor_bin']}, {selected_features['procedure_area']} sqMt"
+    
     # Update layout
     fig.update_layout(
-        title=f"Price Timeline - {area_name} (Similar Features)",
+        title=f"Price Timeline - {area_name}<br><sub>Features: {feature_desc}</sub>",
         xaxis_title="Year",
         yaxis_title="Price (AED)",
         height=500,
@@ -3300,7 +3217,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     predicted_price = model.predict(X_input)[0]
                     
                     # =========================
-                    # FILTER TRAINING DATA BY SELECTED FEATURES
+                    # FILTER TRAINING DATA BY EXACT SAME FEATURES
                     # =========================
                     selected_features = {
                         'rooms_en': rooms_en,
@@ -3313,26 +3230,29 @@ if sidebar_option == "🤖 Model Input / Prediction":
                         'procedure_area': procedure_area
                     }
                     
-                    filtered_data = None
+                    exact_features_data = None
                     if train_data is not None:
-                        filtered_data = filter_training_data_by_features(train_data, selected_features)
+                        exact_features_data = filter_training_data_by_exact_features(
+                            train_data, selected_features, area_name
+                        )
                         
-                        st.subheader("📊 Filtered Historical Data")
-                        st.write(f"Found {len(filtered_data)} historical properties with similar features in {area_name}")
+                        st.subheader("📊 Historical Data with Exact Same Features")
+                        st.write(f"Found {len(exact_features_data)} historical properties with EXACT same features in {area_name}")
                         
-                        if len(filtered_data) > 0:
-                            st.dataframe(filtered_data[['instance_date', 'meter_sale_price', 'rooms_en', 'floor_bin', 'procedure_area']].head(10))
+                        if len(exact_features_data) > 0:
+                            # Show summary of the filtered data
+                            st.dataframe(exact_features_data[['instance_date', 'meter_sale_price', 'rooms_en', 'floor_bin', 'procedure_area']].head(10))
                     
                     # =========================
-                    # CALCULATE LOESS TREND ON FILTERED DATA
+                    # CALCULATE TREND FOR EXACT SAME FEATURES
                     # =========================
                     current_year = datetime.now().year
                     trend_df = None
-                    historical_avg = None
+                    historical_yearly = None
                     
-                    if filtered_data is not None and len(filtered_data) > 0:
-                        trend_df, latest_trend, historical_avg = calculate_loess_trend(
-                            filtered_data, area_name, current_year
+                    if exact_features_data is not None and len(exact_features_data) > 0:
+                        trend_df, latest_trend, historical_yearly = calculate_trend_for_exact_features(
+                            exact_features_data, current_year
                         )
                     
                     # =========================
@@ -3343,35 +3263,18 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     # =========================
                     # CREATE COMBINED PLOT WITH CONFIDENCE INTERVALS
                     # =========================
-                    st.subheader("📈 Price Timeline: Historical Trend + Forecast with Confidence Intervals")
+                    st.subheader("📈 Price Timeline: Historical Trend (Exact Features) + Forecast")
                     
                     combined_fig = create_combined_trend_forecast_plot(
-                        historical_avg, 
+                        historical_yearly, 
                         trend_df, 
                         predicted_price, 
                         forecast_data, 
-                        area_name
+                        area_name,
+                        selected_features
                     )
                     
                     st.plotly_chart(combined_fig, use_container_width=True)
-                    
-                    # =========================
-                    # FEATURE-WISE TREND ANALYSIS
-                    # =========================
-                    if train_data is not None:
-                        st.subheader("🔍 Feature-wise Trend Analysis")
-                        st.write("Explore how different features have influenced prices over time in this area")
-                        
-                        feature_plots = create_feature_wise_trend_plots(train_data, selected_features, area_name)
-                        
-                        # Display feature-wise plots in columns
-                        if feature_plots:
-                            cols = st.columns(2)
-                            plot_keys = list(feature_plots.keys())
-                            
-                            for i, plot_key in enumerate(plot_keys):
-                                with cols[i % 2]:
-                                    st.plotly_chart(feature_plots[plot_key], use_container_width=True)
                     
                     # =========================
                     # DISPLAY PREDICTION RESULTS
@@ -3446,13 +3349,34 @@ if sidebar_option == "🤖 Model Input / Prediction":
                         st.table(forecast_df)
                     
                     # =========================
-                    # DISPLAY TREND ANALYSIS
+                    # DISPLAY TREND ANALYSIS FOR EXACT FEATURES
                     # =========================
                     if trend_df is not None and latest_trend is not None:
-                        st.subheader("📊 Trend Analysis")
-                        st.info(f"Based on {len(filtered_data)} similar properties in {area_name}, " 
-                               f"the historical trend shows properties with these features have "
-                               f"been trending around AED {latest_trend:,.0f}")
+                        st.subheader("📊 Trend Analysis for Exact Features")
+                        
+                        # Calculate trend direction and percentage difference
+                        price_diff = predicted_price - latest_trend
+                        price_diff_percent = (price_diff / latest_trend) * 100
+                        
+                        if price_diff > 0:
+                            trend_direction = "increased"
+                            trend_color = "green"
+                        else:
+                            trend_direction = "decreased"
+                            trend_color = "red"
+                        
+                        st.info(f"""
+                        **Historical Trend Analysis:**
+                        - Based on **{len(exact_features_data)}** properties with **exact same features** in {area_name}
+                        - Historical trend shows similar properties were around **AED {latest_trend:,.0f}**
+                        - Current prediction shows a **{abs(price_diff_percent):.1f}% {trend_direction}** from historical trend
+                        - This indicates the market value for these specific features has **{trend_direction}** over time
+                        """)
+                    
+                    elif exact_features_data is not None and len(exact_features_data) > 0:
+                        st.warning(f"⚠️ Found {len(exact_features_data)} properties with similar features, but insufficient data for trend analysis.")
+                    else:
+                        st.warning("⚠️ No historical data found with exact same features. The prediction is based on the model training.")
                     
                 except Exception as e:
                     st.error(f"❌ Prediction error: {str(e)}")
@@ -3475,4 +3399,3 @@ if st.sidebar.checkbox("Show Debug Info"):
     st.sidebar.write(f"Training data loaded: {train_data is not None}")
     if growth_pivot is not None:
         st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
-        st.sidebar.write(f"Sample growth data: {growth_pivot[['area_name_en', 'ds', 'growth_factor', 'growth_factor_upper', 'growth_factor_lower']].head(3) if 'growth_factor' in growth_pivot.columns else 'N/A'}")
