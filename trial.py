@@ -2671,7 +2671,6 @@ if sidebar_option == "validation":
     import matplotlib.pyplot as plt
     import seaborn as sns
     import numpy as np
-
     
     # =========================
     # LOAD DATA
@@ -2715,6 +2714,35 @@ if sidebar_option == "validation":
         # Filter forecasts for selected area
         area_forecasts = forecasts_df[forecasts_df['area_name_en'] == selected_area].copy().sort_values('forecast_quarter')
         
+        # Calculate forecasts by multiplying growth factors with avg_predicted
+        if not area_forecasts.empty and 'avg_predicted' in area_forecasts.columns:
+            # Use the first avg_predicted as base and multiply by cumulative growth factors
+            base_prediction = area_forecasts['avg_predicted'].iloc[0]
+            
+            # Calculate cumulative growth for each forecast period
+            cumulative_growth_main = 1.0
+            cumulative_growth_lower = 1.0
+            cumulative_growth_upper = 1.0
+            
+            forecast_prices_main = []
+            forecast_prices_lower = []
+            forecast_prices_upper = []
+            
+            for idx, row in area_forecasts.iterrows():
+                cumulative_growth_main *= (1 + row['growth_factor'])
+                cumulative_growth_lower *= (1 + row['growth_factor_lower'])
+                cumulative_growth_upper *= (1 + row['growth_factor_upper'])
+                
+                forecast_prices_main.append(base_prediction * cumulative_growth_main)
+                forecast_prices_lower.append(base_prediction * cumulative_growth_lower)
+                forecast_prices_upper.append(base_prediction * cumulative_growth_upper)
+            
+            # Add calculated forecast prices to the dataframe
+            area_forecasts = area_forecasts.copy()
+            area_forecasts['calculated_forecast'] = forecast_prices_main
+            area_forecasts['calculated_lower'] = forecast_prices_lower
+            area_forecasts['calculated_upper'] = forecast_prices_upper
+        
         # =========================
         # CALCULATE QUARTERLY MEDIAN PRICES FROM TRAIN DATA
         # =========================
@@ -2752,23 +2780,23 @@ if sidebar_option == "validation":
                        fontsize=10,
                        bbox=dict(boxstyle="round,pad=0.3", facecolor="red", alpha=0.2))
         
-        # Plot 3: Forecast with Three Growth Factors
-        if not area_forecasts.empty:
+        # Plot 3: Calculated Forecasts (using growth factors * avg_predicted)
+        if not area_forecasts.empty and 'calculated_forecast' in area_forecasts.columns:
             # Main forecast line
-            ax.plot(area_forecasts['forecast_quarter'], area_forecasts['forecast_price'],
-                    label='Price Forecast', color='green', linewidth=3, linestyle='--', marker='s', markersize=6)
+            ax.plot(area_forecasts['forecast_quarter'], area_forecasts['calculated_forecast'],
+                    label='Price Forecast (Growth × Prediction)', color='green', linewidth=3, linestyle='--', marker='s', markersize=6)
             
-            # Forecast uncertainty (yhat_lower to yhat_upper)
+            # Forecast uncertainty range
             ax.fill_between(area_forecasts['forecast_quarter'],
-                           area_forecasts['yhat_lower'],
-                           area_forecasts['yhat_upper'],
+                           area_forecasts['calculated_lower'],
+                           area_forecasts['calculated_upper'],
                            alpha=0.3, color='green', label='Forecast Range')
             
             # Annotate with growth factors
             for idx, row in area_forecasts.iterrows():
                 ax.annotate(f"Growth:\n{row['growth_factor']:.3f}\n"
                            f"({row['growth_factor_lower']:.3f} - {row['growth_factor_upper']:.3f})",
-                           (row['forecast_quarter'], row['forecast_price']),
+                           (row['forecast_quarter'], row['calculated_forecast']),
                            textcoords="offset points",
                            xytext=(15, 15 if idx % 2 == 0 else -45),
                            ha='left',
@@ -2779,7 +2807,7 @@ if sidebar_option == "validation":
         ax.set_xlabel('Quarter', fontsize=12)
         ax.set_ylabel('Price per Meter ($)', fontsize=12)
         ax.set_title(f'Real Estate Price Trends - {selected_area}\n'
-                    f'Historical Train Data → Predictions → Forecasts', fontsize=14, fontweight='bold')
+                    f'Historical Train Data → Predictions → Forecasts (Growth × Prediction)', fontsize=14, fontweight='bold')
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
         plt.xticks(rotation=45)
@@ -2808,20 +2836,30 @@ if sidebar_option == "validation":
         with col2:
             st.write("**Forecasts & Predictions**")
             if not area_forecasts.empty:
-                display_forecasts = area_forecasts[['forecast_quarter', 'forecast_price', 
-                                                  'yhat_lower', 'yhat_upper', 
-                                                  'growth_factor', 'growth_factor_lower', 
-                                                  'growth_factor_upper', 'avg_predicted']].copy()
-                display_forecasts = display_forecasts.round(4)
-                st.dataframe(display_forecasts.style.format({
-                    'forecast_price': '${:,.2f}',
-                    'yhat_lower': '${:,.2f}',
-                    'yhat_upper': '${:,.2f}',
-                    'growth_factor': '{:.4f}',
-                    'growth_factor_lower': '{:.4f}',
-                    'growth_factor_upper': '{:.4f}',
-                    'avg_predicted': '${:,.2f}'
-                }), use_container_width=True, height=300)
+                if 'calculated_forecast' in area_forecasts.columns:
+                    display_forecasts = area_forecasts[['forecast_quarter', 'avg_predicted', 
+                                                      'calculated_forecast', 'calculated_lower', 'calculated_upper',
+                                                      'growth_factor', 'growth_factor_lower', 'growth_factor_upper']].copy()
+                    display_forecasts = display_forecasts.round(2)
+                    st.dataframe(display_forecasts.style.format({
+                        'avg_predicted': '${:,.2f}',
+                        'calculated_forecast': '${:,.2f}',
+                        'calculated_lower': '${:,.2f}',
+                        'calculated_upper': '${:,.2f}',
+                        'growth_factor': '{:.3f}',
+                        'growth_factor_lower': '{:.3f}',
+                        'growth_factor_upper': '{:.3f}'
+                    }), use_container_width=True, height=300)
+                else:
+                    display_forecasts = area_forecasts[['forecast_quarter', 'avg_predicted',
+                                                      'growth_factor', 'growth_factor_lower', 'growth_factor_upper']].copy()
+                    display_forecasts = display_forecasts.round(2)
+                    st.dataframe(display_forecasts.style.format({
+                        'avg_predicted': '${:,.2f}',
+                        'growth_factor': '{:.3f}',
+                        'growth_factor_lower': '{:.3f}',
+                        'growth_factor_upper': '{:.3f}'
+                    }), use_container_width=True, height=300)
             else:
                 st.info("No forecast data available for this area")
         
@@ -2834,8 +2872,12 @@ if sidebar_option == "validation":
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                current_forecast = area_forecasts['forecast_price'].iloc[0]
-                st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
+                if 'calculated_forecast' in area_forecasts.columns:
+                    current_forecast = area_forecasts['calculated_forecast'].iloc[0]
+                    st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
+                elif 'forecast_price' in area_forecasts.columns:
+                    current_forecast = area_forecasts['forecast_price'].iloc[0]
+                    st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
             
             with col2:
                 if 'avg_predicted' in area_forecasts.columns:
@@ -2844,17 +2886,19 @@ if sidebar_option == "validation":
             
             with col3:
                 growth = area_forecasts['growth_factor'].iloc[0]
-                st.metric("Current Growth Factor", f"{growth:.4f}")
+                st.metric("Current Growth Factor", f"{growth:.3f}")
             
             with col4:
                 if not quarterly_median.empty:
                     latest_median = quarterly_median['median_price'].iloc[-1]
                     st.metric("Latest Historical Median", f"${latest_median:,.2f}")
+            
+            # Show calculation explanation
+            st.info(f"**Calculation Method**: Forecast prices are calculated by multiplying the average predicted price (${area_forecasts['avg_predicted'].iloc[0]:,.2f}) with cumulative growth factors for each quarter.")
     
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         st.info("Please ensure all data files are available in the correct format.")
-
 
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
