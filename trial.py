@@ -2666,239 +2666,55 @@ warnings.filterwarnings('ignore')
 # TAB 3: Area-wise Prediction & Forecast
 # =====================
 if sidebar_option == "validation":
-    import streamlit as st
-    import pandas as pd
-    import matplotlib.pyplot as plt
     import seaborn as sns
     import numpy as np
+    import streamlit as st
+    import pandas as pd
+    import plotly.express as px
     
     # =========================
-    # LOAD DATA
+    # 1️⃣ Load combined trends CSV
     # =========================
-    @st.cache_data
-    def load_data():
-        # Load your datasets
-        train_data = pd.read_csv('df_trained_dataset_6000.csv')  # Replace with your train data path
-        forecasts_df = pd.read_csv('2024_preditions_forcast.csv')  # Your forecasts dataframe
-        
-        # Ensure quarter columns are properly formatted
-        if 'quarter' in train_data.columns:
-            train_data['quarter'] = pd.to_datetime(train_data['quarter'])
-        if 'forecast_quarter' in forecasts_df.columns:
-            forecasts_df['forecast_quarter'] = pd.to_datetime(forecasts_df['forecast_quarter'])
-        
-        return train_data, forecasts_df
+    df_forecast = pd.read_csv("combined_median_trends.csv")
     
-    try:
-        train_data, forecasts_df = load_data()
-        
+    # Ensure columns: area_name_en, quarter, median_price, type
+    st.write("Columns in dataframe:", df_forecast.columns)
+    
+    # =========================
+    # 2️⃣ Streamlit UI: Select Area
+    # =========================
+    st.title("Area-wise Median Price Trend Viewer")
+    
+    areas = df_forecast['area_name_en'].unique()
+    selected_area = st.selectbox("Select Area:", areas)
+    
+    # Filter for selected area
+    df_area = df_forecast[df_forecast['area_name_en'] == selected_area]
+    
+    if df_area.empty:
+        st.warning(f"No data available for area: {selected_area}")
+    else:
         # =========================
-        # SIDEBAR - AREA SELECTION
+        # 3️⃣ Plot Historical + Prediction + Forecast
         # =========================
-        st.sidebar.header("🔍 Area Selection")
-        
-        # Get unique areas from forecasts
-        available_areas = forecasts_df['area_name_en'].unique()
-        selected_area = st.sidebar.selectbox(
-            "Select Area:",
-            options=available_areas,
-            index=0
+        fig = px.line(
+            df_area,
+            x='quarter',
+            y='median_price',
+            color='area_name_en',
+            line_dash='type',   # Solid for Historical, dashed for Prediction/Forecast
+            markers=True,
+            title=f"Area-wise Median Price Trend for {selected_area}"
         )
-        
-        # =========================
-        # FILTER DATA FOR SELECTED AREA
-        # =========================
-        # Filter train data for selected area
-        area_train_data = train_data[train_data['area_name_en'] == selected_area].copy()
-        
-        # Filter forecasts for selected area
-        area_forecasts = forecasts_df[forecasts_df['area_name_en'] == selected_area].copy().sort_values('forecast_quarter')
-        
-        # Calculate forecasts by multiplying growth factors with avg_predicted
-        if not area_forecasts.empty and 'avg_predicted' in area_forecasts.columns:
-            # Use the first avg_predicted as base and multiply by cumulative growth factors
-            base_prediction = area_forecasts['avg_predicted'].iloc[0]
-            
-            # Calculate cumulative growth for each forecast period
-            cumulative_growth_main = 1.0
-            cumulative_growth_lower = 1.0
-            cumulative_growth_upper = 1.0
-            
-            forecast_prices_main = []
-            forecast_prices_lower = []
-            forecast_prices_upper = []
-            
-            for idx, row in area_forecasts.iterrows():
-                cumulative_growth_main *= (1 + row['growth_factor'])
-                cumulative_growth_lower *= (1 + row['growth_factor_lower'])
-                cumulative_growth_upper *= (1 + row['growth_factor_upper'])
-                
-                forecast_prices_main.append(base_prediction * cumulative_growth_main)
-                forecast_prices_lower.append(base_prediction * cumulative_growth_lower)
-                forecast_prices_upper.append(base_prediction * cumulative_growth_upper)
-            
-            # Add calculated forecast prices to the dataframe
-            area_forecasts = area_forecasts.copy()
-            area_forecasts['calculated_forecast'] = forecast_prices_main
-            area_forecasts['calculated_lower'] = forecast_prices_lower
-            area_forecasts['calculated_upper'] = forecast_prices_upper
-        
-        # =========================
-        # CALCULATE QUARTERLY MEDIAN PRICES FROM TRAIN DATA
-        # =========================
-        if not area_train_data.empty and 'quarter' in area_train_data.columns:
-            quarterly_median = area_train_data.groupby('quarter')['meter_sale_price'].median().reset_index()
-            quarterly_median.columns = ['quarter', 'median_price']
-            quarterly_median = quarterly_median.sort_values('quarter')
-        else:
-            quarterly_median = pd.DataFrame(columns=['quarter', 'median_price'])
-        
-        # =========================
-        # MAIN TREND VISUALIZATION
-        # =========================
-        st.subheader(f"📈 Price Trends for {selected_area}")
-        
-        fig, ax = plt.subplots(figsize=(14, 8))
-        
-        # Plot 1: Historical Train Data Trend (Quarterly Median)
-        if not quarterly_median.empty:
-            ax.plot(quarterly_median['quarter'], quarterly_median['median_price'], 
-                    label='Historical Median Price (Train Data)', color='blue', linewidth=3, marker='o', markersize=6)
-        
-        # Plot 2: Average Predicted Price
-        if not area_forecasts.empty and 'avg_predicted' in area_forecasts.columns:
-            # Use the first forecast quarter as prediction point
-            pred_quarter = area_forecasts['forecast_quarter'].iloc[0]
-            pred_price = area_forecasts['avg_predicted'].iloc[0]
-            ax.scatter(pred_quarter, pred_price, color='red', s=150, 
-                      label='Average Predicted Price', zorder=10, marker='D')
-            ax.annotate(f'Prediction: ${pred_price:,.0f}', 
-                       (pred_quarter, pred_price),
-                       textcoords="offset points", 
-                       xytext=(15, 15), 
-                       ha='left',
-                       fontsize=10,
-                       bbox=dict(boxstyle="round,pad=0.3", facecolor="red", alpha=0.2))
-        
-        # Plot 3: Calculated Forecasts (using growth factors * avg_predicted)
-        if not area_forecasts.empty and 'calculated_forecast' in area_forecasts.columns:
-            # Main forecast line
-            ax.plot(area_forecasts['forecast_quarter'], area_forecasts['calculated_forecast'],
-                    label='Price Forecast (Growth × Prediction)', color='green', linewidth=3, linestyle='--', marker='s', markersize=6)
-            
-            # Forecast uncertainty range
-            ax.fill_between(area_forecasts['forecast_quarter'],
-                           area_forecasts['calculated_lower'],
-                           area_forecasts['calculated_upper'],
-                           alpha=0.3, color='green', label='Forecast Range')
-            
-            # Annotate with growth factors
-            for idx, row in area_forecasts.iterrows():
-                ax.annotate(f"Growth:\n{row['growth_factor']:.3f}\n"
-                           f"({row['growth_factor_lower']:.3f} - {row['growth_factor_upper']:.3f})",
-                           (row['forecast_quarter'], row['calculated_forecast']),
-                           textcoords="offset points",
-                           xytext=(15, 15 if idx % 2 == 0 else -45),
-                           ha='left',
-                           fontsize=8,
-                           bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen", alpha=0.7))
-        
-        # Chart formatting
-        ax.set_xlabel('Quarter', fontsize=12)
-        ax.set_ylabel('Price per Meter ($)', fontsize=12)
-        ax.set_title(f'Real Estate Price Trends - {selected_area}\n'
-                    f'Historical Train Data → Predictions → Forecasts (Growth × Prediction)', fontsize=14, fontweight='bold')
-        ax.legend(fontsize=10)
-        ax.grid(True, alpha=0.3)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        st.pyplot(fig)
-        
-        # =========================
-        # DATA TABLES
-        # =========================
-        st.subheader("📋 Detailed Data")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("**Historical Train Data (Quarterly Median)**")
-            if not quarterly_median.empty:
-                historical_display = quarterly_median.copy()
-                historical_display = historical_display.round(2)
-                st.dataframe(historical_display.style.format({
-                    'median_price': '${:,.2f}'
-                }), use_container_width=True, height=300)
-            else:
-                st.info("No historical train data available for this area")
-        
-        with col2:
-            st.write("**Forecasts & Predictions**")
-            if not area_forecasts.empty:
-                if 'calculated_forecast' in area_forecasts.columns:
-                    display_forecasts = area_forecasts[['forecast_quarter', 'avg_predicted', 
-                                                      'calculated_forecast', 'calculated_lower', 'calculated_upper',
-                                                      'growth_factor', 'growth_factor_lower', 'growth_factor_upper']].copy()
-                    display_forecasts = display_forecasts.round(2)
-                    st.dataframe(display_forecasts.style.format({
-                        'avg_predicted': '${:,.2f}',
-                        'calculated_forecast': '${:,.2f}',
-                        'calculated_lower': '${:,.2f}',
-                        'calculated_upper': '${:,.2f}',
-                        'growth_factor': '{:.3f}',
-                        'growth_factor_lower': '{:.3f}',
-                        'growth_factor_upper': '{:.3f}'
-                    }), use_container_width=True, height=300)
-                else:
-                    display_forecasts = area_forecasts[['forecast_quarter', 'avg_predicted',
-                                                      'growth_factor', 'growth_factor_lower', 'growth_factor_upper']].copy()
-                    display_forecasts = display_forecasts.round(2)
-                    st.dataframe(display_forecasts.style.format({
-                        'avg_predicted': '${:,.2f}',
-                        'growth_factor': '{:.3f}',
-                        'growth_factor_lower': '{:.3f}',
-                        'growth_factor_upper': '{:.3f}'
-                    }), use_container_width=True, height=300)
-            else:
-                st.info("No forecast data available for this area")
-        
-        # =========================
-        # KEY METRICS
-        # =========================
-        st.subheader("🎯 Key Metrics")
-        
-        if not area_forecasts.empty:
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                if 'calculated_forecast' in area_forecasts.columns:
-                    current_forecast = area_forecasts['calculated_forecast'].iloc[0]
-                    st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
-                elif 'forecast_price' in area_forecasts.columns:
-                    current_forecast = area_forecasts['forecast_price'].iloc[0]
-                    st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
-            
-            with col2:
-                if 'avg_predicted' in area_forecasts.columns:
-                    predicted_price = area_forecasts['avg_predicted'].iloc[0]
-                    st.metric("Average Predicted Price", f"${predicted_price:,.2f}")
-            
-            with col3:
-                growth = area_forecasts['growth_factor'].iloc[0]
-                st.metric("Current Growth Factor", f"{growth:.3f}")
-            
-            with col4:
-                if not quarterly_median.empty:
-                    latest_median = quarterly_median['median_price'].iloc[-1]
-                    st.metric("Latest Historical Median", f"${latest_median:,.2f}")
-            
-            # Show calculation explanation
-            st.info(f"**Calculation Method**: Forecast prices are calculated by multiplying the average predicted price (${area_forecasts['avg_predicted'].iloc[0]:,.2f}) with cumulative growth factors for each quarter.")
     
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        st.info("Please ensure all data files are available in the correct format.")
+        fig.update_layout(
+            xaxis_title="Quarter",
+            yaxis_title="Median Price",
+            legend_title="Type",
+            xaxis=dict(type='category')
+        )
+    
+        st.plotly_chart(fig, use_container_width=True)
 
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
