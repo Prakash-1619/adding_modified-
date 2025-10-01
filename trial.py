@@ -2720,6 +2720,7 @@ if sidebar_option == "validation":
 ###########################################################################################################################################################################################################################
 
 # =========================
+# =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
 # =========================
 from datetime import datetime, timedelta
@@ -2921,6 +2922,94 @@ def calculate_loess_trend(filtered_data, area_name, current_year):
     except Exception as e:
         st.warning(f"Could not calculate LOESS trend for {area_name}: {str(e)}")
         return None, None, None
+
+# =========================
+# CREATE FEATURE-WISE TREND PLOTS
+# =========================
+def create_feature_wise_trend_plots(train_data, selected_features, area_name):
+    """Create individual trend plots for each feature"""
+    
+    feature_plots = {}
+    
+    # Room-wise trend
+    if 'rooms_en' in selected_features and selected_features['rooms_en']:
+        try:
+            room_data = train_data[train_data['area_name_en'] == area_name].copy()
+            room_trend = room_data.groupby(['year', 'rooms_en'])['meter_sale_price'].median().reset_index()
+            
+            fig_rooms = px.line(room_trend, x='year', y='meter_sale_price', color='rooms_en',
+                               title=f'Price Trends by Room Count - {area_name}',
+                               labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
+                               height=400)
+            fig_rooms.update_layout(template="plotly_white")
+            feature_plots['rooms'] = fig_rooms
+        except Exception as e:
+            st.warning(f"Could not create room-wise trend: {str(e)}")
+    
+    # Floor-wise trend
+    if 'floor_bin' in selected_features and selected_features['floor_bin']:
+        try:
+            floor_data = train_data[train_data['area_name_en'] == area_name].copy()
+            floor_trend = floor_data.groupby(['year', 'floor_bin'])['meter_sale_price'].median().reset_index()
+            
+            fig_floors = px.line(floor_trend, x='year', y='meter_sale_price', color='floor_bin',
+                                title=f'Price Trends by Floor Level - {area_name}',
+                                labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
+                                height=400)
+            fig_floors.update_layout(template="plotly_white")
+            feature_plots['floors'] = fig_floors
+        except Exception as e:
+            st.warning(f"Could not create floor-wise trend: {str(e)}")
+    
+    # Area size trend (binned)
+    if 'procedure_area' in selected_features and selected_features['procedure_area']:
+        try:
+            area_data = train_data[train_data['area_name_en'] == area_name].copy()
+            # Create area bins
+            area_data['area_bin'] = pd.cut(area_data['procedure_area'], 
+                                         bins=[0, 50, 100, 150, 200, 300, 500],
+                                         labels=['0-50', '51-100', '101-150', '151-200', '201-300', '300+'])
+            
+            area_trend = area_data.groupby(['year', 'area_bin'])['meter_sale_price'].median().reset_index()
+            
+            fig_area = px.line(area_trend, x='year', y='meter_sale_price', color='area_bin',
+                              title=f'Price Trends by Area Size (sqMt) - {area_name}',
+                              labels={'meter_sale_price': 'Price (AED)', 'year': 'Year'},
+                              height=400)
+            fig_area.update_layout(template="plotly_white")
+            feature_plots['area'] = fig_area
+        except Exception as e:
+            st.warning(f"Could not create area-wise trend: {str(e)}")
+    
+    # Amenities impact over time
+    try:
+        amenities_data = train_data[train_data['area_name_en'] == area_name].copy()
+        
+        # Calculate premium for each amenity over time
+        amenity_cols = ['swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
+        amenity_trends = []
+        
+        for amenity in amenity_cols:
+            amenity_effect = amenities_data.groupby(['year', amenity])['meter_sale_price'].median().reset_index()
+            amenity_effect_pivot = amenity_effect.pivot(index='year', columns=amenity, values='meter_sale_price').reset_index()
+            
+            if 1 in amenity_effect_pivot.columns and 0 in amenity_effect_pivot.columns:
+                amenity_effect_pivot['premium'] = ((amenity_effect_pivot[1] - amenity_effect_pivot[0]) / amenity_effect_pivot[0]) * 100
+                amenity_effect_pivot['amenity'] = amenity.replace('_', ' ').title()
+                amenity_trends.append(amenity_effect_pivot[['year', 'amenity', 'premium']].dropna())
+        
+        if amenity_trends:
+            amenities_df = pd.concat(amenity_trends, ignore_index=True)
+            fig_amenities = px.line(amenities_df, x='year', y='premium', color='amenity',
+                                   title=f'Amenity Premium Over Time - {area_name}',
+                                   labels={'premium': 'Price Premium (%)', 'year': 'Year'},
+                                   height=400)
+            fig_amenities.update_layout(template="plotly_white")
+            feature_plots['amenities'] = fig_amenities
+    except Exception as e:
+        st.warning(f"Could not create amenities trend: {str(e)}")
+    
+    return feature_plots
 
 # =========================
 # CREATE COMBINED TREND AND FORECAST PLOT WITH ALL GROWTH FACTORS
@@ -3265,6 +3354,24 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     )
                     
                     st.plotly_chart(combined_fig, use_container_width=True)
+                    
+                    # =========================
+                    # FEATURE-WISE TREND ANALYSIS
+                    # =========================
+                    if train_data is not None:
+                        st.subheader("🔍 Feature-wise Trend Analysis")
+                        st.write("Explore how different features have influenced prices over time in this area")
+                        
+                        feature_plots = create_feature_wise_trend_plots(train_data, selected_features, area_name)
+                        
+                        # Display feature-wise plots in columns
+                        if feature_plots:
+                            cols = st.columns(2)
+                            plot_keys = list(feature_plots.keys())
+                            
+                            for i, plot_key in enumerate(plot_keys):
+                                with cols[i % 2]:
+                                    st.plotly_chart(feature_plots[plot_key], use_container_width=True)
                     
                     # =========================
                     # DISPLAY PREDICTION RESULTS
