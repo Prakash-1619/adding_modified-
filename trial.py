@@ -2012,9 +2012,8 @@ if sidebar_option == "📈 Model Results":
     
     ####################################################################________________________>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>______________________________________################################################
         with tab2:
-             #st.header("🔮 Price Forecasting")
+            #st.header("🔮 Price Forecasting")
             #st.markdown("Area-wise predictions with growth factor projections")
-            
 
             # =========================
             # 8️⃣ LOAD DATA FOR FORECASTING TAB
@@ -2321,27 +2320,27 @@ if sidebar_option == "📈 Model Results":
                             return f"{parts[0]} {parts[1]}"
                     return quarter_str.replace('_', ' ').title()
                 
-                # Helper function to prepare forecast data for plotting
-                def prepare_forecast_data(forecast_df, selected_historical, future_quarter_cols, show_historical):
+                # Helper function to prepare forecast data for plotting from a DataFrame row
+                def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical):
                     time_periods = []
                     prices = []
                     
                     # Add historical quarters
                     if show_historical:
-                        historical_cols = [col for col in selected_historical if col in forecast_df.columns and pd.notna(forecast_df[col])]
+                        historical_cols = [col for col in selected_historical if col in forecast_row.index and pd.notna(forecast_row[col])]
                         for hq in historical_cols:
                             time_periods.append(format_quarter_label(hq))
-                            prices.append(forecast_df[hq])
+                            prices.append(forecast_row[hq])
                     
                     # Add current prediction
                     time_periods.append('Current')
-                    prices.append(forecast_df['prediction'])
+                    prices.append(forecast_row['prediction'])
                     
                     # Add future quarters
                     for fq in future_quarter_cols:
-                        if fq in forecast_df.columns and pd.notna(forecast_df[fq]):
+                        if fq in forecast_row.index and pd.notna(forecast_row[fq]):
                             time_periods.append(format_quarter_label(fq))
-                            prices.append(forecast_df[fq])
+                            prices.append(forecast_row[fq])
                     
                     return time_periods, prices
 
