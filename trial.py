@@ -2680,7 +2680,7 @@ if sidebar_option == "validation":
     @st.cache_data
     def load_data():
         # Load your datasets
-        train_data = pd.read_csv('df_trained_dataset_6000.csv)  # Replace with your train data path
+        train_data = pd.read_csv('df_trained_dataset_6000.csv')  # Replace with your train data path
         forecasts_df = pd.read_csv('2024_preditions_forcast.csv')  # Your forecasts dataframe with all columns
         
         # Ensure quarter columns are properly formatted
