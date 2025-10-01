@@ -2720,8 +2720,6 @@ if sidebar_option == "validation":
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
 
-
-
 # =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
 # =========================
@@ -2829,14 +2827,19 @@ def load_training_data():
 # =========================
 @st.cache_data
 def load_forecasting_data():
-    """Load forecasting-specific data"""
+    """Load forecasting-specific data with all growth factors"""
     try:
-        # Load growth factors
+        # Load growth factors with all three columns
         growth_df = pd.read_csv('arima_areas_growth_6M.csv')
-        growth_df = growth_df[['ds', 'area_name_en', 'growth_factor_upper']]
-        growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
         
-        return growth_pivot
+        # Check if all required columns exist
+        required_growth_cols = ['ds', 'area_name_en', 'growth_factor', 'growth_factor_upper', 'growth_factor_lower']
+        
+        if all(col in growth_df.columns for col in required_growth_cols):
+            return growth_df
+        else:
+            st.warning("Forecasting data missing some growth factor columns")
+            return None
     except Exception as e:
         st.error(f"Error loading forecasting data: {str(e)}")
         return None
@@ -2921,10 +2924,10 @@ def calculate_loess_trend(filtered_data, area_name, current_year):
         return None, None, None
 
 # =========================
-# CREATE COMBINED TREND AND FORECAST PLOT
+# CREATE COMBINED TREND AND FORECAST PLOT WITH ALL GROWTH FACTORS
 # =========================
 def create_combined_trend_forecast_plot(historical_data, trend_data, current_price, forecast_data, area_name):
-    """Create a combined plot showing historical trend and future forecast"""
+    """Create a combined plot showing historical trend and future forecast with confidence intervals"""
     
     fig = go.Figure()
     current_year = datetime.now().year
@@ -2961,25 +2964,68 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, current_pri
         hovertemplate='Current Prediction<br>Price: AED %{y:,.0f}<extra></extra>'
     ))
     
-    # Add forecast data (prediction × growth factor)
+    # Add forecast data with confidence intervals
     if forecast_data is not None and len(forecast_data) > 0:
         forecast_years = []
-        forecast_prices = []
+        forecast_main = []
+        forecast_upper = []
+        forecast_lower = []
         
-        for i, (period, growth_factor) in enumerate(forecast_data.items()):
+        # Sort forecast data by period to ensure chronological order
+        sorted_periods = sorted(forecast_data.keys())
+        
+        for i, period in enumerate(sorted_periods):
+            growth_factors = forecast_data[period]
             forecast_year = current_year + (i + 1) * 0.25  # Quarterly increments
-            forecast_price = current_price * growth_factor
+            
             forecast_years.append(forecast_year)
-            forecast_prices.append(forecast_price)
+            forecast_main.append(current_price * growth_factors['main'])
+            forecast_upper.append(current_price * growth_factors['upper'])
+            forecast_lower.append(current_price * growth_factors['lower'])
         
+        # Add confidence interval area
+        fig.add_trace(go.Scatter(
+            x=forecast_years + forecast_years[::-1],
+            y=forecast_upper + forecast_lower[::-1],
+            fill='toself',
+            fillcolor='rgba(255,165,0,0.2)',
+            line=dict(color='rgba(255,255,255,0)'),
+            name='Forecast Confidence Interval',
+            showlegend=True,
+            hoverinfo='skip'
+        ))
+        
+        # Add main forecast line
         fig.add_trace(go.Scatter(
             x=forecast_years,
-            y=forecast_prices,
+            y=forecast_main,
             mode='lines+markers',
-            name='Future Forecast (Prediction × Growth Factor)',
-            line=dict(color='orange', width=3, dash='dash'),
+            name='Future Forecast (Main)',
+            line=dict(color='orange', width=3),
             marker=dict(color='orange', size=8),
             hovertemplate='Year: %{x:.2f}<br>Forecast: AED %{y:,.0f}<extra></extra>'
+        ))
+        
+        # Add upper bound line
+        fig.add_trace(go.Scatter(
+            x=forecast_years,
+            y=forecast_upper,
+            mode='lines',
+            name='Forecast Upper Bound',
+            line=dict(color='orange', width=1, dash='dash'),
+            opacity=0.7,
+            hovertemplate='Year: %{x:.2f}<br>Upper Bound: AED %{y:,.0f}<extra></extra>'
+        ))
+        
+        # Add lower bound line
+        fig.add_trace(go.Scatter(
+            x=forecast_years,
+            y=forecast_lower,
+            mode='lines',
+            name='Forecast Lower Bound',
+            line=dict(color='orange', width=1, dash='dash'),
+            opacity=0.7,
+            hovertemplate='Year: %{x:.2f}<br>Lower Bound: AED %{y:,.0f}<extra></extra>'
         ))
     
     # Update layout
@@ -2995,6 +3041,40 @@ def create_combined_trend_forecast_plot(historical_data, trend_data, current_pri
     
     return fig
 
+# =========================
+# PREPARE FORECAST DATA WITH ALL GROWTH FACTORS
+# =========================
+def prepare_forecast_data(growth_pivot, area_name):
+    """Prepare forecast data with all three growth factors"""
+    if growth_pivot is None:
+        return None
+    
+    try:
+        # Filter growth data for the selected area
+        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
+        
+        if area_growth.empty:
+            return None
+        
+        # Get unique periods (ds values)
+        periods = area_growth['ds'].unique()
+        
+        forecast_data = {}
+        
+        for period in periods:
+            period_data = area_growth[area_growth['ds'] == period].iloc[0]
+            
+            forecast_data[period] = {
+                'main': period_data['growth_factor'],
+                'upper': period_data['growth_factor_upper'],
+                'lower': period_data['growth_factor_lower']
+            }
+        
+        return forecast_data
+        
+    except Exception as e:
+        st.warning(f"Error preparing forecast data: {str(e)}")
+        return None
 
 # =========================
 # MAIN APP
@@ -3168,25 +3248,14 @@ if sidebar_option == "🤖 Model Input / Prediction":
                         )
                     
                     # =========================
-                    # PREPARE FORECAST DATA (Prediction × Growth Factor)
+                    # PREPARE FORECAST DATA WITH ALL GROWTH FACTORS
                     # =========================
-                    forecast_data = {}
-                    if growth_pivot is not None:
-                        area_growth = growth_pivot[growth_pivot['area_name_en'] == area_name]
-                        
-                        if not area_growth.empty:
-                            # Get growth factor columns (excluding area name)
-                            growth_columns = [col for col in growth_pivot.columns if col != 'area_name_en']
-                            
-                            for quarter_col in growth_columns:
-                                if quarter_col in area_growth.columns:
-                                    growth_factor = area_growth[quarter_col].iloc[0]
-                                    forecast_data[quarter_col] = growth_factor
+                    forecast_data = prepare_forecast_data(growth_pivot, area_name)
                     
                     # =========================
-                    # CREATE COMBINED PLOT
+                    # CREATE COMBINED PLOT WITH CONFIDENCE INTERVALS
                     # =========================
-                    st.subheader("📈 Price Timeline: Historical Trend + Forecast")
+                    st.subheader("📈 Price Timeline: Historical Trend + Forecast with Confidence Intervals")
                     
                     combined_fig = create_combined_trend_forecast_plot(
                         historical_avg, 
@@ -3236,21 +3305,35 @@ if sidebar_option == "🤖 Model Input / Prediction":
                     )
                     
                     # =========================
-                    # DISPLAY FORECAST TABLE
+                    # DISPLAY FORECAST TABLE WITH ALL GROWTH FACTORS
                     # =========================
                     if forecast_data:
-                        st.subheader("🔮 Future Price Forecast")
+                        st.subheader("🔮 Future Price Forecast with Confidence Intervals")
                         st.write("Future prices calculated as: Prediction × Growth Factor")
                         
                         forecast_table_data = []
-                        cumulative_price = predicted_price
+                        cumulative_price_main = predicted_price
+                        cumulative_price_upper = predicted_price
+                        cumulative_price_lower = predicted_price
                         
-                        for period, growth_factor in forecast_data.items():
-                            cumulative_price = cumulative_price * growth_factor
+                        # Sort periods chronologically
+                        sorted_periods = sorted(forecast_data.keys())
+                        
+                        for period in sorted_periods:
+                            growth_factors = forecast_data[period]
+                            
+                            cumulative_price_main = cumulative_price_main * growth_factors['main']
+                            cumulative_price_upper = cumulative_price_upper * growth_factors['upper']
+                            cumulative_price_lower = cumulative_price_lower * growth_factors['lower']
+                            
                             forecast_table_data.append({
                                 'Period': period,
-                                'Growth Factor': f"{growth_factor:.4f}",
-                                'Forecasted Price': f"AED {cumulative_price:,.0f}"
+                                'Main Growth Factor': f"{growth_factors['main']:.4f}",
+                                'Upper Growth Factor': f"{growth_factors['upper']:.4f}",
+                                'Lower Growth Factor': f"{growth_factors['lower']:.4f}",
+                                'Forecasted Price (Main)': f"AED {cumulative_price_main:,.0f}",
+                                'Forecasted Price (Upper)': f"AED {cumulative_price_upper:,.0f}",
+                                'Forecasted Price (Lower)': f"AED {cumulative_price_lower:,.0f}"
                             })
                         
                         forecast_df = pd.DataFrame(forecast_table_data)
@@ -3284,3 +3367,6 @@ if st.sidebar.checkbox("Show Debug Info"):
     st.sidebar.write(f"OHE loaded: {ohe is not None}")
     st.sidebar.write(f"Train columns: {len(train_columns) if train_columns else 0}")
     st.sidebar.write(f"Training data loaded: {train_data is not None}")
+    if growth_pivot is not None:
+        st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
+        st.sidebar.write(f"Sample growth data: {growth_pivot[['area_name_en', 'ds', 'growth_factor', 'growth_factor_upper', 'growth_factor_lower']].head(3) if 'growth_factor' in growth_pivot.columns else 'N/A'}")
