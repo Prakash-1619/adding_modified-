@@ -2671,9 +2671,8 @@ if sidebar_option == "validation":
     import matplotlib.pyplot as plt
     import seaborn as sns
     import numpy as np
-    from datetime import datetime
+
     
-   
     # =========================
     # LOAD DATA
     # =========================
@@ -2681,7 +2680,7 @@ if sidebar_option == "validation":
     def load_data():
         # Load your datasets
         train_data = pd.read_csv('df_trained_dataset_6000.csv')  # Replace with your train data path
-        forecasts_df = pd.read_csv('2024_preditions_forcast.csv')  # Your forecasts dataframe with all columns
+        forecasts_df = pd.read_csv('2024_preditions_forcast.csv')  # Your forecasts dataframe
         
         # Ensure quarter columns are properly formatted
         if 'quarter' in train_data.columns:
@@ -2697,7 +2696,7 @@ if sidebar_option == "validation":
         # =========================
         # SIDEBAR - AREA SELECTION
         # =========================
-        st.sidebar.header("🔍 Area Selection & Filters")
+        st.sidebar.header("🔍 Area Selection")
         
         # Get unique areas from forecasts
         available_areas = forecasts_df['area_name_en'].unique()
@@ -2707,210 +2706,108 @@ if sidebar_option == "validation":
             index=0
         )
         
-        # Date range filter for train data
-        if 'quarter' in train_data.columns:
-            min_date = train_data['quarter'].min()
-            max_date = train_data['quarter'].max()
-            
-            st.sidebar.subheader("📅 Date Range Filter")
-            date_range = st.sidebar.date_input(
-                "Select date range for historical data:",
-                value=(min_date, max_date),
-                min_value=min_date,
-                max_value=max_date
-            )
-        
-        # Forecast quarters filter
-        st.sidebar.subheader("🔮 Forecast Horizon")
-        forecast_quarters = sorted(forecasts_df['forecast_quarter'].unique())
-        selected_forecast_quarters = st.sidebar.multiselect(
-            "Select forecast quarters to display:",
-            options=forecast_quarters,
-            default=forecast_quarters
-        )
-        
         # =========================
         # FILTER DATA FOR SELECTED AREA
         # =========================
         # Filter train data for selected area
         area_train_data = train_data[train_data['area_name_en'] == selected_area].copy()
         
-        # Filter forecasts for selected area and selected quarters
-        area_forecasts = forecasts_df[
-            (forecasts_df['area_name_en'] == selected_area) & 
-            (forecasts_df['forecast_quarter'].isin(selected_forecast_quarters))
-        ].copy().sort_values('forecast_quarter')
+        # Filter forecasts for selected area
+        area_forecasts = forecasts_df[forecasts_df['area_name_en'] == selected_area].copy().sort_values('forecast_quarter')
         
         # =========================
         # CALCULATE QUARTERLY MEDIAN PRICES FROM TRAIN DATA
         # =========================
         if not area_train_data.empty and 'quarter' in area_train_data.columns:
-            # Apply date filter if selected
-            if 'date_range' in locals() and len(date_range) == 2:
-                start_date, end_date = date_range
-                area_train_data = area_train_data[
-                    (area_train_data['quarter'] >= pd.Timestamp(start_date)) & 
-                    (area_train_data['quarter'] <= pd.Timestamp(end_date))
-                ]
-            
-            quarterly_median = area_train_data.groupby('quarter')['meter_sale_price'].agg([
-                'median', 'count', 'mean', 'std'
-            ]).reset_index()
-            quarterly_median.columns = ['quarter', 'median_price', 'sample_count', 'mean_price', 'price_std']
+            quarterly_median = area_train_data.groupby('quarter')['meter_sale_price'].median().reset_index()
+            quarterly_median.columns = ['quarter', 'median_price']
             quarterly_median = quarterly_median.sort_values('quarter')
         else:
-            quarterly_median = pd.DataFrame(columns=['quarter', 'median_price', 'sample_count', 'mean_price', 'price_std'])
+            quarterly_median = pd.DataFrame(columns=['quarter', 'median_price'])
         
         # =========================
-        # MAIN DASHBOARD
+        # MAIN TREND VISUALIZATION
         # =========================
+        st.subheader(f"📈 Price Trends for {selected_area}")
+        
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        # Plot 1: Historical Train Data Trend (Quarterly Median)
+        if not quarterly_median.empty:
+            ax.plot(quarterly_median['quarter'], quarterly_median['median_price'], 
+                    label='Historical Median Price (Train Data)', color='blue', linewidth=3, marker='o', markersize=6)
+        
+        # Plot 2: Average Predicted Price
+        if not area_forecasts.empty and 'avg_predicted' in area_forecasts.columns:
+            # Use the first forecast quarter as prediction point
+            pred_quarter = area_forecasts['forecast_quarter'].iloc[0]
+            pred_price = area_forecasts['avg_predicted'].iloc[0]
+            ax.scatter(pred_quarter, pred_price, color='red', s=150, 
+                      label='Average Predicted Price', zorder=10, marker='D')
+            ax.annotate(f'Prediction: ${pred_price:,.0f}', 
+                       (pred_quarter, pred_price),
+                       textcoords="offset points", 
+                       xytext=(15, 15), 
+                       ha='left',
+                       fontsize=10,
+                       bbox=dict(boxstyle="round,pad=0.3", facecolor="red", alpha=0.2))
+        
+        # Plot 3: Forecast with Three Growth Factors
         if not area_forecasts.empty:
-            # Key Metrics
-            st.subheader(f"📊 Key Metrics - {selected_area}")
+            # Main forecast line
+            ax.plot(area_forecasts['forecast_quarter'], area_forecasts['forecast_price'],
+                    label='Price Forecast', color='green', linewidth=3, linestyle='--', marker='s', markersize=6)
             
-            col1, col2, col3, col4 = st.columns(4)
+            # Forecast uncertainty (yhat_lower to yhat_upper)
+            ax.fill_between(area_forecasts['forecast_quarter'],
+                           area_forecasts['yhat_lower'],
+                           area_forecasts['yhat_upper'],
+                           alpha=0.3, color='green', label='Forecast Range')
             
-            with col1:
-                current_forecast = area_forecasts['forecast_price'].iloc[0]
-                st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
-            
-            with col2:
-                growth = area_forecasts['growth_factor'].iloc[0] * 100
-                st.metric("Growth Factor", f"{growth:.2f}%")
-            
-            with col3:
-                if 'avg_predicted' in area_forecasts.columns:
-                    predicted_price = area_forecasts['avg_predicted'].iloc[0]
-                    st.metric("Average Predicted Price", f"${predicted_price:,.2f}")
-            
-            with col4:
-                if not quarterly_median.empty:
-                    latest_median = quarterly_forecasts['median_price'].iloc[-1]
-                    st.metric("Latest Historical Median", f"${latest_median:,.2f}")
-            
-            # =========================
-            # TREND VISUALIZATION
-            # =========================
-            st.subheader(f"📈 Price Trends & Forecasts for {selected_area}")
-            
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12))
-            
-            # Plot 1: Price Trends
-            # Historical median prices
+            # Annotate with growth factors
+            for idx, row in area_forecasts.iterrows():
+                ax.annotate(f"Growth:\n{row['growth_factor']:.3f}\n"
+                           f"({row['growth_factor_lower']:.3f} - {row['growth_factor_upper']:.3f})",
+                           (row['forecast_quarter'], row['forecast_price']),
+                           textcoords="offset points",
+                           xytext=(15, 15 if idx % 2 == 0 else -45),
+                           ha='left',
+                           fontsize=8,
+                           bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen", alpha=0.7))
+        
+        # Chart formatting
+        ax.set_xlabel('Quarter', fontsize=12)
+        ax.set_ylabel('Price per Meter ($)', fontsize=12)
+        ax.set_title(f'Real Estate Price Trends - {selected_area}\n'
+                    f'Historical Train Data → Predictions → Forecasts', fontsize=14, fontweight='bold')
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        st.pyplot(fig)
+        
+        # =========================
+        # DATA TABLES
+        # =========================
+        st.subheader("📋 Detailed Data")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Historical Train Data (Quarterly Median)**")
             if not quarterly_median.empty:
-                ax1.plot(quarterly_median['quarter'], quarterly_median['median_price'], 
-                        label='Historical Median Price', color='blue', linewidth=3, marker='o', markersize=6)
-                
-                # Add confidence interval for historical data
-                if 'price_std' in quarterly_median.columns:
-                    ax1.fill_between(quarterly_median['quarter'],
-                                   quarterly_median['median_price'] - quarterly_median['price_std'],
-                                   quarterly_median['median_price'] + quarterly_median['price_std'],
-                                   alpha=0.2, color='blue', label='Historical Price Variability')
-            
-            # Plot average predictions
-            if not area_forecasts.empty and 'avg_predicted' in area_forecasts.columns:
-                # Use the first forecast quarter as prediction point
-                pred_quarter = area_forecasts['forecast_quarter'].iloc[0]
-                pred_price = area_forecasts['avg_predicted'].iloc[0]
-                ax1.scatter(pred_quarter, pred_price, color='red', s=150, 
-                           label='Model Prediction', zorder=10, marker='D')
-                ax1.annotate(f'Prediction: ${pred_price:,.0f}', 
-                            (pred_quarter, pred_price),
-                            textcoords="offset points", 
-                            xytext=(15, 15), 
-                            ha='left',
-                            fontsize=10,
-                            bbox=dict(boxstyle="round,pad=0.3", facecolor="red", alpha=0.2))
-            
-            # Plot forecasts
+                historical_display = quarterly_median.copy()
+                historical_display = historical_display.round(2)
+                st.dataframe(historical_display.style.format({
+                    'median_price': '${:,.2f}'
+                }), use_container_width=True, height=300)
+            else:
+                st.info("No historical train data available for this area")
+        
+        with col2:
+            st.write("**Forecasts & Predictions**")
             if not area_forecasts.empty:
-                # Main forecast line
-                ax1.plot(area_forecasts['forecast_quarter'], area_forecasts['forecast_price'],
-                        label='Price Forecast', color='green', linewidth=4, linestyle='--', marker='s', markersize=8)
-                
-                # Forecast uncertainty (yhat_lower to yhat_upper)
-                ax1.fill_between(area_forecasts['forecast_quarter'],
-                               area_forecasts['yhat_lower'],
-                               area_forecasts['yhat_upper'],
-                               alpha=0.3, color='green', label='Forecast Confidence Interval')
-                
-                # Annotate forecast points with growth factors
-                for idx, row in area_forecasts.iterrows():
-                    ax1.annotate(f"+{row['growth_factor']*100:.1f}%",
-                                (row['forecast_quarter'], row['forecast_price']),
-                                textcoords="offset points",
-                                xytext=(10, 10 if idx % 2 == 0 else -20),
-                                ha='center',
-                                fontsize=9,
-                                fontweight='bold',
-                                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen", alpha=0.7))
-            
-            ax1.set_xlabel('Quarter', fontsize=12)
-            ax1.set_ylabel('Price per Meter ($)', fontsize=12)
-            ax1.set_title(f'Real Estate Price Trends - {selected_area}\n'
-                         f'Historical Median vs Predictions vs Forecasts', fontsize=14, fontweight='bold')
-            ax1.legend(fontsize=10)
-            ax1.grid(True, alpha=0.3)
-            ax1.tick_params(axis='x', rotation=45)
-            
-            # Plot 2: Growth Factors
-            if not area_forecasts.empty:
-                # Main growth factor line
-                ax2.plot(area_forecasts['forecast_quarter'], area_forecasts['growth_factor'] * 100,
-                        label='Growth Factor', color='purple', linewidth=3, marker='o', markersize=6)
-                
-                # Growth factor uncertainty
-                ax2.fill_between(area_forecasts['forecast_quarter'],
-                               area_forecasts['growth_factor_lower'] * 100,
-                               area_forecasts['growth_factor_upper'] * 100,
-                               alpha=0.3, color='purple', label='Growth Factor Range')
-                
-                # Add zero reference line
-                ax2.axhline(y=0, color='red', linestyle='--', alpha=0.5, label='Zero Growth')
-                
-                # Annotate growth factors
-                for idx, row in area_forecasts.iterrows():
-                    ax2.annotate(f"{row['growth_factor']*100:+.1f}%",
-                                (row['forecast_quarter'], row['growth_factor'] * 100),
-                                textcoords="offset points",
-                                xytext=(0, 10),
-                                ha='center',
-                                fontsize=9,
-                                fontweight='bold')
-            
-            ax2.set_xlabel('Quarter', fontsize=12)
-            ax2.set_ylabel('Growth Factor (%)', fontsize=12)
-            ax2.set_title('Growth Factor Trends with Confidence Intervals', fontsize=14, fontweight='bold')
-            ax2.legend(fontsize=10)
-            ax2.grid(True, alpha=0.3)
-            ax2.tick_params(axis='x', rotation=45)
-            
-            plt.tight_layout()
-            st.pyplot(fig)
-            
-            # =========================
-            # DATA TABLES
-            # =========================
-            st.subheader("📋 Detailed Data View")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("**Historical Price Data**")
-                if not quarterly_median.empty:
-                    historical_display = quarterly_median[['quarter', 'median_price', 'mean_price', 'sample_count']].copy()
-                    historical_display = historical_display.round(2)
-                    st.dataframe(historical_display.style.format({
-                        'median_price': '${:,.2f}',
-                        'mean_price': '${:,.2f}',
-                        'sample_count': '{:.0f}'
-                    }), use_container_width=True, height=300)
-                else:
-                    st.info("No historical data available for this area")
-            
-            with col2:
-                st.write("**Forecast & Prediction Data**")
                 display_forecasts = area_forecasts[['forecast_quarter', 'forecast_price', 
                                                   'yhat_lower', 'yhat_upper', 
                                                   'growth_factor', 'growth_factor_lower', 
@@ -2920,94 +2817,39 @@ if sidebar_option == "validation":
                     'forecast_price': '${:,.2f}',
                     'yhat_lower': '${:,.2f}',
                     'yhat_upper': '${:,.2f}',
-                    'growth_factor': '{:.2%}',
-                    'growth_factor_lower': '{:.2%}',
-                    'growth_factor_upper': '{:.2%}',
+                    'growth_factor': '{:.4f}',
+                    'growth_factor_lower': '{:.4f}',
+                    'growth_factor_upper': '{:.4f}',
                     'avg_predicted': '${:,.2f}'
                 }), use_container_width=True, height=300)
-            
-            # =========================
-            # PERFORMANCE SUMMARY
-            # =========================
-            st.subheader("🎯 Performance Summary")
-            
-            if not area_forecasts.empty and 'avg_actual' in area_forecasts.columns:
-                perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
-                
-                with perf_col1:
-                    if 'avg_actual' in area_forecasts.columns and 'avg_predicted' in area_forecasts.columns:
-                        actual = area_forecasts['avg_actual'].iloc[0]
-                        predicted = area_forecasts['avg_predicted'].iloc[0]
-                        error_pct = ((predicted - actual) / actual) * 100
-                        st.metric("Prediction Accuracy", f"{abs(error_pct):.2f}%", 
-                                 delta=f"{error_pct:.2f}%", delta_color="inverse")
-                
-                with perf_col2:
-                    latest_growth = area_forecasts['growth_factor'].iloc[0] * 100
-                    st.metric("Current Growth Rate", f"{latest_growth:.2f}%")
-                
-                with perf_col3:
-                    if 'sample_count' in area_forecasts.columns:
-                        samples = area_forecasts['sample_count'].iloc[0]
-                        st.metric("Test Samples", f"{samples:.0f}")
-                
-                with perf_col4:
-                    forecast_horizon = len(area_forecasts)
-                    st.metric("Forecast Periods", f"{forecast_horizon}")
+            else:
+                st.info("No forecast data available for this area")
         
-        else:
-            st.warning(f"No forecast data available for {selected_area} in selected quarters")
-            
         # =========================
-        # AREA COMPARISON
+        # KEY METRICS
         # =========================
-        st.sidebar.subheader("🔁 Compare Areas")
-        compare_areas = st.sidebar.multiselect(
-            "Select areas to compare:",
-            options=available_areas,
-            default=[selected_area] if selected_area in available_areas else []
-        )
+        st.subheader("🎯 Key Metrics")
         
-        if len(compare_areas) > 1:
-            st.subheader("🔄 Multi-Area Comparison")
+        if not area_forecasts.empty:
+            col1, col2, col3, col4 = st.columns(4)
             
-            comp_fig, (comp_ax1, comp_ax2) = plt.subplots(2, 1, figsize=(14, 10))
+            with col1:
+                current_forecast = area_forecasts['forecast_price'].iloc[0]
+                st.metric("Current Forecast Price", f"${current_forecast:,.2f}")
             
-            colors = plt.cm.Set3(np.linspace(0, 1, len(compare_areas)))
+            with col2:
+                if 'avg_predicted' in area_forecasts.columns:
+                    predicted_price = area_forecasts['avg_predicted'].iloc[0]
+                    st.metric("Average Predicted Price", f"${predicted_price:,.2f}")
             
-            for i, area in enumerate(compare_areas):
-                area_comp_data = forecasts_df[
-                    (forecasts_df['area_name_en'] == area) & 
-                    (forecasts_df['forecast_quarter'].isin(selected_forecast_quarters))
-                ].sort_values('forecast_quarter')
-                
-                if not area_comp_data.empty:
-                    # Price comparison
-                    comp_ax1.plot(area_comp_data['forecast_quarter'], 
-                                 area_comp_data['forecast_price'],
-                                 label=area, color=colors[i], linewidth=2.5, marker='o')
-                    
-                    # Growth factor comparison
-                    comp_ax2.plot(area_comp_data['forecast_quarter'], 
-                                 area_comp_data['growth_factor'] * 100,
-                                 label=area, color=colors[i], linewidth=2.5, marker='s')
+            with col3:
+                growth = area_forecasts['growth_factor'].iloc[0]
+                st.metric("Current Growth Factor", f"{growth:.4f}")
             
-            comp_ax1.set_xlabel('Quarter')
-            comp_ax1.set_ylabel('Forecast Price ($)')
-            comp_ax1.set_title('Area-wise Price Forecast Comparison')
-            comp_ax1.legend()
-            comp_ax1.grid(True, alpha=0.3)
-            comp_ax1.tick_params(axis='x', rotation=45)
-            
-            comp_ax2.set_xlabel('Quarter')
-            comp_ax2.set_ylabel('Growth Factor (%)')
-            comp_ax2.set_title('Area-wise Growth Factor Comparison')
-            comp_ax2.legend()
-            comp_ax2.grid(True, alpha=0.3)
-            comp_ax2.tick_params(axis='x', rotation=45)
-            
-            plt.tight_layout()
-            st.pyplot(comp_fig)
+            with col4:
+                if not quarterly_median.empty:
+                    latest_median = quarterly_median['median_price'].iloc[-1]
+                    st.metric("Latest Historical Median", f"${latest_median:,.2f}")
     
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
