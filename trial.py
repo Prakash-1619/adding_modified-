@@ -2670,12 +2670,12 @@ if sidebar_option == "validation":
     import pandas as pd
     import plotly.graph_objects as go
     from statsmodels.nonparametric.smoothers_lowess import lowess
-    final_merged_df = final_merged_df[~final_merged_df['area_name_en'].isin(['Al Warsan First', 'Palm Jumeirah'])]
+   
     # =========================
     # 1️⃣ Load Data
     # =========================
     final_merged_df = pd.read_csv('final_merged_dataset.csv')
-    
+    final_merged_df = final_merged_df[~final_merged_df['area_name_en'].isin(['Al Warsan First', 'Palm Jumeirah'])]
     # Convert quarters to string (if not already)
     final_merged_df['past_quarter'] = final_merged_df['past_quarter'].astype(str)
     final_merged_df['forecast_quarter'] = final_merged_df['forecast_quarter'].astype(str)
