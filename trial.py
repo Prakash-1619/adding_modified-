@@ -2669,64 +2669,79 @@ if sidebar_option == "validation":
     import streamlit as st
     import pandas as pd
     import plotly.graph_objects as go
+    from statsmodels.nonparametric.smoothers_lowess import lowess
     
     # =========================
     # 1️⃣ Load merged dataset
     # =========================
     final_merged_df = pd.read_csv('final_merged_dataset.csv')
-    
-    # Convert quarters to string for plotting
+    final_merged_df = final_merged_df[~final_merged_df['area_name_en'].isin(['Al Warsan First', 'Palm Jumeirah'])]
+    # Convert quarters to string
     final_merged_df['past_quarter'] = final_merged_df['past_quarter'].astype(str)
     final_merged_df['forecast_quarter'] = final_merged_df['forecast_quarter'].astype(str)
+    
+    # Create numeric mapping for LOESS
+    all_quarters = list(final_merged_df['past_quarter'].unique()) + list(final_merged_df['forecast_quarter'].unique())
+    quarter_mapping = {q: i for i, q in enumerate(sorted(set(all_quarters)))}
+    
+    final_merged_df['past_quarter_num'] = final_merged_df['past_quarter'].map(quarter_mapping)
+    final_merged_df['forecast_quarter_num'] = final_merged_df['forecast_quarter'].map(quarter_mapping)
     
     # =========================
     # 2️⃣ Streamlit App
     # =========================
-    st.title("Area-wise Trend & Forecast with Test Medians")
+    st.title("Area-wise Trend + Forecast Connected with LOESS")
     
     # Area selection
     areas = final_merged_df['area_name_en'].unique()
     selected_area = st.selectbox("Select an Area", areas)
     
-    # Filter data for selected area
     df_area = final_merged_df[final_merged_df['area_name_en'] == selected_area]
     
     # =========================
-    # 3️⃣ Create Plotly figure
+    # 3️⃣ Combine past + forecast for LOESS
+    # =========================
+    x_combined = list(df_area['past_quarter_num']) + list(df_area['forecast_quarter_num'])
+    y_combined = list(df_area['past_median_price']) + list(df_area['forecast_price'])
+    quarters_combined = list(df_area['past_quarter']) + list(df_area['forecast_quarter'])
+    
+    # Apply LOESS smoothing across the full timeline
+    loess_combined = lowess(y_combined, x_combined, frac=0.5)
+    
+    # =========================
+    # 4️⃣ Forecast range (LOESS smoothed separately)
+    # =========================
+    loess_upper = lowess(df_area['yhat_upper'], df_area['forecast_quarter_num'], frac=0.5)
+    loess_lower = lowess(df_area['yhat_lower'], df_area['forecast_quarter_num'], frac=0.5)
+    
+    # =========================
+    # 5️⃣ Plot
     # =========================
     fig = go.Figure()
     
-    # Past median trend
+    # Connected trend + forecast
     fig.add_trace(go.Scatter(
-        x=df_area['past_quarter'],
-        y=df_area['past_median_price'],
+        x=[quarters_combined[int(idx)] for idx in loess_combined[:,0]],
+        y=loess_combined[:,1],
         mode='lines+markers',
-        name='Past Median',
-        line=dict(color='blue')
-    ))
-    
-    # Forecast line
-    fig.add_trace(go.Scatter(
-        x=df_area['forecast_quarter'],
-        y=df_area['forecast_price'],
-        mode='lines+markers',
-        name='Forecast',
+        name='Trend + Forecast (LOESS)',
         line=dict(color='green')
     ))
     
-    # Forecast uncertainty range
+    # Forecast range as shaded area
     fig.add_trace(go.Scatter(
-        x=list(df_area['forecast_quarter']) + list(df_area['forecast_quarter'][::-1]),
-        y=list(df_area['yhat_upper']) + list(df_area['yhat_lower'][::-1]),
+        x=[df_area['forecast_quarter'].iloc[i] for i in range(len(loess_upper[:,0]))] + 
+          [df_area['forecast_quarter'].iloc[i] for i in range(len(loess_lower[:,0])-1, -1, -1)],
+        y=list(loess_upper[:,1]) + list(loess_lower[:,1][::-1]),
         fill='toself',
         fillcolor='rgba(0,255,0,0.2)',
         line=dict(color='rgba(255,255,255,0)'),
         hoverinfo='skip',
         showlegend=True,
-        name='Forecast Range'
+        name='Forecast Range (LOESS)'
     ))
     
-    # Test medians
+    # Test median points
     fig.add_trace(go.Scatter(
         x=[df_area['forecast_quarter'].iloc[0]],
         y=[df_area['actual_median'].iloc[0]],
@@ -2745,16 +2760,17 @@ if sidebar_option == "validation":
     
     # Layout
     fig.update_layout(
-        title=f"{selected_area}: Past Trend + Forecast + Test Median",
+        title=f"{selected_area}: Trend + Forecast Connected with LOESS",
         xaxis_title="Quarter",
         yaxis_title="Price per meter",
         template='plotly_white'
     )
     
     # =========================
-    # 4️⃣ Display in Streamlit
+    # 6️⃣ Display in Streamlit
     # =========================
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 ###########################################################################################################################################################################################################################
