@@ -2666,55 +2666,96 @@ warnings.filterwarnings('ignore')
 # TAB 3: Area-wise Prediction & Forecast
 # =====================
 if sidebar_option == "validation":
-    import seaborn as sns
-    import numpy as np
     import streamlit as st
     import pandas as pd
-    import plotly.express as px
+    import plotly.graph_objects as go
     
     # =========================
-    # 1️⃣ Load combined trends CSV
+    # 1️⃣ Load merged dataset
     # =========================
-    df_forecast = pd.read_csv("combined_median_trends.csv")
+    final_merged_df = pd.read_csv('final_merged_dataset.csv')
     
-    # Ensure columns: area_name_en, quarter, median_price, type
-    st.write("Columns in dataframe:", df_forecast.columns)
+    # Convert quarters to string for plotting
+    final_merged_df['past_quarter'] = final_merged_df['past_quarter'].astype(str)
+    final_merged_df['forecast_quarter'] = final_merged_df['forecast_quarter'].astype(str)
     
     # =========================
-    # 2️⃣ Streamlit UI: Select Area
+    # 2️⃣ Streamlit App
     # =========================
-    st.title("Area-wise Median Price Trend Viewer")
+    st.title("Area-wise Trend & Forecast with Test Medians")
     
-    areas = df_forecast['area_name_en'].unique()
-    selected_area = st.selectbox("Select Area:", areas)
+    # Area selection
+    areas = final_merged_df['area_name_en'].unique()
+    selected_area = st.selectbox("Select an Area", areas)
     
-    # Filter for selected area
-    df_area = df_forecast[df_forecast['area_name_en'] == selected_area]
+    # Filter data for selected area
+    df_area = final_merged_df[final_merged_df['area_name_en'] == selected_area]
     
-    if df_area.empty:
-        st.warning(f"No data available for area: {selected_area}")
-    else:
-        # =========================
-        # 3️⃣ Plot Historical + Prediction + Forecast
-        # =========================
-        fig = px.line(
-            df_area,
-            x='quarter',
-            y='median_price',
-            color='area_name_en',
-            line_dash='type',   # Solid for Historical, dashed for Prediction/Forecast
-            markers=True,
-            title=f"Area-wise Median Price Trend for {selected_area}"
-        )
+    # =========================
+    # 3️⃣ Create Plotly figure
+    # =========================
+    fig = go.Figure()
     
-        fig.update_layout(
-            xaxis_title="Quarter",
-            yaxis_title="Median Price",
-            legend_title="Type",
-            xaxis=dict(type='category')
-        )
+    # Past median trend
+    fig.add_trace(go.Scatter(
+        x=df_area['past_quarter'],
+        y=df_area['past_median_price'],
+        mode='lines+markers',
+        name='Past Median',
+        line=dict(color='blue')
+    ))
     
-        st.plotly_chart(fig, use_container_width=True)
+    # Forecast line
+    fig.add_trace(go.Scatter(
+        x=df_area['forecast_quarter'],
+        y=df_area['forecast_price'],
+        mode='lines+markers',
+        name='Forecast',
+        line=dict(color='green')
+    ))
+    
+    # Forecast uncertainty range
+    fig.add_trace(go.Scatter(
+        x=list(df_area['forecast_quarter']) + list(df_area['forecast_quarter'][::-1]),
+        y=list(df_area['yhat_upper']) + list(df_area['yhat_lower'][::-1]),
+        fill='toself',
+        fillcolor='rgba(0,255,0,0.2)',
+        line=dict(color='rgba(255,255,255,0)'),
+        hoverinfo='skip',
+        showlegend=True,
+        name='Forecast Range'
+    ))
+    
+    # Test medians
+    fig.add_trace(go.Scatter(
+        x=[df_area['forecast_quarter'].iloc[0]],
+        y=[df_area['actual_median'].iloc[0]],
+        mode='markers',
+        name='Actual Median (Test)',
+        marker=dict(color='red', size=10, symbol='circle')
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=[df_area['forecast_quarter'].iloc[0]],
+        y=[df_area['predicted_median'].iloc[0]],
+        mode='markers',
+        name='Predicted Median (Test)',
+        marker=dict(color='orange', size=10, symbol='diamond')
+    ))
+    
+    # Layout
+    fig.update_layout(
+        title=f"{selected_area}: Past Trend + Forecast + Test Median",
+        xaxis_title="Quarter",
+        yaxis_title="Price per meter",
+        template='plotly_white'
+    )
+    
+    # =========================
+    # 4️⃣ Display in Streamlit
+    # =========================
+    st.plotly_chart(fig, use_container_width=True)
+
 
 ###########################################################################################################################################################################################################################
 ###########################################################################################################################################################################################################################
