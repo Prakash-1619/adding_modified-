@@ -2719,7 +2719,7 @@ if sidebar_option == "validation":
         x=df_area['past_quarter'],
         y=smoothed_past,
         mode='lines+markers',
-        name='Past Median (Smoothed)',
+        name='Past trend ',
         line=dict(color='blue')
     ))
     
@@ -2729,7 +2729,7 @@ if sidebar_option == "validation":
         x=df_area['forecast_quarter'],
         y=smoothed_forecast,
         mode='lines+markers',
-        name='Forecast (Smoothed)',
+        name='Forecast',
         line=dict(color='green')
     ))
     
@@ -2758,13 +2758,13 @@ if sidebar_option == "validation":
         x=[df_area['forecast_quarter'].iloc[0]],
         y=[df_area['predicted_median'].iloc[0]],
         mode='markers',
-        name='Predicted Median (Test)',
+        name='Predicted mean (Test)',
         marker=dict(color='orange', size=10, symbol='diamond')
     ))
     
     # Layout
     fig.update_layout(
-        title=f"{selected_area}: Quarterly Trend + Forecast + Test Median (LOESS)",
+        title=f"{selected_area}: Quarterly Trend + Forecast + Test mean (LOESS)",
         xaxis_title="Quarter",
         yaxis_title="Price per meter",
         template='plotly_white'
