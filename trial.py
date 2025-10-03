@@ -1377,11 +1377,14 @@ elif page == "V2.1":
                     "Non-Null Count": df.notnull().sum(),
                     "Missing Values": df.isnull().sum(),
                     "Unique Values": df.nunique(),
-                    "Sample Unique (first 5)": [df[col].unique()[:5] for col in df.columns]
+                    # Convert to string so Streamlit/PyArrow can handle it
+                    "Sample Unique (first 5)": [", ".join(map(str, df[col].unique()[:5])) for col in df.columns]
                 })
                 return summary
             
-            # Example: define df_train here (replace with your own dataset)
+            st.title("📊 Dataset Summary")
+            
+            # Example: load your dataset
             # df_train = pd.read_csv("your_dataset.csv")
             
             # Show dataset shape
@@ -1396,6 +1399,7 @@ elif page == "V2.1":
             st.subheader("📑 Column-wise Summary")
             summary = data_summary(df_train)
             st.dataframe(summary)
+
 
             
         # --- Test Data Tab ---
