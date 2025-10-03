@@ -1380,19 +1380,23 @@ elif page == "V2.1":
                     "Sample Unique (first 5)": [df[col].unique()[:5] for col in df.columns]
                 })
                 return summary
-        
+            
+            # Example: define df_train here (replace with your own dataset)
+            # df_train = pd.read_csv("your_dataset.csv")
+            
             # Show dataset shape
             st.write(f"**Total Rows:** {df_train.shape[0]}")
             st.write(f"**Total Columns:** {df_train.shape[1]}")
-        
+            
             # Show preview of data
             st.subheader("🔎 Data Preview")
             st.dataframe(df_train.head())
-        
+            
             # Show summary
             st.subheader("📑 Column-wise Summary")
             summary = data_summary(df_train)
             st.dataframe(summary)
+
             
         # --- Test Data Tab ---
         with tab3:
