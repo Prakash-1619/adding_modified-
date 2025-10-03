@@ -1380,9 +1380,6 @@ elif page == "V2.1":
                     "Sample Unique (first 5)": [df[col].unique()[:5] for col in df.columns]
                 })
                 return summary
-            
-    
-            
         
             # Show dataset shape
             st.write(f"**Total Rows:** {df_train.shape[0]}")
@@ -1397,18 +1394,6 @@ elif page == "V2.1":
             summary = data_summary(df_train)
             st.dataframe(summary)
             
-                # Option to download summary
-                csv = summary.to_csv(index=True).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Summary as CSV",
-                    data=csv,
-                    file_name="data_summary.csv",
-                    mime="text/csv"
-                )
-            
-            else:
-                st.info("👆 Please upload a CSV file to generate summary.")
-
         # --- Test Data Tab ---
         with tab3:
             st.subheader("Test Dataset")
