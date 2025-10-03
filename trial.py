@@ -1359,12 +1359,37 @@ elif page == "V2.1":
         st.header("📂 Data Files Overview")
         
         # Create inner tabs for Training and Test data
-        tab1, tab2,tab3 = st.tabs(["Training Data","Data Summary","Test Data"])
+        tab1, tab2,tab3 = st.tabs(["Overview","Train Data","Test Data"])
         
         # --- Training Data Tab ---
-        with tab1:
-            st.subheader("Training Dataset")
-            st.dataframe(df_train)
+        with tab1:  
+            st.subheader("Data Overview")
+            st.markdown("""
+            - We have considered **data from 2022 to June 2025**.
+            - **Property usage**: Residential only.
+            - **Property type**: Units only.
+            """)
+            
+            st.subheader("🛠️ Feature Engineering")
+            st.markdown("""
+            - Data filtered for **18 areas** with more than **6,000 records**.
+            - Features considered from **user perspective**:
+              - Rooms
+              - Procedure area
+              - Floor bins
+              - Has parking
+              - Swimming pools
+              - Elevators
+              - Nearby metro
+              - Has balcony
+            """)
+            
+            st.subheader("🤖 Models Used")
+            st.markdown("""
+            1. **Decision Tree** – for regression (price prediction).  
+            2. **Auto ARIMA** – for time series forecasting.  
+            """)
+
     
         with tab2:
             import streamlit as st
@@ -1378,7 +1403,7 @@ elif page == "V2.1":
                     "Missing Values": df.isnull().sum(),
                     "Unique Values": df.nunique(),
                     # Convert to string so Streamlit/PyArrow can handle it
-                    "Sample Unique (first 5)": [", ".join(map(str, df[col].unique()[:5])) for col in df.columns]
+                    "Sample Unique (first 5)": [", ".join(map(str, df[col].unique()[:10])) for col in df.columns]
                 })
                 return summary
             
@@ -1393,7 +1418,7 @@ elif page == "V2.1":
             
             # Show preview of data
             st.subheader("🔎 Data Preview")
-            st.dataframe(df_train.head())
+            st.dataframe(df_train.sample(10))
             
             # Show summary
             st.subheader("📑 Column-wise Summary")
