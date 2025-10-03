@@ -2651,127 +2651,63 @@ if sidebar_option == "📈 Model Results":
                         file_name="dubai_forecast_upper_bound.csv",
                         mime="text/csv",
                         key="forecast_upper_download")
+        with tab3:            
+            import streamlit as st
+            import plotly.graph_objects as go
+            import pandas as pd
+
+            df_test_forcast = pd.read_csv('df_test_forcast.csv')
+            df_test_forcast['diff_%'] = (df_test_forcast['median_growth'] - df_test_forcast['actual_median']) / df_test_forcast['median_growth'] * 100
+            
+            st.title("📊 Predicted vs Actual Median Prices with Difference %")
+            
+            fig = go.Figure()
+            
+            # --- Bars (side by side) ---
+            fig.add_trace(go.Bar(
+                x=df_test_forcast["area_name_en"],
+                y=df_test_forcast["median_growth"],
+                name="Predicted Median Price"
+            ))
+            
+            fig.add_trace(go.Bar(
+                x=df_test_forcast["area_name_en"],
+                y=df_test_forcast["actual_median"],
+                name="Actual Median Price"
+            ))
+            
+            # --- Line on secondary y-axis ---
+            fig.add_trace(go.Scatter(
+                x=df_test_forcast["area_name_en"],
+                y=df_test_forcast["diff_%"],
+                name="Difference %",
+                mode="lines+markers",
+                yaxis="y2"
+            ))
+            
+            # --- Layout ---
+            fig.update_layout(
+                title="Predicted vs Actual Median Prices with Diff %",
+                xaxis=dict(title="Area"),
+                yaxis=dict(title="Price"),
+                yaxis2=dict(
+                    title="Difference %",
+                    overlaying="y",
+                    side="right",
+                    zeroline=True,      # show zero line
+                    zerolinecolor="red",
+                    zerolinewidth=2
+                ),
+                barmode="group",
+                xaxis_tickangle=-45,
+                bargap=0.2,
+            )
+            
+            # --- Show in Streamlit ---
+            st.plotly_chart(fig, use_container_width=True)
+
     ###############################################################################################################################################################################################################################
 
-import pandas as pd
-import streamlit as st
-import pickle
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import numpy as np
-from datetime import datetime, timedelta
-import warnings
-warnings.filterwarnings('ignore')
-# =====================
-# TAB 3: Area-wise Prediction & Forecast
-# =====================
-if sidebar_option == "validation":
-    import streamlit as st
-    import pandas as pd
-    import plotly.graph_objects as go
-    from statsmodels.nonparametric.smoothers_lowess import lowess
-   
-    # =========================
-    # 1️⃣ Load Data
-    # =========================
-    final_merged_df = pd.read_csv('final_merged_dataset.csv')
-    final_merged_df = final_merged_df[~final_merged_df['area_name_en'].isin(['Al Warsan First', 'Palm Jumeirah'])]
-    # Convert quarters to string (if not already)
-    final_merged_df['past_quarter'] = final_merged_df['past_quarter'].astype(str)
-    final_merged_df['forecast_quarter'] = final_merged_df['forecast_quarter'].astype(str)
-    
-    # Helper function: convert "YYYYQX" to numeric value for LOESS
-    def quarter_to_num(qtr_str):
-        year = int(qtr_str[:4])
-        q = int(qtr_str[-1])
-        return year + (q-1)/4  # e.g., 2023Q1 -> 2023.0, 2023Q2 -> 2023.25
-    
-    final_merged_df['past_quarter_num'] = final_merged_df['past_quarter'].apply(quarter_to_num)
-    final_merged_df['forecast_quarter_num'] = final_merged_df['forecast_quarter'].apply(quarter_to_num)
-    
-    # LOESS smoothing function
-    def loess_smooth(x, y, frac=0.4):
-        return lowess(y, x, frac=frac, return_sorted=False)
-    
-    # =========================
-    # 2️⃣ Streamlit App
-    # =========================
-    st.title("Area-wise Trend + Forecast with LOESS Smoothing")
-    
-    # Area selection
-    areas = final_merged_df['area_name_en'].unique()
-    selected_area = st.selectbox("Select Area", areas)
-    
-    # Optional: LOESS smoothing slider
-    frac = st.slider("LOESS smoothing fraction", min_value=0.1, max_value=1.0, value=0.4, step=0.05)
-    
-    # Filter data for selected area
-    df_area = final_merged_df[final_merged_df['area_name_en'] == selected_area].copy()
-    
-    # =========================
-    # 3️⃣ Plotting
-    # =========================
-    fig = go.Figure()
-    
-    # Smoothed past trend
-    smoothed_past = loess_smooth(df_area['past_quarter_num'], df_area['past_median_price'], frac=frac)
-    fig.add_trace(go.Scatter(
-        x=df_area['past_quarter'],
-        y=smoothed_past,
-        mode='lines+markers',
-        name='Past trend ',
-        line=dict(color='blue')
-    ))
-    
-    # Smoothed forecast
-    smoothed_forecast = loess_smooth(df_area['forecast_quarter_num'], df_area['forecast_price'], frac=frac)
-    fig.add_trace(go.Scatter(
-        x=df_area['forecast_quarter'],
-        y=smoothed_forecast,
-        mode='lines+markers',
-        name='Forecast',
-        line=dict(color='green')
-    ))
-    
-    # Forecast range (shaded)
-    fig.add_trace(go.Scatter(
-        x=list(df_area['forecast_quarter']) + list(df_area['forecast_quarter'][::-1]),
-        y=list(df_area['yhat_upper']) + list(df_area['yhat_lower'][::-1]),
-        fill='toself',
-        fillcolor='rgba(0,255,0,0.2)',
-        line=dict(color='rgba(255,255,255,0)'),
-        hoverinfo='skip',
-        showlegend=True,
-        name='Forecast Range'
-    ))
-    
-    # Test medians
-    fig.add_trace(go.Scatter(
-        x=[df_area['forecast_quarter'].iloc[0]],
-        y=[df_area['actual_median'].iloc[0]],
-        mode='markers',
-        name='Actual Median (Test)',
-        marker=dict(color='red', size=10, symbol='circle')
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=[df_area['forecast_quarter'].iloc[0]],
-        y=[df_area['predicted_median'].iloc[0]],
-        mode='markers',
-        name='Predicted mean (Test)',
-        marker=dict(color='orange', size=10, symbol='diamond')
-    ))
-    
-    # Layout
-    fig.update_layout(
-        title=f"{selected_area}: Quarterly Trend + Forecast + Test mean (LOESS)",
-        xaxis_title="Quarter",
-        yaxis_title="Price per meter",
-        template='plotly_white'
-    )
-    
-    # Display in Streamlit
-    st.plotly_chart(fig, use_container_width=True)
 
 
 
