@@ -1359,16 +1359,58 @@ elif page == "V2.1":
         st.header("📂 Data Files Overview")
         
         # Create inner tabs for Training and Test data
-        tab1, tab2 = st.tabs(["Training Data", "Test Data"])
+        tab1, tab2,tab3 = st.tabs(["Training Data","Data Summary","Test Data"])
         
         # --- Training Data Tab ---
         with tab1:
             st.subheader("Training Dataset")
             st.dataframe(df_train)
     
-        
-        # --- Test Data Tab ---
         with tab2:
+            import streamlit as st
+            import pandas as pd
+            
+            def data_summary(df: pd.DataFrame):
+                """Return dataframe summary for Streamlit display."""
+                summary = pd.DataFrame({
+                    "DataType": df.dtypes.astype(str),
+                    "Non-Null Count": df.notnull().sum(),
+                    "Missing Values": df.isnull().sum(),
+                    "Unique Values": df.nunique(),
+                    "Sample Unique (first 5)": [df[col].unique()[:5] for col in df.columns]
+                })
+                return summary
+            
+    
+            
+        
+            # Show dataset shape
+            st.write(f"**Total Rows:** {df_train.shape[0]}")
+            st.write(f"**Total Columns:** {df_train.shape[1]}")
+        
+            # Show preview of data
+            st.subheader("🔎 Data Preview")
+            st.dataframe(df_train.head())
+        
+            # Show summary
+            st.subheader("📑 Column-wise Summary")
+            summary = data_summary(df_train)
+            st.dataframe(summary)
+            
+                # Option to download summary
+                csv = summary.to_csv(index=True).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Summary as CSV",
+                    data=csv,
+                    file_name="data_summary.csv",
+                    mime="text/csv"
+                )
+            
+            else:
+                st.info("👆 Please upload a CSV file to generate summary.")
+
+        # --- Test Data Tab ---
+        with tab3:
             st.subheader("Test Dataset")
             st.dataframe(df_test)
         
