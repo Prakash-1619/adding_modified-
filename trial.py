@@ -1508,7 +1508,7 @@ elif page == "V2.1":
                 
                 return period_stats, title_suffix
             
-            def create_combined_plot(df, time_period, title_suffix):
+            def create_combined_plot(df, time_period, title_suffix, plot_key_suffix=""):
                 """
                 Create a combined plot with time series and boxplots
                 """
@@ -1602,7 +1602,7 @@ elif page == "V2.1":
                 # Update layout
                 fig.update_layout(
                     height=900,
-                    title_text=f"Complete Analysis by {title_suffix}",
+                    title_text=f"Complete Analysis by {title_suffix} {plot_key_suffix}",
                     hovermode='x unified',
                     showlegend=True
                 )
@@ -1622,14 +1622,15 @@ elif page == "V2.1":
                 # Dataset selection in sidebar
                 st.sidebar.header("Dataset Selection")
                 dataset_options = {
-                    "Dataset 1": "df_trained_dataset_6000.csv",
-                    "Dataset 2": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
+                    "Actual_data": "over_all_dataset.csv",
+                    "areas_with_6000": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
                 }
                 
                 selected_dataset = st.sidebar.selectbox(
                     "Choose Dataset",
                     options=list(dataset_options.keys()),
-                    index=0
+                    index=0,
+                    key="dataset_select"
                 )
                 
                 file_path = dataset_options[selected_dataset]
@@ -1646,7 +1647,7 @@ elif page == "V2.1":
                             st.error(f"Missing required columns: {', '.join(missing_columns)}")
                             st.write("Available columns:", list(df.columns))
                             return
-                        
+ 
                         # Create two tabs: Whole Data and Area-wise
                         analysis_tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
                         
@@ -1695,32 +1696,32 @@ elif page == "V2.1":
                                 
                                 # Create combined plot
                                 st.subheader(f"Combined Analysis by {title_suffix}")
-                                combined_fig = create_combined_plot(df_filtered_whole, time_period_whole, title_suffix)
-                                st.plotly_chart(combined_fig, use_container_width=True)
+                                combined_fig = create_combined_plot(df_filtered_whole, time_period_whole, title_suffix, "Whole Data")
+                                st.plotly_chart(combined_fig, use_container_width=True, key=f"whole_data_combined_{time_period_whole}")
                                 
                                 # Display summary statistics
                                 st.subheader("Summary Statistics")
                                 col1, col2, col3, col4, col5 = st.columns(5)
                                 
                                 with col1:
-                                    st.metric("Total Records", len(df_filtered_whole))
+                                    st.metric("Total Records", len(df_filtered_whole), key="whole_total_records")
                                 with col2:
                                     avg_price = df_filtered_whole['meter_sale_price'].mean()
-                                    st.metric("Overall Avg Price", f"{avg_price:.2f}")
+                                    st.metric("Overall Avg Price", f"{avg_price:.2f}", key="whole_avg_price")
                                 with col3:
                                     price_std = df_filtered_whole['meter_sale_price'].std()
-                                    st.metric("Price Std Dev", f"{price_std:.2f}")
+                                    st.metric("Price Std Dev", f"{price_std:.2f}", key="whole_std_dev")
                                 with col4:
                                     min_price = df_filtered_whole['meter_sale_price'].min()
-                                    st.metric("Min Price", f"{min_price:.2f}")
+                                    st.metric("Min Price", f"{min_price:.2f}", key="whole_min_price")
                                 with col5:
                                     max_price = df_filtered_whole['meter_sale_price'].max()
-                                    st.metric("Max Price", f"{max_price:.2f}")
+                                    st.metric("Max Price", f"{max_price:.2f}", key="whole_max_price")
                                 
                                 # Additional statistics
                                 st.subheader("Detailed Price Statistics")
                                 price_stats = df_filtered_whole['meter_sale_price'].describe()
-                                st.dataframe(price_stats.round(2), use_container_width=True)
+                                st.dataframe(price_stats.round(2), use_container_width=True, key="whole_price_stats")
                         
                         # =========================
                         # AREA-WISE TAB
@@ -1780,11 +1781,13 @@ elif page == "V2.1":
                                 # Create combined plot for area-wise analysis
                                 if selected_area_single == "All Areas":
                                     st.subheader(f"Combined Analysis for All Areas by {title_suffix_area}")
+                                    plot_suffix = "All Areas"
                                 else:
                                     st.subheader(f"Combined Analysis for {selected_area_single} by {title_suffix_area}")
+                                    plot_suffix = selected_area_single
                                 
-                                combined_fig_area = create_combined_plot(df_area, time_period_area, title_suffix_area)
-                                st.plotly_chart(combined_fig_area, use_container_width=True)
+                                combined_fig_area = create_combined_plot(df_area, time_period_area, title_suffix_area, plot_suffix)
+                                st.plotly_chart(combined_fig_area, use_container_width=True, key=f"area_wise_combined_{time_period_area}_{selected_area_single}")
                                 
                                 # Display detailed statistics for selected area
                                 st.subheader("Area Details")
@@ -1795,19 +1798,19 @@ elif page == "V2.1":
                                     area_data = df[df['area_name_en'] == selected_area_single]
                                     
                                     with col1:
-                                        st.metric("Total Records in Area", len(area_data))
+                                        st.metric("Total Records in Area", len(area_data), key=f"area_total_{selected_area_single}")
                                     with col2:
                                         area_avg = area_data['meter_sale_price'].mean()
-                                        st.metric("Area Average Price", f"{area_avg:.2f}")
+                                        st.metric("Area Average Price", f"{area_avg:.2f}", key=f"area_avg_{selected_area_single}")
                                     with col3:
                                         area_std = area_data['meter_sale_price'].std()
-                                        st.metric("Price Std Dev", f"{area_std:.2f}")
+                                        st.metric("Price Std Dev", f"{area_std:.2f}", key=f"area_std_{selected_area_single}")
                                     with col4:
                                         area_min = area_data['meter_sale_price'].min()
-                                        st.metric("Min Price", f"{area_min:.2f}")
+                                        st.metric("Min Price", f"{area_min:.2f}", key=f"area_min_{selected_area_single}")
                                     with col5:
                                         area_max = area_data['meter_sale_price'].max()
-                                        st.metric("Max Price", f"{area_max:.2f}")
+                                        st.metric("Max Price", f"{area_max:.2f}", key=f"area_max_{selected_area_single}")
                     
                     except Exception as e:
                         st.error(f"Error processing file: {str(e)}")
