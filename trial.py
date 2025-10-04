@@ -2160,6 +2160,7 @@ if sidebar_option == "📈 Model Results":
             import pickle
             import plotly.express as px
             import plotly.graph_objects as go
+            import os
             
             # =========================
             # INITIALIZATION & SETUP
@@ -2182,14 +2183,43 @@ if sidebar_option == "📈 Model Results":
                 try:
                     # Load area models
                     area_models = {}
-                    # Add your model loading logic here
-                    # Example:
-                    # with open('model_area1.pkl', 'rb') as f:
-                    #     area_models['Area1'] = pickle.load(f)
+                    area_files = [
+                        "dt_model_Al_Barsha_South_Fifth.pkl", "dt_model_Al_Barsha_South_Fourth.pkl", 
+                        "dt_model_Al_Barshaa_South_Third.pkl", "dt_model_Al_Hebiah_Fourth.pkl",
+                        "dt_model_Al_Khairan_First.pkl", "dt_model_Al_Merkadh.pkl", 
+                        "dt_model_Al_Thanyah_Fifth.pkl", "dt_model_Al_Warsan_First.pkl",
+                        "dt_model_Al_Yelayiss_2.pkl", "dt_model_Bukadra.pkl", 
+                        "dt_model_Burj_Khalifa.pkl", "dt_model_Business_Bay.pkl",
+                        "dt_model_Hadaeq_Sheikh_Mohammed_Bin_Rashid.pkl", "dt_model_Jabal_Ali_First.pkl",
+                        "dt_model_Madinat_Al_Mataar.pkl", "dt_model_Madinat_Dubai_Almelaheyah.pkl",
+                        "dt_model_Marsa_Dubai.pkl", "dt_model_Me'Aisem_First.pkl",
+                        "dt_model_Nadd_Hessa.pkl", "dt_model_Wadi_Al_Safa_5.pkl"
+                    ]
+                    
+                    # Extract area names from filenames and load models
+                    for model_file in area_files:
+                        try:
+                            # Extract area name from filename
+                            area_name = model_file.replace('dt_model_', '').replace('.pkl', '')
+                            area_name = area_name.replace('_', ' ').title()
+                            
+                            # Load the model
+                            if os.path.exists(model_file):
+                                with open(model_file, 'rb') as f:
+                                    area_models[area_name] = pickle.load(f)
+                                st.success(f"✅ Loaded model for {area_name}")
+                            else:
+                                st.warning(f"⚠️ Model file not found: {model_file}")
+                        except Exception as e:
+                            st.error(f"❌ Error loading model {model_file}: {str(e)}")
                     
                     # Load OHE transformer
-                    with open("onehot_encoder.pkl", "rb") as f:
-                        ohe = pickle.load(f)
+                    if os.path.exists("onehot_encoder.pkl"):
+                        with open("onehot_encoder.pkl", "rb") as f:
+                            ohe = pickle.load(f)
+                    else:
+                        st.error("❌ OHE transformer file not found: onehot_encoder.pkl")
+                        ohe = None
                         
                     return area_models, ohe
                 except Exception as e:
@@ -2198,6 +2228,15 @@ if sidebar_option == "📈 Model Results":
             
             # Load models and preprocessing
             area_models, ohe = load_models_and_preprocessing()
+            
+            # Display loaded areas for debugging
+            st.sidebar.markdown("### 🔍 Loaded Areas")
+            if area_models:
+                st.sidebar.success(f"✅ {len(area_models)} areas loaded")
+                for area in sorted(area_models.keys()):
+                    st.sidebar.write(f"• {area}")
+            else:
+                st.sidebar.error("❌ No areas loaded")
             
             # =========================
             # LOAD DATA FOR FORECASTING TAB
@@ -2288,13 +2327,21 @@ if sidebar_option == "📈 Model Results":
             # Forecasting controls
             # =========================
             st.sidebar.title("🔧 Forecast Controls")
-            available_areas = list(area_models.keys())
+            
+            # Check if area_models is loaded
+            if not area_models:
+                st.sidebar.error("❌ No area models loaded. Please check your model files.")
+                available_areas = []
+            else:
+                available_areas = list(area_models.keys())
+            
             selected_areas_forecast = st.sidebar.multiselect(
                 "Select Areas for Forecasting",
                 options=available_areas,
                 default=available_areas[:4] if len(available_areas) > 4 else available_areas,
                 key="forecast_areas_sidebar"
             )
+            
             grouping_options = ['rooms_en', 'floor_bin', 'swimming_pool', 'balcony', 'elevator', 'metro', 'has_parking']
             selected_grouping = st.sidebar.selectbox("Group by Feature", options=grouping_options, index=0)
             st.sidebar.markdown("---")
@@ -2325,6 +2372,7 @@ if sidebar_option == "📈 Model Results":
                     
                     for area in selected_areas_forecast:
                         if area not in area_models:
+                            st.warning(f"Model not found for area: {area}")
                             continue
                         model = area_models[area]
                         mask = test_samples_forecast['area_name_en'] == area
