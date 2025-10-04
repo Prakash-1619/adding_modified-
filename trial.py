@@ -1918,7 +1918,7 @@ elif page == "V2.1":
                     st.error(f"❌ File not found: {file_path}")
             
             if __name__ == "__main__":
-        main()
+                main()
         with main_tabs[1]:
             sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
             
