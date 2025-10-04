@@ -1372,7 +1372,9 @@ elif page == "V2.1":
             
             st.subheader("🛠️ Feature Engineering")
             st.markdown("""
-            - Data filtered for **18 areas** with more than **6,000 records**.
+            -  **18 areas** filtered having more than **6,000 records**.
+            - For these areas 6000 sample records have taken into consideration for the model.
+            -
             - Features considered from **user perspective**:
               - Rooms
               - Procedure area
@@ -1403,7 +1405,7 @@ elif page == "V2.1":
                     "Missing Values": df.isnull().sum(),
                     "Unique Values": df.nunique(),
                     # Convert to string so Streamlit/PyArrow can handle it
-                    "Sample Unique (first 5)": [", ".join(map(str, df[col].unique()[:10])) for col in df.columns]
+                    "Sample Unique (first 10)": [", ".join(map(str, df[col].unique()[:10])) for col in df.columns]
                 })
                 return summary
             
