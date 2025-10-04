@@ -1621,7 +1621,7 @@ elif page == "V2.1":
                 
                 # Dataset selection in sidebar
                 st.sidebar.header("Dataset Selection")
-                dataset_options = {"Actual_data": "over_all_dataset_og.csv"
+                dataset_options = {"Actual_data": "over_all_dataset_og.csv",
                     "Data without_outliers": "over_all_dataset.csv",
                     "areas_with_6000": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
                 }
