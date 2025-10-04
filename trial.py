@@ -1491,16 +1491,15 @@ elif page == "V2.1":
                 """
                 df_with_period = create_time_period_column(df, time_period)
                 
-                # Limit the number of periods for better visualization
+                # Limit periods (max 12 for readability)
                 unique_periods = df_with_period['time_period'].unique()
                 if len(unique_periods) > 12:
-                    # Take the most recent periods
                     recent_periods = df_with_period.groupby('time_period')['instance_date'].max().nlargest(12).index
                     df_plot = df_with_period[df_with_period['time_period'].isin(recent_periods)]
                 else:
                     df_plot = df_with_period
                 
-                # Calculate average prices and record counts for line plot
+                # Calculate stats for line plot
                 period_stats = df_plot.groupby(['time_period', 'sort_key']).agg({
                     'meter_sale_price': 'mean',
                     'instance_date': 'count'
@@ -1508,12 +1507,12 @@ elif page == "V2.1":
                 period_stats.columns = ['time_period', 'sort_key', 'avg_meter_sale_price', 'record_count']
                 period_stats = period_stats.sort_values('sort_key')
                 
-                # Create subplot with 3 rows: Time series with dual y-axis, Boxplot, Record count
+                # Subplots: line, boxplot, bar
                 fig = make_subplots(
                     rows=3, cols=1,
                     subplot_titles=(
                         f'Average Price and Record Count by {title_suffix}',
-                        f'Detailed Box Plot with Outliers by {title_suffix}',
+                        f'Price Distribution by {title_suffix}',
                         f'Record Count by {title_suffix}'
                     ),
                     vertical_spacing=0.08,
@@ -1522,36 +1521,30 @@ elif page == "V2.1":
                     specs=[[{"secondary_y": True}], [{}], [{}]]
                 )
                 
-                # 1. Time series line plot with dual y-axis (row 1)
-                # Average price line
+                # 1. Time series line plot
                 fig.add_trace(
                     go.Scatter(
                         x=period_stats['time_period'],
                         y=period_stats['avg_meter_sale_price'],
                         name='Average Price',
                         mode='lines+markers',
-                        line=dict(color='blue', width=3),
-                        marker=dict(size=8, color='blue')
+                        line=dict(color='blue', width=3)
                     ),
-                    row=1, col=1,
-                    secondary_y=False
+                    row=1, col=1, secondary_y=False
                 )
                 
-                # Record count line
                 fig.add_trace(
                     go.Scatter(
                         x=period_stats['time_period'],
                         y=period_stats['record_count'],
                         name='Record Count',
                         mode='lines+markers',
-                        line=dict(color='green', width=2, dash='dot'),
-                        marker=dict(size=6, color='green')
+                        line=dict(color='green', width=2, dash='dot')
                     ),
-                    row=1, col=1,
-                    secondary_y=True
+                    row=1, col=1, secondary_y=True
                 )
                 
-                # Add trendline for average price
+                # Add rolling trend line
                 period_stats['trend'] = period_stats['avg_meter_sale_price'].rolling(window=2, min_periods=1).mean()
                 fig.add_trace(
                     go.Scatter(
@@ -1561,50 +1554,24 @@ elif page == "V2.1":
                         mode='lines',
                         line=dict(dash='dash', color='red', width=2)
                     ),
-                    row=1, col=1,
-                    secondary_y=False
+                    row=1, col=1, secondary_y=False
                 )
                 
-                # 2. Detailed Boxplot with all statistics (row 2)
-                for period in df_plot['time_period'].unique():
-                    period_data = df_plot[df_plot['time_period'] == period]['meter_sale_price']
-                    
-                    # Calculate box plot statistics manually
-                    q1 = period_data.quantile(0.25)
-                    median = period_data.median()
-                    q3 = period_data.quantile(0.75)
-                    iqr = q3 - q1
-                    lower_fence = q1 - 1.5 * iqr
-                    upper_fence = q3 + 1.5 * iqr
-                    
-                    # Identify outliers
-                    outliers = period_data[(period_data < lower_fence) | (period_data > upper_fence)]
-                    non_outliers = period_data[(period_data >= lower_fence) & (period_data <= upper_fence)]
-                    
-                    min_val = non_outliers.min() if len(non_outliers) > 0 else period_data.min()
-                    max_val = non_outliers.max() if len(non_outliers) > 0 else period_data.max()
-                    
-                    fig.add_trace(
-                        go.Box(
-                            y=period_data,
-                            name=period,
-                            boxpoints='outliers',  # Show only outliers as points
-                            jitter=0.3,
-                            pointpos=-1.8,
-                            marker_color='lightblue',
-                            line_color='darkblue',
-                            showlegend=False,
-                            # Custom box plot statistics
-                            q1=[q1],
-                            median=[median],
-                            q3=[q3],
-                            lowerfence=[min_val],
-                            upperfence=[max_val]
-                        ),
-                        row=2, col=1
-                    )
+                # 2. Boxplots (time-series wise)
+                fig.add_trace(
+                    go.Box(
+                        x=df_plot['time_period'],
+                        y=df_plot['meter_sale_price'],
+                        name='Price Distribution',
+                        boxpoints='outliers',
+                        marker_color='lightblue',
+                        line_color='darkblue',
+                        showlegend=False
+                    ),
+                    row=2, col=1
+                )
                 
-                # 3. Record count bar plot (row 3)
+                # 3. Record count bar plot
                 fig.add_trace(
                     go.Bar(
                         x=period_stats['time_period'],
@@ -1617,7 +1584,7 @@ elif page == "V2.1":
                     row=3, col=1
                 )
                 
-                # Update layout
+                # Layout
                 fig.update_layout(
                     height=900,
                     title_text=f"Complete Analysis by {title_suffix} - {plot_key_suffix}",
@@ -1625,20 +1592,18 @@ elif page == "V2.1":
                     showlegend=True
                 )
                 
-                # Update axes
-                fig.update_xaxes(title_text=title_suffix, row=3, col=1)
+                fig.update_xaxes(title_text=title_suffix, row=3, col=1, tickangle=45)
                 fig.update_yaxes(title_text="Average Price", row=1, col=1, secondary_y=False)
                 fig.update_yaxes(title_text="Record Count", row=1, col=1, secondary_y=True)
                 fig.update_yaxes(title_text="Price Distribution", row=2, col=1)
                 fig.update_yaxes(title_text="Record Count", row=3, col=1)
-                fig.update_xaxes(tickangle=45, row=3, col=1)
                 
                 return fig
             
             def main():
-                st.markdown("Analyze average meter sale prices across different time periods")
+                st.markdown("## Analyze average meter sale prices across different time periods")
                 
-                # Dataset selection in sidebar
+                # Dataset selection
                 st.sidebar.header("Dataset Selection")
                 dataset_options = {
                     "Actual_data": "over_all_dataset_og.csv",
@@ -1649,8 +1614,7 @@ elif page == "V2.1":
                 selected_dataset = st.sidebar.selectbox(
                     "Choose Dataset",
                     options=list(dataset_options.keys()),
-                    index=0,
-                    key="dataset_select"
+                    index=0
                 )
                 
                 file_path = dataset_options[selected_dataset]
@@ -1658,157 +1622,99 @@ elif page == "V2.1":
                 if os.path.exists(file_path):
                     try:
                         df = pd.read_csv(file_path)
-                        
-                        # Validate required columns
                         required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
-                        missing_columns = [col for col in required_columns if col not in df.columns]
+                        missing = [c for c in required_columns if c not in df.columns]
                         
-                        if missing_columns:
-                            st.error(f"Missing required columns: {', '.join(missing_columns)}")
-                            st.write("Available columns:", list(df.columns))
+                        if missing:
+                            st.error(f"Missing required columns: {', '.join(missing)}")
                             return
             
-                        # Create two tabs: Whole Data and Area-wise
-                        analysis_tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
+                        tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
                         
-                        # =========================
                         # WHOLE DATA TAB
-                        # =========================
-                        with analysis_tabs[0]:
+                        with tabs[0]:
                             st.subheader("Complete Dataset Analysis")
-                            
-                            # Time period selection for whole data
                             time_period_whole = st.selectbox(
                                 "Select Time Period",
-                                options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
-                                index=2,
-                                key="whole_data_period"
+                                ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
+                                index=2
                             )
                             
-                            # Use entire date range (removed date range selection)
-                            df_filtered_whole = df.copy()
-                            
-                            # Process data for whole data tab
-                            if len(df_filtered_whole) > 0:
-                                # Get title suffix
+                            if len(df) > 0:
                                 title_suffix = {
-                                    'Daily': 'Day', 'Weekly': 'Week', 'Monthly': 'Month', 
-                                    'Quarterly': 'Quarter', 'Half-Yearly': 'Half-Year', 'Yearly': 'Year'
+                                    'Daily':'Day','Weekly':'Week','Monthly':'Month',
+                                    'Quarterly':'Quarter','Half-Yearly':'Half-Year','Yearly':'Year'
                                 }[time_period_whole]
                                 
-                                # Create combined plot
                                 st.subheader(f"Combined Analysis by {title_suffix}")
-                                combined_fig = create_combined_plot(df_filtered_whole, time_period_whole, title_suffix, "Whole Data")
-                                st.plotly_chart(combined_fig, use_container_width=True, key=f"whole_data_combined_{time_period_whole}")
+                                fig = create_combined_plot(df, time_period_whole, title_suffix, "Whole Data")
+                                st.plotly_chart(fig, use_container_width=True)
                                 
-                                # Display summary statistics
                                 st.subheader("Summary Statistics")
                                 col1, col2, col3, col4, col5 = st.columns(5)
+                                with col1: st.metric("Total Records", len(df))
+                                with col2: st.metric("Overall Avg Price", f"{df['meter_sale_price'].mean():.2f}")
+                                with col3: st.metric("Price Std Dev", f"{df['meter_sale_price'].std():.2f}")
+                                with col4: st.metric("Min Price", f"{df['meter_sale_price'].min():.2f}")
+                                with col5: st.metric("Max Price", f"{df['meter_sale_price'].max():.2f}")
                                 
-                                with col1:
-                                    st.metric("Total Records", len(df_filtered_whole), key="whole_total_records")
-                                with col2:
-                                    avg_price = df_filtered_whole['meter_sale_price'].mean()
-                                    st.metric("Overall Avg Price", f"{avg_price:.2f}", key="whole_avg_price")
-                                with col3:
-                                    price_std = df_filtered_whole['meter_sale_price'].std()
-                                    st.metric("Price Std Dev", f"{price_std:.2f}", key="whole_std_dev")
-                                with col4:
-                                    min_price = df_filtered_whole['meter_sale_price'].min()
-                                    st.metric("Min Price", f"{min_price:.2f}", key="whole_min_price")
-                                with col5:
-                                    max_price = df_filtered_whole['meter_sale_price'].max()
-                                    st.metric("Max Price", f"{max_price:.2f}", key="whole_max_price")
-                                
-                                # Additional statistics
                                 st.subheader("Detailed Price Statistics")
-                                price_stats = df_filtered_whole['meter_sale_price'].describe()
-                                st.dataframe(price_stats.round(2), use_container_width=True, key="whole_price_stats")
+                                st.dataframe(df['meter_sale_price'].describe().round(2))
                         
-                        # =========================
                         # AREA-WISE TAB
-                        # =========================
-                        with analysis_tabs[1]:
+                        with tabs[1]:
                             st.subheader("Individual Area Analysis")
-                            
-                            # Area selection for area-wise analysis
                             areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
-                            selected_area_single = st.selectbox(
-                                "Select Area for Detailed Analysis",
-                                options=areas_all,
-                                index=0,
-                                key="area_wise_select"
-                            )
+                            selected_area = st.selectbox("Select Area", options=areas_all, index=0)
                             
-                            # Time period selection for area-wise
                             time_period_area = st.selectbox(
                                 "Select Time Period",
-                                options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
-                                index=2,
-                                key="area_wise_period"
+                                ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'],
+                                index=2
                             )
                             
-                            # Filter data based on selected area (removed date range selection)
-                            if selected_area_single != "All Areas":
-                                df_area = df[df['area_name_en'] == selected_area_single]
+                            if selected_area != "All Areas":
+                                df_area = df[df['area_name_en'] == selected_area]
                             else:
                                 df_area = df.copy()
                             
-                            # Process data for area-wise tab
                             if len(df_area) > 0:
-                                # Get title suffix
                                 title_suffix_area = {
-                                    'Daily': 'Day', 'Weekly': 'Week', 'Monthly': 'Month', 
-                                    'Quarterly': 'Quarter', 'Half-Yearly': 'Half-Year', 'Yearly': 'Year'
+                                    'Daily':'Day','Weekly':'Week','Monthly':'Month',
+                                    'Quarterly':'Quarter','Half-Yearly':'Half-Year','Yearly':'Year'
                                 }[time_period_area]
                                 
-                                # Create combined plot for area-wise analysis
-                                if selected_area_single == "All Areas":
+                                if selected_area == "All Areas":
                                     st.subheader(f"Combined Analysis for All Areas by {title_suffix_area}")
                                     plot_suffix = "All Areas"
                                 else:
-                                    st.subheader(f"Combined Analysis for {selected_area_single} by {title_suffix_area}")
-                                    plot_suffix = selected_area_single
+                                    st.subheader(f"Combined Analysis for {selected_area} by {title_suffix_area}")
+                                    plot_suffix = selected_area
                                 
-                                combined_fig_area = create_combined_plot(df_area, time_period_area, title_suffix_area, plot_suffix)
-                                st.plotly_chart(combined_fig_area, use_container_width=True, key=f"area_wise_combined_{time_period_area}_{selected_area_single}")
+                                fig_area = create_combined_plot(df_area, time_period_area, title_suffix_area, plot_suffix)
+                                st.plotly_chart(fig_area, use_container_width=True)
                                 
-                                # Display detailed statistics for selected area
-                                st.subheader("Area Details")
-                                
-                                if selected_area_single != "All Areas":
+                                if selected_area != "All Areas":
+                                    st.subheader("Area Details")
                                     col1, col2, col3, col4, col5 = st.columns(5)
-                                    
-                                    area_data = df[df['area_name_en'] == selected_area_single]
-                                    
-                                    with col1:
-                                        st.metric("Total Records in Area", len(area_data), key=f"area_total_{selected_area_single}")
-                                    with col2:
-                                        area_avg = area_data['meter_sale_price'].mean()
-                                        st.metric("Area Average Price", f"{area_avg:.2f}", key=f"area_avg_{selected_area_single}")
-                                    with col3:
-                                        area_std = area_data['meter_sale_price'].std()
-                                        st.metric("Price Std Dev", f"{area_std:.2f}", key=f"area_std_{selected_area_single}")
-                                    with col4:
-                                        area_min = area_data['meter_sale_price'].min()
-                                        st.metric("Min Price", f"{area_min:.2f}", key=f"area_min_{selected_area_single}")
-                                    with col5:
-                                        area_max = area_data['meter_sale_price'].max()
-                                        st.metric("Max Price", f"{area_max:.2f}", key=f"area_max_{selected_area_single}")
+                                    with col1: st.metric("Total Records", len(df_area))
+                                    with col2: st.metric("Area Avg Price", f"{df_area['meter_sale_price'].mean():.2f}")
+                                    with col3: st.metric("Price Std Dev", f"{df_area['meter_sale_price'].std():.2f}")
+                                    with col4: st.metric("Min Price", f"{df_area['meter_sale_price'].min():.2f}")
+                                    with col5: st.metric("Max Price", f"{df_area['meter_sale_price'].max():.2f}")
                             
                             else:
-                                st.warning(f"No data available for the selected area: {selected_area_single}")
+                                st.warning(f"No data available for {selected_area}")
                     
                     except Exception as e:
-                        st.error(f"Error processing file: {str(e)}")
-                        import traceback
-                        st.error(f"Error details: {traceback.format_exc()}")
+                        st.error(f"Error: {str(e)}")
                 
                 else:
                     st.error(f"❌ File not found: {file_path}")
             
             if __name__ == "__main__":
                 main()
+
         with main_tabs[1]:
             sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
             
