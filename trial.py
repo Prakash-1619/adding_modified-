@@ -1437,7 +1437,7 @@ elif page == "V2.1":
     # --- EDA & Feature Engineering Tab ---
     if sidebar_option == "📊 EDA & Feature Engineering":
         #st.header("📊 EDA & Feature Engineering")
-    
+        
         main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis", "Area-wise Analysis"])
         
         # =========================
@@ -1451,9 +1451,9 @@ elif page == "V2.1":
             from plotly.subplots import make_subplots
             import os
             
-            def create_time_series_plot(df, time_period):
+            def create_time_period_column(df, time_period):
                 """
-                Create a time series plot based on selected time period with record counts
+                Create time period column for the dataframe
                 """
                 df = df.copy()
                 df['instance_date'] = pd.to_datetime(df['instance_date'])
@@ -1461,36 +1461,38 @@ elif page == "V2.1":
                 if time_period == 'Daily':
                     df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
                     df['sort_key'] = df['instance_date']
-                    title_suffix = 'Day'
                     
                 elif time_period == 'Weekly':
                     df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
                     df['sort_key'] = df['instance_date'].dt.to_period('W')
-                    title_suffix = 'Week'
                     
                 elif time_period == 'Monthly':
                     df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
                     df['sort_key'] = df['instance_date'].dt.to_period('M')
-                    title_suffix = 'Month'
                     
                 elif time_period == 'Quarterly':
                     df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
                     df['sort_key'] = df['instance_date'].dt.to_period('Q')
-                    title_suffix = 'Quarter'
                     
                 elif time_period == 'Half-Yearly':
                     df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
                     df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
                     df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
-                    title_suffix = 'Half-Year'
                     
                 elif time_period == 'Yearly':
                     df['time_period'] = df['instance_date'].dt.strftime('%Y')
                     df['sort_key'] = df['instance_date'].dt.to_period('Y')
-                    title_suffix = 'Year'
+                
+                return df
+            
+            def create_time_series_plot(df, time_period):
+                """
+                Create a time series plot based on selected time period with record counts
+                """
+                df_with_period = create_time_period_column(df, time_period)
                 
                 # Group by time period and calculate both average price and record count
-                period_stats = df.groupby(['time_period', 'sort_key']).agg({
+                period_stats = df_with_period.groupby(['time_period', 'sort_key']).agg({
                     'meter_sale_price': ['mean', 'count'],
                     'instance_date': 'first'
                 }).reset_index()
@@ -1498,35 +1500,121 @@ elif page == "V2.1":
                 period_stats.columns = ['time_period', 'sort_key', 'meter_sale_price', 'record_count', 'first_date']
                 period_stats = period_stats.sort_values('sort_key')
                 
+                # Get title suffix
+                title_suffix = {
+                    'Daily': 'Day', 'Weekly': 'Week', 'Monthly': 'Month', 
+                    'Quarterly': 'Quarter', 'Half-Yearly': 'Half-Year', 'Yearly': 'Year'
+                }[time_period]
+                
                 return period_stats, title_suffix
             
-            def create_time_period_column(df, time_period):
+            def create_combined_plot(df, time_period, title_suffix):
                 """
-                Create time period column for boxplot analysis
+                Create a combined plot with time series and boxplots
                 """
-                df = df.copy()
-                df['instance_date'] = pd.to_datetime(df['instance_date'])
+                df_with_period = create_time_period_column(df, time_period)
                 
-                if time_period == 'Daily':
-                    df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
-                    
-                elif time_period == 'Weekly':
-                    df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
-                    
-                elif time_period == 'Monthly':
-                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
-                    
-                elif time_period == 'Quarterly':
-                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
-                    
-                elif time_period == 'Half-Yearly':
-                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
-                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
-                    
-                elif time_period == 'Yearly':
-                    df['time_period'] = df['instance_date'].dt.strftime('%Y')
+                # Limit the number of periods for better visualization
+                unique_periods = df_with_period['time_period'].unique()
+                if len(unique_periods) > 12:
+                    # Take the most recent periods
+                    recent_periods = df_with_period.groupby('time_period')['instance_date'].max().nlargest(12).index
+                    df_plot = df_with_period[df_with_period['time_period'].isin(recent_periods)]
+                else:
+                    df_plot = df_with_period
                 
-                return df
+                # Calculate average prices for line plot
+                period_avg = df_plot.groupby(['time_period', 'sort_key'])['meter_sale_price'].mean().reset_index()
+                period_avg = period_avg.sort_values('sort_key')
+                
+                # Calculate record counts
+                period_count = df_plot.groupby(['time_period', 'sort_key']).size().reset_index(name='record_count')
+                period_count = period_count.sort_values('sort_key')
+                
+                # Create subplot with 3 rows: Time series, Boxplot, Record count
+                fig = make_subplots(
+                    rows=3, cols=1,
+                    subplot_titles=(
+                        f'Average Price Trend by {title_suffix}',
+                        f'Price Distribution by {title_suffix}',
+                        f'Record Count by {title_suffix}'
+                    ),
+                    vertical_spacing=0.08,
+                    shared_xaxes=True,
+                    row_heights=[0.4, 0.4, 0.2]
+                )
+                
+                # 1. Time series line plot (row 1)
+                fig.add_trace(
+                    go.Scatter(
+                        x=period_avg['time_period'],
+                        y=period_avg['meter_sale_price'],
+                        name='Average Price',
+                        mode='lines+markers',
+                        line=dict(color='blue', width=3),
+                        marker=dict(size=8, color='blue')
+                    ),
+                    row=1, col=1
+                )
+                
+                # Add trendline
+                period_avg['trend'] = period_avg['meter_sale_price'].rolling(window=2, min_periods=1).mean()
+                fig.add_trace(
+                    go.Scatter(
+                        x=period_avg['time_period'],
+                        y=period_avg['trend'],
+                        name='Trend Line',
+                        mode='lines',
+                        line=dict(dash='dash', color='red', width=2)
+                    ),
+                    row=1, col=1
+                )
+                
+                # 2. Boxplot (row 2)
+                # Create boxplot data
+                for period in df_plot['time_period'].unique():
+                    period_data = df_plot[df_plot['time_period'] == period]['meter_sale_price']
+                    fig.add_trace(
+                        go.Box(
+                            y=period_data,
+                            name=period,
+                            boxpoints=False,  # Remove individual points to reduce clutter
+                            marker_color='lightblue',
+                            line_color='darkblue',
+                            showlegend=False
+                        ),
+                        row=2, col=1
+                    )
+                
+                # 3. Record count bar plot (row 3)
+                fig.add_trace(
+                    go.Bar(
+                        x=period_count['time_period'],
+                        y=period_count['record_count'],
+                        name='Record Count',
+                        marker_color='green',
+                        opacity=0.7,
+                        showlegend=False
+                    ),
+                    row=3, col=1
+                )
+                
+                # Update layout
+                fig.update_layout(
+                    height=900,
+                    title_text=f"Complete Analysis by {title_suffix}",
+                    hovermode='x unified',
+                    showlegend=True
+                )
+                
+                # Update axes
+                fig.update_xaxes(title_text=title_suffix, row=3, col=1)
+                fig.update_yaxes(title_text="Average Price", row=1, col=1)
+                fig.update_yaxes(title_text="Price Distribution", row=2, col=1)
+                fig.update_yaxes(title_text="Record Count", row=3, col=1)
+                fig.update_xaxes(tickangle=45, row=3, col=1)
+                
+                return fig
             
             def main():
                 st.markdown("Analyze average meter sale prices across different time periods")
@@ -1534,8 +1622,8 @@ elif page == "V2.1":
                 # Dataset selection in sidebar
                 st.sidebar.header("Dataset Selection")
                 dataset_options = {
-                    "Actual_data": "over_all_dataset.csv",
-                    "Areas_with_6000": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
+                    "Dataset 1": "df_trained_dataset_6000.csv",
+                    "Dataset 2": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
                 }
                 
                 selected_dataset = st.sidebar.selectbox(
@@ -1556,15 +1644,8 @@ elif page == "V2.1":
                         
                         if missing_columns:
                             st.error(f"Missing required columns: {', '.join(missing_columns)}")
+                            st.write("Available columns:", list(df.columns))
                             return
-                        
-                        # Display basic info
-                        st.sidebar.header("Data Overview")
-                        st.sidebar.write(f"Dataset: {selected_dataset}")
-                        st.sidebar.write(f"Total records: {len(df):,}")
-                        st.sidebar.write(f"Date range: {df['instance_date'].min()} to {df['instance_date'].max()}")
-                        st.sidebar.write(f"Areas: {df['area_name_en'].nunique()}")
-                        st.sidebar.write(f"Average price: {df['meter_sale_price'].mean():.2f}")
                         
                         # Create two tabs: Whole Data and Area-wise
                         analysis_tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
@@ -1606,65 +1687,16 @@ elif page == "V2.1":
                             
                             # Process data for whole data tab
                             if len(df_filtered_whole) > 0:
-                                processed_df_whole, title_suffix_whole = create_time_series_plot(df_filtered_whole, time_period_whole)
+                                # Get title suffix
+                                title_suffix = {
+                                    'Daily': 'Day', 'Weekly': 'Week', 'Monthly': 'Month', 
+                                    'Quarterly': 'Quarter', 'Half-Yearly': 'Half-Year', 'Yearly': 'Year'
+                                }[time_period_whole]
                                 
-                                # Create dual-axis plot for price and record count
-                                fig_whole = make_subplots(
-                                    rows=1, cols=1,
-                                    specs=[[{"secondary_y": True}]]
-                                )
-                                
-                                # Add price line
-                                fig_whole.add_trace(
-                                    go.Scatter(
-                                        x=processed_df_whole['time_period'],
-                                        y=processed_df_whole['meter_sale_price'],
-                                        name='Average Price',
-                                        mode='lines+markers',
-                                        line=dict(color='blue', width=3),
-                                        marker=dict(size=6)
-                                    ),
-                                    secondary_y=False
-                                )
-                                
-                                # Add record count bars
-                                fig_whole.add_trace(
-                                    go.Bar(
-                                        x=processed_df_whole['time_period'],
-                                        y=processed_df_whole['record_count'],
-                                        name='Record Count',
-                                        marker_color='lightblue',
-                                        opacity=0.7
-                                    ),
-                                    secondary_y=True
-                                )
-                                
-                                # Add trendline for price
-                                processed_df_whole['price_trend'] = processed_df_whole['meter_sale_price'].rolling(window=3, min_periods=1).mean()
-                                fig_whole.add_trace(
-                                    go.Scatter(
-                                        x=processed_df_whole['time_period'],
-                                        y=processed_df_whole['price_trend'],
-                                        name='Price Trend (3-period MA)',
-                                        mode='lines',
-                                        line=dict(dash='dash', color='red', width=2)
-                                    ),
-                                    secondary_y=False
-                                )
-                                
-                                fig_whole.update_layout(
-                                    title=f'Overall Price Trend and Record Count by {title_suffix_whole}',
-                                    xaxis_title=title_suffix_whole,
-                                    hovermode='x unified',
-                                    height=500,
-                                    showlegend=True
-                                )
-                                
-                                fig_whole.update_yaxes(title_text="Average Price", secondary_y=False)
-                                fig_whole.update_yaxes(title_text="Number of Records", secondary_y=True)
-                                fig_whole.update_xaxes(tickangle=45)
-                                
-                                st.plotly_chart(fig_whole, use_container_width=True)
+                                # Create combined plot
+                                st.subheader(f"Combined Analysis by {title_suffix}")
+                                combined_fig = create_combined_plot(df_filtered_whole, time_period_whole, title_suffix)
+                                st.plotly_chart(combined_fig, use_container_width=True)
                                 
                                 # Display summary statistics
                                 st.subheader("Summary Statistics")
@@ -1679,70 +1711,16 @@ elif page == "V2.1":
                                     price_std = df_filtered_whole['meter_sale_price'].std()
                                     st.metric("Price Std Dev", f"{price_std:.2f}")
                                 with col4:
-                                    total_period_records = processed_df_whole['record_count'].sum()
-                                    st.metric("Period Records", total_period_records)
+                                    min_price = df_filtered_whole['meter_sale_price'].min()
+                                    st.metric("Min Price", f"{min_price:.2f}")
                                 with col5:
-                                    avg_records_period = processed_df_whole['record_count'].mean()
-                                    st.metric("Avg Records/Period", f"{avg_records_period:.1f}")
-                                
-                                # Boxplot Section - Boxplot for each time period
-                                st.subheader(f"Price Distribution by {title_suffix_whole}")
-                                
-                                # Add time period column to filtered data for boxplot
-                                df_boxplot = create_time_period_column(df_filtered_whole, time_period_whole)
-                                
-                                # Limit the number of periods for better visualization
-                                unique_periods = df_boxplot['time_period'].unique()
-                                if len(unique_periods) > 20:
-                                    st.warning(f"Showing boxplot for first 20 {title_suffix_whole.lower()}s (too many periods for clear visualization)")
-                                    # Take the most recent 20 periods
-                                    recent_periods = df_boxplot.groupby('time_period')['instance_date'].max().nlargest(20).index
-                                    df_boxplot_limited = df_boxplot[df_boxplot['time_period'].isin(recent_periods)]
-                                else:
-                                    df_boxplot_limited = df_boxplot
-                                
-                                # Create boxplot
-                                fig_box = px.box(
-                                    df_boxplot_limited, 
-                                    x='time_period', 
-                                    y='meter_sale_price',
-                                    title=f'Price Distribution by {title_suffix_whole}',
-                                    height=500
-                                )
-                                fig_box.update_layout(
-                                    xaxis_title=title_suffix_whole,
-                                    yaxis_title='Meter Sale Price',
-                                    xaxis_tickangle=45
-                                )
-                                st.plotly_chart(fig_box, use_container_width=True)
-                                
-                                # Histogram Section
-                                st.subheader("Overall Price Distribution Histogram")
-                                fig_hist = px.histogram(
-                                    df_filtered_whole, 
-                                    x='meter_sale_price',
-                                    title='Overall Price Distribution',
-                                    nbins=50,
-                                    height=400
-                                )
-                                fig_hist.update_layout(showlegend=False)
-                                st.plotly_chart(fig_hist, use_container_width=True)
+                                    max_price = df_filtered_whole['meter_sale_price'].max()
+                                    st.metric("Max Price", f"{max_price:.2f}")
                                 
                                 # Additional statistics
                                 st.subheader("Detailed Price Statistics")
                                 price_stats = df_filtered_whole['meter_sale_price'].describe()
                                 st.dataframe(price_stats.round(2), use_container_width=True)
-                                
-                                # Display detailed record count table
-                                st.subheader("Time Period Summary")
-                                record_summary = processed_df_whole[['time_period', 'meter_sale_price', 'record_count']].copy()
-                                record_summary = record_summary.rename(columns={
-                                    'time_period': title_suffix_whole,
-                                    'meter_sale_price': 'Average Price',
-                                    'record_count': 'Record Count'
-                                })
-                                record_summary['Cumulative Records'] = record_summary['Record Count'].cumsum()
-                                st.dataframe(record_summary.round(2), use_container_width=True)
                         
                         # =========================
                         # AREA-WISE TAB
@@ -1793,156 +1771,48 @@ elif page == "V2.1":
                             
                             # Process data for area-wise tab
                             if len(df_area) > 0:
-                                processed_df_area, title_suffix_area = create_time_series_plot(df_area, time_period_area)
+                                # Get title suffix
+                                title_suffix_area = {
+                                    'Daily': 'Day', 'Weekly': 'Week', 'Monthly': 'Month', 
+                                    'Quarterly': 'Quarter', 'Half-Yearly': 'Half-Year', 'Yearly': 'Year'
+                                }[time_period_area]
                                 
-                                # Create visualization based on whether it's single area or all areas
+                                # Create combined plot for area-wise analysis
                                 if selected_area_single == "All Areas":
-                                    # For all areas - use subplots
-                                    fig_area = make_subplots(
-                                        rows=2, cols=1,
-                                        subplot_titles=(f'Average Meter Sale Price by {title_suffix_area}', f'Number of Records by {title_suffix_area}'),
-                                        vertical_spacing=0.1,
-                                        shared_xaxes=True
-                                    )
-                                    
-                                    # Group by area for multiple areas view
-                                    areas_data = df_area.groupby(['area_name_en', 'time_period', 'sort_key']).agg({
-                                        'meter_sale_price': 'mean',
-                                        'instance_date': 'count'
-                                    }).reset_index()
-                                    areas_data = areas_data.rename(columns={'instance_date': 'record_count'})
-                                    areas_data = areas_data.sort_values('sort_key')
-                                    
-                                    areas_in_data = areas_data['area_name_en'].unique()
-                                    for area in areas_in_data:
-                                        area_data = areas_data[areas_data['area_name_en'] == area]
-                                        
-                                        # Price plot
-                                        fig_area.add_trace(
-                                            go.Scatter(
-                                                x=area_data['time_period'],
-                                                y=area_data['meter_sale_price'],
-                                                name=f'{area} - Price',
-                                                mode='lines+markers',
-                                                legendgroup=area
-                                            ),
-                                            row=1, col=1
-                                        )
-                                        
-                                        # Record count plot
-                                        fig_area.add_trace(
-                                            go.Bar(
-                                                x=area_data['time_period'],
-                                                y=area_data['record_count'],
-                                                name=f'{area} - Records',
-                                                legendgroup=area,
-                                                showlegend=False,
-                                                opacity=0.7
-                                            ),
-                                            row=2, col=1
-                                        )
-                                    
+                                    st.subheader(f"Combined Analysis for All Areas by {title_suffix_area}")
                                 else:
-                                    # For single area - create dual y-axis plot
-                                    fig_area = make_subplots(
-                                        rows=1, cols=1,
-                                        specs=[[{"secondary_y": True}]]
-                                    )
-                                    
-                                    # Add price line
-                                    fig_area.add_trace(
-                                        go.Scatter(
-                                            x=processed_df_area['time_period'],
-                                            y=processed_df_area['meter_sale_price'],
-                                            name='Average Price',
-                                            mode='lines+markers',
-                                            line=dict(color='blue')
-                                        ),
-                                        secondary_y=False
-                                    )
-                                    
-                                    # Add record count bars
-                                    fig_area.add_trace(
-                                        go.Bar(
-                                            x=processed_df_area['time_period'],
-                                            y=processed_df_area['record_count'],
-                                            name='Record Count',
-                                            marker_color='lightblue',
-                                            opacity=0.7
-                                        ),
-                                        secondary_y=True
-                                    )
-                                    
-                                    # Add trendline for single area
-                                    processed_df_area['trend'] = processed_df_area['meter_sale_price'].rolling(window=3, min_periods=1).mean()
-                                    fig_area.add_trace(
-                                        go.Scatter(
-                                            x=processed_df_area['time_period'],
-                                            y=processed_df_area['trend'],
-                                            name='Price Trend (3-period MA)',
-                                            mode='lines',
-                                            line=dict(dash='dash', color='red')
-                                        ),
-                                        secondary_y=False
-                                    )
+                                    st.subheader(f"Combined Analysis for {selected_area_single} by {title_suffix_area}")
                                 
-                                if selected_area_single == "All Areas":
-                                    fig_area.update_layout(
-                                        height=700,
-                                        title_text=f"Price Trend and Record Count by {title_suffix_area} - All Areas",
-                                        hovermode='x unified',
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                                    )
-                                    fig_area.update_xaxes(title_text=title_suffix_area, row=2, col=1)
-                                    fig_area.update_yaxes(title_text="Average Price", row=1, col=1)
-                                    fig_area.update_yaxes(title_text="Number of Records", row=2, col=1)
-                                else:
-                                    fig_area.update_layout(
-                                        title=f'Price Trend and Record Count in {selected_area_single} by {title_suffix_area}',
-                                        xaxis_title=title_suffix_area,
-                                        hovermode='x unified',
-                                        height=500
-                                    )
-                                    fig_area.update_yaxes(title_text="Average Price", secondary_y=False)
-                                    fig_area.update_yaxes(title_text="Number of Records", secondary_y=True)
+                                combined_fig_area = create_combined_plot(df_area, time_period_area, title_suffix_area)
+                                st.plotly_chart(combined_fig_area, use_container_width=True)
                                 
-                                fig_area.update_xaxes(tickangle=45)
-                                st.plotly_chart(fig_area, use_container_width=True)
+                                # Display detailed statistics for selected area
+                                st.subheader("Area Details")
                                 
-                                # Boxplot for Area-wise analysis
                                 if selected_area_single != "All Areas":
-                                    st.subheader(f"Price Distribution by {title_suffix_area} in {selected_area_single}")
+                                    col1, col2, col3, col4, col5 = st.columns(5)
                                     
-                                    # Add time period column for boxplot
-                                    df_area_boxplot = create_time_period_column(df_area, time_period_area)
+                                    area_data = df[df['area_name_en'] == selected_area_single]
                                     
-                                    # Limit periods if too many
-                                    unique_periods_area = df_area_boxplot['time_period'].unique()
-                                    if len(unique_periods_area) > 15:
-                                        st.warning(f"Showing boxplot for first 15 {title_suffix_area.lower()}s")
-                                        recent_periods_area = df_area_boxplot.groupby('time_period')['instance_date'].max().nlargest(15).index
-                                        df_area_boxplot_limited = df_area_boxplot[df_area_boxplot['time_period'].isin(recent_periods_area)]
-                                    else:
-                                        df_area_boxplot_limited = df_area_boxplot
-                                    
-                                    # Create boxplot
-                                    fig_box_area = px.box(
-                                        df_area_boxplot_limited, 
-                                        x='time_period', 
-                                        y='meter_sale_price',
-                                        title=f'Price Distribution by {title_suffix_area} in {selected_area_single}',
-                                        height=500
-                                    )
-                                    fig_box_area.update_layout(
-                                        xaxis_title=title_suffix_area,
-                                        yaxis_title='Meter Sale Price',
-                                        xaxis_tickangle=45
-                                    )
-                                    st.plotly_chart(fig_box_area, use_container_width=True)
+                                    with col1:
+                                        st.metric("Total Records in Area", len(area_data))
+                                    with col2:
+                                        area_avg = area_data['meter_sale_price'].mean()
+                                        st.metric("Area Average Price", f"{area_avg:.2f}")
+                                    with col3:
+                                        area_std = area_data['meter_sale_price'].std()
+                                        st.metric("Price Std Dev", f"{area_std:.2f}")
+                                    with col4:
+                                        area_min = area_data['meter_sale_price'].min()
+                                        st.metric("Min Price", f"{area_min:.2f}")
+                                    with col5:
+                                        area_max = area_data['meter_sale_price'].max()
+                                        st.metric("Max Price", f"{area_max:.2f}")
                     
                     except Exception as e:
                         st.error(f"Error processing file: {str(e)}")
-                        st.error(f"Error details: {str(e)}")
+                        import traceback
+                        st.error(f"Error details: {traceback.format_exc()}")
                 
                 else:
                     st.error(f"❌ File not found: {file_path}")
