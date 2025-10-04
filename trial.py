@@ -2162,7 +2162,45 @@ if sidebar_option == "📈 Model Results":
             import plotly.graph_objects as go
             
             # =========================
-            # 8️⃣ LOAD DATA FOR FORECASTING TAB
+            # INITIALIZATION & SETUP
+            # =========================
+            
+            # Initialize session state for models if not exists
+            if 'area_models' not in st.session_state:
+                st.session_state.area_models = {}
+            if 'ohe' not in st.session_state:
+                st.session_state.ohe = None
+            
+            # Define global variables (you'll need to adjust these paths)
+            file_path = "test_samples_forecast.csv"  # Update with your actual file path
+            drop_col = ['Unnamed: 0']  # Update with columns to drop
+            
+            # Load models and preprocessing objects
+            @st.cache_resource
+            def load_models_and_preprocessing():
+                """Load trained models and preprocessing objects"""
+                try:
+                    # Load area models
+                    area_models = {}
+                    # Add your model loading logic here
+                    # Example:
+                    # with open('model_area1.pkl', 'rb') as f:
+                    #     area_models['Area1'] = pickle.load(f)
+                    
+                    # Load OHE transformer
+                    with open("ohe_transformer.pkl", "rb") as f:
+                        ohe = pickle.load(f)
+                        
+                    return area_models, ohe
+                except Exception as e:
+                    st.error(f"Error loading models: {str(e)}")
+                    return {}, None
+            
+            # Load models and preprocessing
+            area_models, ohe = load_models_and_preprocessing()
+            
+            # =========================
+            # LOAD DATA FOR FORECASTING TAB
             # =========================
             @st.cache_data
             def load_forecasting_data():
@@ -2171,7 +2209,6 @@ if sidebar_option == "📈 Model Results":
                     # Load test data for forecasting
                     test_samples_forecast = pd.read_csv(file_path)
                     test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
-                    st.dataframe(test_samples_forecast)
                     
                     # Remove unwanted columns
                     columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']
@@ -2191,21 +2228,21 @@ if sidebar_option == "📈 Model Results":
                     growth_lower_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_lower').reset_index()
                     growth_upper_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
                     
-                    # Load and prepare historical quarterly **average** prices from training data
+                    # Load and prepare historical quarterly mean prices from training data
                     train_data = pd.read_csv("df_trained_dataset_6000.csv")
                     train_data['instance_date'] = pd.to_datetime(train_data['instance_date'])
                     train_data['year_quarter'] = train_data['instance_date'].dt.year.astype(str) + '-Q' + train_data['instance_date'].dt.quarter.astype(str)
                     
-                    # Calculate **average** prices per area per quarter
-                    historical_avg = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].mean().reset_index()
-                    historical_pivot = historical_avg.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
+                    # Calculate mean prices per area per quarter
+                    historical_mean = train_data.groupby(['area_name_en', 'year_quarter'])['meter_sale_price'].mean().reset_index()
+                    historical_pivot = historical_mean.pivot(index='area_name_en', columns='year_quarter', values='meter_sale_price').reset_index()
                     
                     # Overall historical trends
-                    overall_historical_avg = train_data.groupby(['year_quarter'])['meter_sale_price'].mean().reset_index()
-                    overall_historical_pivot = overall_historical_avg.set_index('year_quarter')['meter_sale_price'].to_dict()
+                    overall_historical_mean = train_data.groupby(['year_quarter'])['meter_sale_price'].mean().reset_index()
+                    overall_historical_pivot = overall_historical_mean.set_index('year_quarter')['meter_sale_price'].to_dict()
                     
                     # Get recent quarters
-                    recent_quarters = sorted(historical_avg['year_quarter'].unique())
+                    recent_quarters = sorted(historical_mean['year_quarter'].unique())
                     historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
                     
                     return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, growth_lower_pivot, growth_upper_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot
@@ -2310,11 +2347,11 @@ if sidebar_option == "📈 Model Results":
                     pred_df = pd.concat(pred_list)
                     overall_pred_df = pd.concat(overall_predictions)
                     
-                    # Feature-wise **mean** grouping
+                    # Feature-wise MEAN grouping
                     group_cols = ['area_name_en'] + grouping_features
                     mean_pred_group = pred_df.groupby(group_cols)['prediction'].mean().reset_index()
                     
-                    # Overall trend (mean)
+                    # Overall trend (MEAN)
                     overall_mean = overall_pred_df.groupby(['area_name_en'])['prediction'].mean().reset_index()
                     
                     # Merge with growth factors
@@ -2348,273 +2385,327 @@ if sidebar_option == "📈 Model Results":
                             overall_forecast_lower_df[q] = overall_forecast_lower_df['prediction'] * overall_forecast_lower_df[q]
                             overall_forecast_upper_df[q] = overall_forecast_upper_df['prediction'] * overall_forecast_upper_df[q]
             
-            # =========================
-            # Visualization code
-            # =========================
-            # =========================
-            # 1️⃣1️⃣ FORECASTING VISUALIZATIONS
-            # =========================
-            st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
+                    # Final forecast with historical data
+                    all_quarter_cols = []
+                    if show_historical and historical_pivot is not None:
+                        available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
+                        selected_historical = available_historical[-num_historical_quarters:]
+                        all_quarter_cols = selected_historical + ['prediction'] + future_quarter_cols
+                    else:
+                        all_quarter_cols = ['prediction'] + future_quarter_cols
+                    
+                    final_forecast = forecast_df[group_cols + all_quarter_cols]
+                    final_forecast_lower = forecast_lower_df[group_cols + all_quarter_cols]
+                    final_forecast_upper = forecast_upper_df[group_cols + all_quarter_cols]
+                    
+                    final_overall_forecast = overall_forecast_df[['area_name_en'] + all_quarter_cols]
+                    final_overall_forecast_lower = overall_forecast_lower_df[['area_name_en'] + all_quarter_cols]
+                    final_overall_forecast_upper = overall_forecast_upper_df[['area_name_en'] + all_quarter_cols]
             
-            st.subheader("📈 Forecast Visualizations")
+                # =========================
+                # VISUALIZATIONS
+                # =========================
+                st.success(f"✅ Forecast generated for {len(final_forecast)} feature combinations")
             
-            # Helper function for formatting quarters
-            def format_quarter_label(quarter_str):
-                if '-' in quarter_str:
-                    parts = quarter_str.split('-')
-                    if len(parts) == 2:
-                        return f"{parts[0]} {parts[1]}"
-                return quarter_str.replace('_', ' ').title()
+                st.subheader("📈 Forecast Visualizations")
             
-            # Helper function to prepare forecast data for plotting from a DataFrame row
-            def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical):
-                time_periods = []
-                prices = []
+                # Helper function for formatting quarters
+                def format_quarter_label(quarter_str):
+                    if '-' in quarter_str:
+                        parts = quarter_str.split('-')
+                        if len(parts) == 2:
+                            return f"{parts[0]} {parts[1]}"
+                    return quarter_str.replace('_', ' ').title()
             
-                # Add historical quarters
-                if show_historical:
-                    historical_cols = [col for col in selected_historical if col in forecast_row.index and pd.notna(forecast_row[col])]
-                    for hq in historical_cols:
-                        time_periods.append(format_quarter_label(hq))
-                        prices.append(forecast_row[hq])
+                # Helper function to prepare forecast data for plotting from a DataFrame row
+                def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical):
+                    time_periods = []
+                    prices = []
             
-                # Add current prediction
-                time_periods.append('Current')
-                prices.append(forecast_row['prediction'])
+                    # Add historical quarters
+                    if show_historical:
+                        historical_cols = [col for col in selected_historical if col in forecast_row.index and pd.notna(forecast_row[col])]
+                        for hq in historical_cols:
+                            time_periods.append(format_quarter_label(hq))
+                            prices.append(forecast_row[hq])
             
-                # Add future quarters
-                for fq in future_quarter_cols:
-                    if fq in forecast_row.index and pd.notna(forecast_row[fq]):
-                        time_periods.append(format_quarter_label(fq))
-                        prices.append(forecast_row[fq])
+                    # Add current prediction
+                    time_periods.append('Current')
+                    prices.append(forecast_row['prediction'])
             
-                return time_periods, prices
+                    # Add future quarters
+                    for fq in future_quarter_cols:
+                        if fq in forecast_row.index and pd.notna(forecast_row[fq]):
+                            time_periods.append(format_quarter_label(fq))
+                            prices.append(forecast_row[fq])
             
-            # 1️⃣ Overall Market Trend
-            if show_overall_trend:
-                st.markdown("### 🌐 Overall Market Trend - All Scenarios")
-                fig_overall = go.Figure()
+                    return time_periods, prices
             
-                # Historical overall mean trend
-                if show_historical and overall_historical_pivot:
-                    historical_quarters_sorted = sorted([q for q in overall_historical_pivot.keys() if q in historical_quarters])
-                    historical_prices = [overall_historical_pivot[q] for q in historical_quarters_sorted]
-                    historical_labels = [format_quarter_label(q) for q in historical_quarters_sorted]
+                # 1️⃣ Overall Market Trend - FIXED VERSION
+                if show_overall_trend:
+                    st.markdown("### 🌐 Overall Market Trend - All Scenarios")
+                    fig_overall = go.Figure()
             
-                    fig_overall.add_trace(go.Scatter(
-                        x=historical_labels,
-                        y=historical_prices,
-                        mode='lines+markers',
-                        name='Historical Overall Mean',
-                        line=dict(color='blue', width=4, dash='solid'),
-                        marker=dict(size=8)
-                    ))
-            
-                # Add forecast scenarios (Base, Lower, Upper)
-                scenarios = [
-                    (final_overall_forecast, 'Base Scenario', 'red', 'solid'),
-                    (final_overall_forecast_lower, 'Lower Bound', 'orange', 'dot'),
-                    (final_overall_forecast_upper, 'Upper Bound', 'green', 'dash')
-                ]
-            
-                for scenario_df, scenario_name, color, dash_style in scenarios:
-                    future_prices = []
-                    valid_future_quarters = []
-            
-                    for area in selected_areas_forecast:
-                        area_data = scenario_df[scenario_df['area_name_en'] == area]
-                        if not area_data.empty:
-                            area_future_prices = []
-                            for q in future_quarter_cols:
-                                if q in area_data.columns and pd.notna(area_data[q].iloc[0]):
-                                    area_future_prices.append(area_data[q].iloc[0])
-                                    if q not in valid_future_quarters:
-                                        valid_future_quarters.append(q)
-                            if area_future_prices:
-                                future_prices.append(area_future_prices)
-            
-                    if future_prices:
-                        max_len = max(len(prices) for prices in future_prices)
-                        padded_prices = []
-                        for prices in future_prices:
-                            if len(prices) < max_len:
-                                padded_prices.append(prices + [np.nan] * (max_len - len(prices)))
-                            else:
-                                padded_prices.append(prices)
-            
-                        # Compute mean across areas for future quarters
-                        future_mean_prices = np.nanmean(padded_prices, axis=0)
-                        future_labels = [format_quarter_label(q) for q in valid_future_quarters]
-            
-                        # Combine historical + current + future
-                        time_periods = []
-                        overall_prices = []
-            
-                        if show_historical:
-                            time_periods.extend(historical_labels)
-                            overall_prices.extend(historical_prices)
-            
-                        # Current overall mean
-                        current_overall_mean = overall_pred_df['prediction'].mean()
-                        time_periods.append('Current')
-                        overall_prices.append(current_overall_mean)
-            
-                        time_periods.extend(future_labels)
-                        overall_prices.extend(future_mean_prices)
+                    # Historical overall mean trend - FIXED: Use consistent time periods
+                    if show_historical and overall_historical_pivot:
+                        # Get the same historical quarters that will be used in forecasts
+                        available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
+                        selected_historical = available_historical[-num_historical_quarters:]
+                        
+                        historical_quarters_sorted = sorted([q for q in overall_historical_pivot.keys() if q in selected_historical])
+                        historical_prices = [overall_historical_pivot[q] for q in historical_quarters_sorted]
+                        historical_labels = [format_quarter_label(q) for q in historical_quarters_sorted]
             
                         fig_overall.add_trace(go.Scatter(
-                            x=time_periods,
-                            y=overall_prices,
+                            x=historical_labels,
+                            y=historical_prices,
                             mode='lines+markers',
-                            name=scenario_name,
-                            line=dict(color=color, width=3, dash=dash_style),
+                            name='Historical Overall Mean',
+                            line=dict(color='blue', width=4, dash='solid'),
                             marker=dict(size=8)
                         ))
             
-                fig_overall.update_layout(
-                    title="Overall Market Price Trend & Forecast - All Scenarios",
-                    xaxis_title="Time Period",
-                    yaxis_title="Average Price (AED)",
-                    height=500,
-                    template="plotly_white",
-                    showlegend=True
-                )
-            
-                if show_historical:
-                    fig_overall.add_vline(
-                        x=len(historical_labels)-0.5,
-                        line_width=2,
-                        line_dash="dot",
-                        line_color="gray",
-                        annotation_text="Historical → Forecast"
-                    )
-            
-                st.plotly_chart(fig_overall, use_container_width=True)
-            
-            # 2️⃣ Area-wise Forecasts
-            for area in selected_areas_forecast:
-                area_data_base = final_forecast[final_forecast['area_name_en'] == area]
-                area_overall_base = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
-                area_overall_lower = final_overall_forecast_lower[final_overall_forecast_lower['area_name_en'] == area]
-                area_overall_upper = final_overall_forecast_upper[final_overall_forecast_upper['area_name_en'] == area]
-            
-                if area_data_base.empty:
-                    continue
-            
-                col1, col2 = st.columns(2)
-            
-                with col1:
-                    st.markdown(f"### 📊 {area} - Feature-wise Forecast (Base Scenario)")
-                    fig_features = go.Figure()
-                    for idx, (_, row) in enumerate(area_data_base.iterrows()):
-                        feature_label = ""
-                        for gf in grouping_features:
-                            if gf in row and row[gf] == 1:
-                                feature_label += f"{gf.replace('_', ' ').title()}, "
-                        feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
-            
-                        time_periods, prices = prepare_forecast_data(row, historical_quarters[-num_historical_quarters:], future_quarter_cols, show_historical)
-            
-                        fig_features.add_trace(go.Scatter(
-                            x=time_periods,
-                            y=prices,
-                            mode='lines+markers',
-                            name=feature_label,
-                            line=dict(width=3),
-                            marker=dict(size=6)
-                        ))
-            
-                    fig_features.update_layout(
-                        title=f"Feature-wise Forecast - {area} (Base Scenario)",
-                        xaxis_title="Time Period",
-                        yaxis_title="Average Price (AED)",
-                        height=400,
-                        template="plotly_white"
-                    )
-                    st.plotly_chart(fig_features, use_container_width=True)
-            
-                with col2:
-                    st.markdown(f"### 📈 {area} - Overall Trend (All Scenarios)")
-                    fig_overall_area = go.Figure()
+                    # Add forecast scenarios (Base, Lower, Upper) - FIXED: Use consistent time periods
                     scenarios = [
-                        (area_overall_base, 'Base Scenario', 'red', 'solid'),
-                        (area_overall_lower, 'Lower Bound', 'orange', 'dot'),
-                        (area_overall_upper, 'Upper Bound', 'green', 'dash')
+                        (final_overall_forecast, 'Base Scenario', 'red', 'solid'),
+                        (final_overall_forecast_lower, 'Lower Bound', 'orange', 'dot'),
+                        (final_overall_forecast_upper, 'Upper Bound', 'green', 'dash')
                     ]
             
                     for scenario_df, scenario_name, color, dash_style in scenarios:
-                        if not scenario_df.empty:
-                            row = scenario_df.iloc[0]
-                            time_periods, prices = prepare_forecast_data(row, historical_quarters[-num_historical_quarters:], future_quarter_cols, show_historical)
-                            fig_overall_area.add_trace(go.Scatter(
+                        future_prices = []
+                        valid_future_quarters = []
+            
+                        for area in selected_areas_forecast:
+                            area_data = scenario_df[scenario_df['area_name_en'] == area]
+                            if not area_data.empty:
+                                area_future_prices = []
+                                for q in future_quarter_cols:
+                                    if q in area_data.columns and pd.notna(area_data[q].iloc[0]):
+                                        area_future_prices.append(area_data[q].iloc[0])
+                                        if q not in valid_future_quarters:
+                                            valid_future_quarters.append(q)
+                                if area_future_prices:
+                                    future_prices.append(area_future_prices)
+            
+                        if future_prices:
+                            max_len = max(len(prices) for prices in future_prices)
+                            padded_prices = []
+                            for prices in future_prices:
+                                if len(prices) < max_len:
+                                    padded_prices.append(prices + [np.nan] * (max_len - len(prices)))
+                                else:
+                                    padded_prices.append(prices)
+            
+                            # Compute MEAN across areas for future quarters
+                            future_mean_prices = np.nanmean(padded_prices, axis=0)
+                            future_labels = [format_quarter_label(q) for q in valid_future_quarters]
+            
+                            # Combine historical + current + future - FIXED: Use consistent time periods
+                            time_periods = []
+                            overall_prices = []
+            
+                            if show_historical:
+                                time_periods.extend(historical_labels)
+                                overall_prices.extend(historical_prices)
+            
+                            # Current overall MEAN
+                            current_overall_mean = overall_pred_df['prediction'].mean()
+                            time_periods.append('Current')
+                            overall_prices.append(current_overall_mean)
+            
+                            time_periods.extend(future_labels)
+                            overall_prices.extend(future_mean_prices)
+            
+                            fig_overall.add_trace(go.Scatter(
                                 x=time_periods,
-                                y=prices,
+                                y=overall_prices,
                                 mode='lines+markers',
-                                name=f'{area} - {scenario_name}',
+                                name=scenario_name,
                                 line=dict(color=color, width=3, dash=dash_style),
                                 marker=dict(size=8)
                             ))
             
-                    fig_overall_area.update_layout(
-                        title=f"Overall Area Forecast - {area} (All Scenarios)",
+                    fig_overall.update_layout(
+                        title="Overall Market Price Trend & Forecast - All Scenarios",
                         xaxis_title="Time Period",
                         yaxis_title="Average Price (AED)",
-                        height=400,
-                        template="plotly_white"
+                        height=500,
+                        template="plotly_white",
+                        showlegend=True
                     )
-                    st.plotly_chart(fig_overall_area, use_container_width=True)
             
-            # 3️⃣ Market Comparison Heatmap
-            st.subheader("🔥 Market Comparison Heatmap (Base Scenario)")
-            heatmap_data = []
-            row_labels = []
-            time_periods_heatmap = []
+                    if show_historical:
+                        fig_overall.add_vline(
+                            x=len(historical_labels)-0.5,
+                            line_width=2,
+                            line_dash="dot",
+                            line_color="gray",
+                            annotation_text="Historical → Forecast"
+                        )
             
-            if show_historical:
-                historical_labels = [format_quarter_label(hq) for hq in historical_quarters[-num_historical_quarters:]]
-                time_periods_heatmap.extend(historical_labels)
-            time_periods_heatmap.append('Current')
-            future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
-            time_periods_heatmap.extend(future_labels)
+                    st.plotly_chart(fig_overall, use_container_width=True)
             
-            # Overall mean prices for heatmap
-            overall_prices_heatmap = []
-            if show_overall_trend:
-                if show_historical and overall_historical_pivot:
-                    for hq in historical_quarters[-num_historical_quarters:]:
-                        overall_prices_heatmap.append(overall_historical_pivot[hq])
-                current_overall_mean = overall_pred_df['prediction'].mean()
-                overall_prices_heatmap.append(current_overall_mean)
+                # 2️⃣ Area-wise Forecasts
+                for area in selected_areas_forecast:
+                    area_data_base = final_forecast[final_forecast['area_name_en'] == area]
+                    area_overall_base = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
+                    area_overall_lower = final_overall_forecast_lower[final_overall_forecast_lower['area_name_en'] == area]
+                    area_overall_upper = final_overall_forecast_upper[final_overall_forecast_upper['area_name_en'] == area]
             
-                future_prices_base = []
+                    if area_data_base.empty:
+                        continue
+            
+                    col1, col2 = st.columns(2)
+            
+                    with col1:
+                        st.markdown(f"### 📊 {area} - Feature-wise Forecast (Base Scenario)")
+                        fig_features = go.Figure()
+                        for idx, (_, row) in enumerate(area_data_base.iterrows()):
+                            feature_label = ""
+                            for gf in grouping_features:
+                                if gf in row and row[gf] == 1:
+                                    feature_label += f"{gf.replace('_', ' ').title()}, "
+                            feature_label = feature_label.rstrip(", ") or f"Config {idx+1}"
+            
+                            time_periods, prices = prepare_forecast_data(row, selected_historical, future_quarter_cols, show_historical)
+            
+                            fig_features.add_trace(go.Scatter(
+                                x=time_periods,
+                                y=prices,
+                                mode='lines+markers',
+                                name=feature_label,
+                                line=dict(width=3),
+                                marker=dict(size=6)
+                            ))
+            
+                        fig_features.update_layout(
+                            title=f"Feature-wise Forecast - {area} (Base Scenario)",
+                            xaxis_title="Time Period",
+                            yaxis_title="Average Price (AED)",
+                            height=400,
+                            template="plotly_white"
+                        )
+                        st.plotly_chart(fig_features, use_container_width=True)
+            
+                    with col2:
+                        st.markdown(f"### 📈 {area} - Overall Trend (All Scenarios)")
+                        fig_overall_area = go.Figure()
+                        scenarios = [
+                            (area_overall_base, 'Base Scenario', 'red', 'solid'),
+                            (area_overall_lower, 'Lower Bound', 'orange', 'dot'),
+                            (area_overall_upper, 'Upper Bound', 'green', 'dash')
+                        ]
+            
+                        for scenario_df, scenario_name, color, dash_style in scenarios:
+                            if not scenario_df.empty:
+                                row = scenario_df.iloc[0]
+                                time_periods, prices = prepare_forecast_data(row, selected_historical, future_quarter_cols, show_historical)
+                                fig_overall_area.add_trace(go.Scatter(
+                                    x=time_periods,
+                                    y=prices,
+                                    mode='lines+markers',
+                                    name=f'{area} - {scenario_name}',
+                                    line=dict(color=color, width=3, dash=dash_style),
+                                    marker=dict(size=8)
+                                ))
+            
+                        fig_overall_area.update_layout(
+                            title=f"Overall Area Forecast - {area} (All Scenarios)",
+                            xaxis_title="Time Period",
+                            yaxis_title="Average Price (AED)",
+                            height=400,
+                            template="plotly_white"
+                        )
+                        st.plotly_chart(fig_overall_area, use_container_width=True)
+            
+                # 3️⃣ Market Comparison Heatmap
+                st.subheader("🔥 Market Comparison Heatmap (Base Scenario)")
+                heatmap_data = []
+                row_labels = []
+                time_periods_heatmap = []
+            
+                if show_historical:
+                    historical_labels = [format_quarter_label(hq) for hq in selected_historical]
+                    time_periods_heatmap.extend(historical_labels)
+                time_periods_heatmap.append('Current')
+                future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
+                time_periods_heatmap.extend(future_labels)
+            
+                # Overall MEAN prices for heatmap
+                overall_prices_heatmap = []
+                if show_overall_trend:
+                    if show_historical and overall_historical_pivot:
+                        for hq in selected_historical:
+                            if hq in overall_historical_pivot:
+                                overall_prices_heatmap.append(overall_historical_pivot[hq])
+                    current_overall_mean = overall_pred_df['prediction'].mean()
+                    overall_prices_heatmap.append(current_overall_mean)
+            
+                    # Calculate future MEAN for base scenario
+                    future_prices_base = []
+                    for area in selected_areas_forecast:
+                        area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
+                        if not area_data.empty:
+                            area_future_prices = []
+                            for fq in future_quarter_cols:
+                                if fq in area_data.columns and pd.notna(area_data[fq].iloc[0]):
+                                    area_future_prices.append(area_data[fq].iloc[0])
+                            if area_future_prices:
+                                future_prices_base.append(area_future_prices)
+                    if future_prices_base:
+                        future_mean_prices = np.nanmean(future_prices_base, axis=0)
+                        overall_prices_heatmap.extend(future_mean_prices.tolist())
+            
+                    heatmap_data.append(overall_prices_heatmap)
+                    row_labels.append('Market Average')
+            
+                # Add area data to heatmap
                 for area in selected_areas_forecast:
                     area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == area]
                     if not area_data.empty:
-                        area_future_prices = []
+                        area_prices = []
+                        row = area_data.iloc[0]
+                        
+                        # Historical prices
+                        if show_historical:
+                            for hq in selected_historical:
+                                if hq in row and pd.notna(row[hq]):
+                                    area_prices.append(row[hq])
+                                else:
+                                    area_prices.append(np.nan)
+                        
+                        # Current price
+                        area_prices.append(row['prediction'])
+                        
+                        # Future prices
                         for fq in future_quarter_cols:
-                            if fq in area_data.columns and pd.notna(area_data[fq].iloc[0]):
-                                area_future_prices.append(area_data[fq].iloc[0])
-                        if area_future_prices:
-                            future_prices_base.append(area_future_prices)
-                if future_prices_base:
-                    future_mean_prices = np.nanmean(future_prices_base, axis=0)
-                    overall_prices_heatmap.extend(future_mean_prices.tolist())
+                            if fq in row and pd.notna(row[fq]):
+                                area_prices.append(row[fq])
+                            else:
+                                area_prices.append(np.nan)
+                        
+                        if len(area_prices) == len(time_periods_heatmap):
+                            heatmap_data.append(area_prices)
+                            row_labels.append(area)
             
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=[overall_prices_heatmap],
-                x=time_periods_heatmap,
-                y=['Market Average'],
-                colorscale='YlOrRd',
-                colorbar=dict(title='Average Price (AED)')
-            ))
-            fig_heatmap.update_layout(
-                title="Market Comparison Heatmap",
-                xaxis_title="Time Period",
-                yaxis_title="",
-                height=250,
-                template="plotly_white"
-            )
-            st.plotly_chart(fig_heatmap, use_container_width=True)
+                if heatmap_data:
+                    fig_heatmap = go.Figure(data=go.Heatmap(
+                        z=heatmap_data,
+                        x=time_periods_heatmap,
+                        y=row_labels,
+                        colorscale='YlOrRd',
+                        colorbar=dict(title='Average Price (AED)')
+                    ))
+                    fig_heatmap.update_layout(
+                        title="Market Comparison Heatmap (Base Scenario)",
+                        xaxis_title="Time Period",
+                        yaxis_title="",
+                        height=400,
+                        template="plotly_white"
+                    )
+                    st.plotly_chart(fig_heatmap, use_container_width=True)
+
 
 
 
