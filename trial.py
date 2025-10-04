@@ -2172,7 +2172,7 @@ if sidebar_option == "📈 Model Results":
                 st.session_state.ohe = None
             
             # Define global variables (you'll need to adjust these paths)
-            file_path = "test_data_20 areas_1.csv"  # Update with your actual file path
+            file_path = "test_data_20 areas_1.csv"  # Updated to your actual file
             drop_col = ['Unnamed: 0']  # Update with columns to drop
             
             # Load models and preprocessing objects
@@ -2206,8 +2206,8 @@ if sidebar_option == "📈 Model Results":
             def load_forecasting_data():
                 """Load forecasting-specific data"""
                 try:
-                    # Load test data for forecasting
-                    test_samples_forecast = pd.read_csv(file_path)
+                    # Load test data for forecasting - USING YOUR ACTUAL FILE
+                    test_samples_forecast = pd.read_csv("test_data_20 areas_1.csv")
                     test_samples_forecast = test_samples_forecast.drop(columns=[col for col in drop_col if col in test_samples_forecast.columns])
                     
                     # Remove unwanted columns
@@ -2705,6 +2705,8 @@ if sidebar_option == "📈 Model Results":
                         template="plotly_white"
                     )
                     st.plotly_chart(fig_heatmap, use_container_width=True)
+
+
 
 
 
