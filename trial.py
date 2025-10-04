@@ -1446,7 +1446,6 @@ elif page == "V2.1":
         with main_tabs[0]:
             import streamlit as st
             import pandas as pd
-            import plotly.express as px
             import plotly.graph_objects as go
             from plotly.subplots import make_subplots
             import os
@@ -1487,19 +1486,14 @@ elif page == "V2.1":
             
             def create_combined_plot(df, time_period, title_suffix, plot_key_suffix=""):
                 """
-                Create a combined plot with time series, boxplots, and record count
+                Create a combined plot with average price, counts, and boxplots
                 """
                 df_with_period = create_time_period_column(df, time_period)
                 
-                # Limit periods (max 12 for readability)
-                unique_periods = df_with_period['time_period'].unique()
-                if len(unique_periods) > 12:
-                    recent_periods = df_with_period.groupby('time_period')['instance_date'].max().nlargest(12).index
-                    df_plot = df_with_period[df_with_period['time_period'].isin(recent_periods)]
-                else:
-                    df_plot = df_with_period
+                # Use all periods, don’t limit to 12
+                df_plot = df_with_period
                 
-                # Calculate stats for line plot
+                # Calculate stats
                 period_stats = df_plot.groupby(['time_period', 'sort_key']).agg({
                     'meter_sale_price': 'mean',
                     'instance_date': 'count'
@@ -1507,7 +1501,7 @@ elif page == "V2.1":
                 period_stats.columns = ['time_period', 'sort_key', 'avg_meter_sale_price', 'record_count']
                 period_stats = period_stats.sort_values('sort_key')
                 
-                # Subplots: line, boxplot, bar
+                # Subplots: Avg price + Count (row1), Boxplot (row2), Record count bar (row3)
                 fig = make_subplots(
                     rows=3, cols=1,
                     subplot_titles=(
@@ -1521,7 +1515,7 @@ elif page == "V2.1":
                     specs=[[{"secondary_y": True}], [{}], [{}]]
                 )
                 
-                # 1. Time series line plot
+                # 1. Average Price (line + markers)
                 fig.add_trace(
                     go.Scatter(
                         x=period_stats['time_period'],
@@ -1533,6 +1527,7 @@ elif page == "V2.1":
                     row=1, col=1, secondary_y=False
                 )
                 
+                # 2. Record Count (line + markers, right axis)
                 fig.add_trace(
                     go.Scatter(
                         x=period_stats['time_period'],
@@ -1544,20 +1539,7 @@ elif page == "V2.1":
                     row=1, col=1, secondary_y=True
                 )
                 
-                # Add rolling trend line
-                period_stats['trend'] = period_stats['avg_meter_sale_price'].rolling(window=2, min_periods=1).mean()
-                fig.add_trace(
-                    go.Scatter(
-                        x=period_stats['time_period'],
-                        y=period_stats['trend'],
-                        name='Price Trend',
-                        mode='lines',
-                        line=dict(dash='dash', color='red', width=2)
-                    ),
-                    row=1, col=1, secondary_y=False
-                )
-                
-                # 2. Boxplots (time-series wise)
+                # 3. Boxplots
                 fig.add_trace(
                     go.Box(
                         x=df_plot['time_period'],
@@ -1571,7 +1553,7 @@ elif page == "V2.1":
                     row=2, col=1
                 )
                 
-                # 3. Record count bar plot
+                # 4. Record count bar
                 fig.add_trace(
                     go.Bar(
                         x=period_stats['time_period'],
@@ -1614,7 +1596,8 @@ elif page == "V2.1":
                 selected_dataset = st.sidebar.selectbox(
                     "Choose Dataset",
                     options=list(dataset_options.keys()),
-                    index=0
+                    index=0,
+                    key="dataset_select"
                 )
                 
                 file_path = dataset_options[selected_dataset]
@@ -1637,7 +1620,8 @@ elif page == "V2.1":
                             time_period_whole = st.selectbox(
                                 "Select Time Period",
                                 ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
-                                index=2
+                                index=2,
+                                key="whole_time_period"
                             )
                             
                             if len(df) > 0:
@@ -1665,12 +1649,13 @@ elif page == "V2.1":
                         with tabs[1]:
                             st.subheader("Individual Area Analysis")
                             areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
-                            selected_area = st.selectbox("Select Area", options=areas_all, index=0)
+                            selected_area = st.selectbox("Select Area", options=areas_all, index=0, key="area_select")
                             
                             time_period_area = st.selectbox(
                                 "Select Time Period",
                                 ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'],
-                                index=2
+                                index=2,
+                                key="area_time_period"
                             )
                             
                             if selected_area != "All Areas":
@@ -1714,6 +1699,7 @@ elif page == "V2.1":
             
             if __name__ == "__main__":
                 main()
+
 
         with main_tabs[1]:
             sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
