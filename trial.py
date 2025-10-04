@@ -2172,7 +2172,7 @@ if sidebar_option == "📈 Model Results":
                 st.session_state.ohe = None
             
             # Define global variables (you'll need to adjust these paths)
-            file_path = "test_samples_forecast.csv"  # Update with your actual file path
+            file_path = "test_data_20 areas_1.csv"  # Update with your actual file path
             drop_col = ['Unnamed: 0']  # Update with columns to drop
             
             # Load models and preprocessing objects
@@ -2188,7 +2188,7 @@ if sidebar_option == "📈 Model Results":
                     #     area_models['Area1'] = pickle.load(f)
                     
                     # Load OHE transformer
-                    with open("ohe_transformer.pkl", "rb") as f:
+                    with open("onehot_encoder.pkl", "rb") as f:
                         ohe = pickle.load(f)
                         
                     return area_models, ohe
