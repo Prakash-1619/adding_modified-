@@ -1436,9 +1436,8 @@ elif page == "V2.1":
         
     # --- EDA & Feature Engineering Tab ---
     if sidebar_option == "📊 EDA & Feature Engineering":
-
         #st.header("📊 EDA & Feature Engineering")
-        
+    
         main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis", "Area-wise Analysis"])
         
         # =========================
@@ -1501,14 +1500,42 @@ elif page == "V2.1":
                 
                 return period_stats, title_suffix
             
+            def create_time_period_column(df, time_period):
+                """
+                Create time period column for boxplot analysis
+                """
+                df = df.copy()
+                df['instance_date'] = pd.to_datetime(df['instance_date'])
+                
+                if time_period == 'Daily':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
+                    
+                elif time_period == 'Weekly':
+                    df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
+                    
+                elif time_period == 'Monthly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
+                    
+                elif time_period == 'Quarterly':
+                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    
+                elif time_period == 'Half-Yearly':
+                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
+                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    
+                elif time_period == 'Yearly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y')
+                
+                return df
+            
             def main():
                 st.markdown("Analyze average meter sale prices across different time periods")
                 
                 # Dataset selection in sidebar
                 st.sidebar.header("Dataset Selection")
                 dataset_options = {
-                    "Dataset 1": "over_all_dataset.csv",
-                    "Dataset 2": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
+                    "Actual_data": "over_all_dataset.csv",
+                    "Areas_with_6000": "df_trained_dataset_6000.csv"  # Replace with your second dataset path
                 }
                 
                 selected_dataset = st.sidebar.selectbox(
@@ -1531,6 +1558,13 @@ elif page == "V2.1":
                             st.error(f"Missing required columns: {', '.join(missing_columns)}")
                             return
                         
+                        # Display basic info
+                        st.sidebar.header("Data Overview")
+                        st.sidebar.write(f"Dataset: {selected_dataset}")
+                        st.sidebar.write(f"Total records: {len(df):,}")
+                        st.sidebar.write(f"Date range: {df['instance_date'].min()} to {df['instance_date'].max()}")
+                        st.sidebar.write(f"Areas: {df['area_name_en'].nunique()}")
+                        st.sidebar.write(f"Average price: {df['meter_sale_price'].mean():.2f}")
                         
                         # Create two tabs: Whole Data and Area-wise
                         analysis_tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
@@ -1651,33 +1685,48 @@ elif page == "V2.1":
                                     avg_records_period = processed_df_whole['record_count'].mean()
                                     st.metric("Avg Records/Period", f"{avg_records_period:.1f}")
                                 
-                                # Boxplot and Histogram Section
-                                st.subheader("Price Distribution Analysis")
+                                # Boxplot Section - Boxplot for each time period
+                                st.subheader(f"Price Distribution by {title_suffix_whole}")
                                 
-                                col_box, col_hist = st.columns(2)
+                                # Add time period column to filtered data for boxplot
+                                df_boxplot = create_time_period_column(df_filtered_whole, time_period_whole)
                                 
-                                with col_box:
-                                    # Boxplot
-                                    fig_box = px.box(
-                                        df_filtered_whole, 
-                                        y='meter_sale_price',
-                                        title='Price Distribution Boxplot',
-                                        height=400
-                                    )
-                                    fig_box.update_layout(showlegend=False)
-                                    st.plotly_chart(fig_box, use_container_width=True)
+                                # Limit the number of periods for better visualization
+                                unique_periods = df_boxplot['time_period'].unique()
+                                if len(unique_periods) > 20:
+                                    st.warning(f"Showing boxplot for first 20 {title_suffix_whole.lower()}s (too many periods for clear visualization)")
+                                    # Take the most recent 20 periods
+                                    recent_periods = df_boxplot.groupby('time_period')['instance_date'].max().nlargest(20).index
+                                    df_boxplot_limited = df_boxplot[df_boxplot['time_period'].isin(recent_periods)]
+                                else:
+                                    df_boxplot_limited = df_boxplot
                                 
-                                with col_hist:
-                                    # Histogram
-                                    fig_hist = px.histogram(
-                                        df_filtered_whole, 
-                                        x='meter_sale_price',
-                                        title='Price Distribution Histogram',
-                                        nbins=50,
-                                        height=400
-                                    )
-                                    fig_hist.update_layout(showlegend=False)
-                                    st.plotly_chart(fig_hist, use_container_width=True)
+                                # Create boxplot
+                                fig_box = px.box(
+                                    df_boxplot_limited, 
+                                    x='time_period', 
+                                    y='meter_sale_price',
+                                    title=f'Price Distribution by {title_suffix_whole}',
+                                    height=500
+                                )
+                                fig_box.update_layout(
+                                    xaxis_title=title_suffix_whole,
+                                    yaxis_title='Meter Sale Price',
+                                    xaxis_tickangle=45
+                                )
+                                st.plotly_chart(fig_box, use_container_width=True)
+                                
+                                # Histogram Section
+                                st.subheader("Overall Price Distribution Histogram")
+                                fig_hist = px.histogram(
+                                    df_filtered_whole, 
+                                    x='meter_sale_price',
+                                    title='Overall Price Distribution',
+                                    nbins=50,
+                                    height=400
+                                )
+                                fig_hist.update_layout(showlegend=False)
+                                st.plotly_chart(fig_hist, use_container_width=True)
                                 
                                 # Additional statistics
                                 st.subheader("Detailed Price Statistics")
@@ -1860,56 +1909,40 @@ elif page == "V2.1":
                                 fig_area.update_xaxes(tickangle=45)
                                 st.plotly_chart(fig_area, use_container_width=True)
                                 
-                                # Display detailed statistics for selected area
-                                st.subheader("Area Details")
-                                
+                                # Boxplot for Area-wise analysis
                                 if selected_area_single != "All Areas":
-                                    col1, col2, col3, col4, col5 = st.columns(5)
+                                    st.subheader(f"Price Distribution by {title_suffix_area} in {selected_area_single}")
                                     
-                                    area_data = df[df['area_name_en'] == selected_area_single]
-                                    current_stats = processed_df_area
+                                    # Add time period column for boxplot
+                                    df_area_boxplot = create_time_period_column(df_area, time_period_area)
                                     
-                                    with col1:
-                                        st.metric("Total Records in Area", len(area_data))
-                                    with col2:
-                                        area_avg = area_data['meter_sale_price'].mean()
-                                        st.metric("Area Average Price", f"{area_avg:.2f}")
-                                    with col3:
-                                        total_period_records = current_stats['record_count'].sum()
-                                        st.metric("Selected Period Records", total_period_records)
-                                    with col4:
-                                        avg_records_per_period = current_stats['record_count'].mean()
-                                        st.metric("Avg Records/Period", f"{avg_records_per_period:.1f}")
-                                    with col5:
-                                        max_records_period = current_stats.loc[current_stats['record_count'].idxmax()]
-                                        st.metric("Max Records Period", f"{max_records_period['record_count']}")
+                                    # Limit periods if too many
+                                    unique_periods_area = df_area_boxplot['time_period'].unique()
+                                    if len(unique_periods_area) > 15:
+                                        st.warning(f"Showing boxplot for first 15 {title_suffix_area.lower()}s")
+                                        recent_periods_area = df_area_boxplot.groupby('time_period')['instance_date'].max().nlargest(15).index
+                                        df_area_boxplot_limited = df_area_boxplot[df_area_boxplot['time_period'].isin(recent_periods_area)]
+                                    else:
+                                        df_area_boxplot_limited = df_area_boxplot
                                     
-                                    # Boxplot and Histogram for individual area
-                                    st.subheader(f"Price Distribution in {selected_area_single}")
-                                    
-                                    col_box_area, col_hist_area = st.columns(2)
-                                    
-                                    with col_box_area:
-                                        fig_box_area = px.box(
-                                            area_data, 
-                                            y='meter_sale_price',
-                                            title=f'Price Distribution in {selected_area_single}',
-                                            height=400
-                                        )
-                                        st.plotly_chart(fig_box_area, use_container_width=True)
-                                    
-                                    with col_hist_area:
-                                        fig_hist_area = px.histogram(
-                                            area_data, 
-                                            x='meter_sale_price',
-                                            title=f'Price Distribution in {selected_area_single}',
-                                            nbins=30,
-                                            height=400
-                                        )
-                                        st.plotly_chart(fig_hist_area, use_container_width=True)
+                                    # Create boxplot
+                                    fig_box_area = px.box(
+                                        df_area_boxplot_limited, 
+                                        x='time_period', 
+                                        y='meter_sale_price',
+                                        title=f'Price Distribution by {title_suffix_area} in {selected_area_single}',
+                                        height=500
+                                    )
+                                    fig_box_area.update_layout(
+                                        xaxis_title=title_suffix_area,
+                                        yaxis_title='Meter Sale Price',
+                                        xaxis_tickangle=45
+                                    )
+                                    st.plotly_chart(fig_box_area, use_container_width=True)
                     
                     except Exception as e:
                         st.error(f"Error processing file: {str(e)}")
+                        st.error(f"Error details: {str(e)}")
                 
                 else:
                     st.error(f"❌ File not found: {file_path}")
