@@ -1332,9 +1332,9 @@ elif page == "V2.1":
     ])
     drop_col = ['Unnamed: 0']  # list instead of string
     
-    train_file_path = "df_trained_dataset_6000.csv"  # Replace with your CSV path
-    test_file_path1 = "test_data_20 areas_1.csv"  # Replace with your CSV path
-    test_file_path = "over_all_dataset.csv"
+    train_file_path1 = "df_trained_dataset_6000.csv"  # Replace with your CSV path
+    test_file_path = "test_data_20 areas_1.csv"  # Replace with your CSV path
+    train_file_path = "over_all_dataset.csv"
     # --- Load Train Data ---
     try:
         df_train = pd.read_csv(train_file_path)
