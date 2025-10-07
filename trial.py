@@ -2811,7 +2811,245 @@ if sidebar_option == "📈 Model Results":
                 if display_data:
                     display_df = pd.DataFrame(display_data)
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
-
+                    #####################################################################################################################_____________________________________+++++++++++++++++++++++++++++++++++++++++++++++++
+        with tab2:
+            import streamlit as st
+            import plotly.graph_objects as go
+            import plotly.express as px
+            import pandas as pd
+            
+            # Set page configuration
+            #st.set_page_config(page_title="ARIMA Forecast", layout="wide")
+            arima_forecast_df_quarterly = pd.read_csv("arima_forecast_quarterly_all_areas.csv")
+            arima_forecast_df_quarterly = arima_forecast_df_quarterly.drop(columns=[col for col in drop_col if col in arima_forecast_df_quarterly.columns])
+            # Title
+            st.title("ARIMA Forecast - Quarterly Data")
+            
+            # Your metrics data (replace this with your actual metrics DataFrame)
+            metrics_data = {
+                'area_name_en': [
+                    'Al Barsha South Fifth', 'Al Barsha South Fourth', 'Al Barshaa South Third',
+                    'Al Hebiah Fourth', 'Al Khairan First', 'Al Merkadh', 'Al Thanyah Fifth',
+                    'Al Yelayiss 2', 'Burj Khalifa', 'Business Bay', 
+                    'Hadaeq Sheikh Mohammed Bin Rashid', 'Jabal Ali First', 'Madinat Al Mataar',
+                    'Madinat Dubai Almelaheyah', 'Marsa Dubai', 'Me\'Aisem First', 'Nadd Hessa',
+                    'Wadi Al Safa 5'
+                ],
+                'MAE': [
+                    1080.890459, 721.225994, 1118.409692, 579.593767, 1337.522897, 1096.323912,
+                    523.932791, 666.745732, 1589.888349, 1357.038565, 1076.517280, 858.558121,
+                    768.352293, 1152.594843, 1289.914164, 498.010100, 404.747743, 631.813785
+                ],
+                'RMSE': [
+                    1512.120078, 1622.076318, 1949.541688, 750.356845, 2793.295634, 2892.483144,
+                    749.020401, 888.454287, 3318.609051, 3090.978111, 2431.840921, 1096.402134,
+                    1082.907618, 1685.947827, 2683.503879, 655.352504, 575.951861, 838.465041
+                ],
+                'MAPE': [
+                    10.080573, 7.733304, 10.709510, 6.610677, 7.758506, 6.363154, 4.782912,
+                    6.877848, 8.668525, 7.722372, 7.249083, 9.661324, 9.512773, 6.104294,
+                    8.397232, 5.758879, 5.387785, 9.256670
+                ]
+            }
+            
+            metrics_df = pd.DataFrame(metrics_data)
+            
+            # Create tabs
+            tab1, tab2 = st.tabs(["Forecast", "Metrics"])
+            
+            with tab1:
+                # Forecast Tab
+                st.header("ARIMA Forecast by Area")
+                
+                # Area selection
+                areas = arima_forecast_df_quarterly['area_name_en'].unique()
+                selected_area = st.selectbox("Select Area:", areas, key="forecast_select")
+                
+                # Get metrics for selected area
+                area_metrics = metrics_df[metrics_df['area_name_en'] == selected_area]
+                
+                # Display metrics for selected area
+                if not area_metrics.empty:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("MAE", f"{area_metrics['MAE'].iloc[0]:.2f}")
+                    with col2:
+                        st.metric("RMSE", f"{area_metrics['RMSE'].iloc[0]:.2f}")
+                    with col3:
+                        st.metric("MAPE", f"{area_metrics['MAPE'].iloc[0]:.2f}%")
+                
+                # Filter data for selected area
+                df_area = arima_forecast_df_quarterly[arima_forecast_df_quarterly['area_name_en'] == selected_area]
+                
+                # Separate actual and forecast data
+                actual_df = df_area[df_area['type'] == 'fitted']
+                forecast_df = df_area[df_area['type'] == 'forecast']
+                
+                # Create plot
+                fig = go.Figure()
+                
+                # Actual (fitted)
+                if not actual_df.empty:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=actual_df['ds'],
+                            y=actual_df['actual'],
+                            mode='lines+markers',
+                            name='Actual',
+                            line=dict(color='blue', width=3),
+                            marker=dict(size=8)
+                        )
+                    )
+                
+                # Forecast
+                if not forecast_df.empty:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=forecast_df['ds'],
+                            y=forecast_df['yhat'],
+                            mode='lines+markers',
+                            name='Forecast',
+                            line=dict(color='orange', width=3),
+                            marker=dict(size=8)
+                        )
+                    )
+                
+                    # Confidence interval
+                    fig.add_trace(
+                        go.Scatter(
+                            x=forecast_df['ds'].tolist() + forecast_df['ds'].tolist()[::-1],
+                            y=forecast_df['yhat_upper'].tolist() + forecast_df['yhat_lower'].tolist()[::-1],
+                            fill='toself',
+                            fillcolor='rgba(255,165,0,0.2)',
+                            line=dict(color='rgba(255,255,255,0)'),
+                            hoverinfo="skip",
+                            showlegend=False,
+                            name='Confidence Interval'
+                        )
+                    )
+                
+                    # Connect last actual to first forecast
+                    if not actual_df.empty:
+                        fig.add_trace(
+                            go.Scatter(
+                                x=[actual_df['ds'].iloc[-1], forecast_df['ds'].iloc[0]],
+                                y=[actual_df['actual'].iloc[-1], forecast_df['yhat'].iloc[0]],
+                                mode='lines',
+                                line=dict(color='green', dash='dash', width=2),
+                                name='Connection'
+                            )
+                        )
+                
+                # X-axis labels
+                tickvals = df_area['ds'].tolist()
+                ticktext = df_area['quarter_label'].tolist()
+                
+                fig.update_layout(
+                    title=f"{selected_area} - Actual vs Forecast (Quarterly)",
+                    xaxis_title="Quarter",
+                    yaxis_title="Meter Sale Price",
+                    xaxis=dict(tickmode='array', tickvals=tickvals, ticktext=ticktext),
+                    template='plotly_white',
+                    hovermode="x unified",
+                    height=600,
+                    showlegend=True
+                )
+                
+                # Display the plot
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Optional: Show data table
+                if st.checkbox("Show Forecast Data Table", key="forecast_table"):
+                    st.subheader("Forecast Data")
+                    
+                    # Create a display dataframe with relevant columns
+                    display_columns = ['ds', 'quarter_label', 'type', 'actual', 'yhat', 'yhat_lower', 'yhat_upper']
+                    available_columns = [col for col in display_columns if col in df_area.columns]
+                    
+                    display_df = df_area[available_columns].copy()
+                    
+                    # Format the display
+                    if 'actual' in display_df.columns:
+                        display_df['actual'] = display_df['actual'].round(2)
+                    if 'yhat' in display_df.columns:
+                        display_df['yhat'] = display_df['yhat'].round(2)
+                    if 'yhat_lower' in display_df.columns:
+                        display_df['yhat_lower'] = display_df['yhat_lower'].round(2)
+                    if 'yhat_upper' in display_df.columns:
+                        display_df['yhat_upper'] = display_df['yhat_upper'].round(2)
+                    
+                    st.dataframe(display_df.sort_values('ds'))
+            
+            with tab2:
+                # Metrics Tab
+                st.header("Model Performance Metrics")
+                
+                # Display metrics table
+                st.subheader("All Areas Metrics")
+                
+                # Format the metrics for display
+                display_metrics = metrics_df.copy()
+                display_metrics['MAE'] = display_metrics['MAE'].round(2)
+                display_metrics['RMSE'] = display_metrics['RMSE'].round(2)
+                display_metrics['MAPE'] = display_metrics['MAPE'].round(2)
+                
+                st.dataframe(display_metrics, use_container_width=True)
+                
+                # Create bar charts for each metric
+                st.subheader("Metrics Visualization")
+                
+                # Sort metrics by area name for better visualization
+                sorted_metrics = metrics_df.sort_values('area_name_en')
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # MAE Bar Chart
+                    fig_mae = px.bar(
+                        sorted_metrics,
+                        x='area_name_en',
+                        y='MAE',
+                        title='MAE by Area',
+                        color='MAE',
+                        color_continuous_scale='blues'
+                    )
+                    fig_mae.update_layout(xaxis_tickangle=-45, height=400)
+                    st.plotly_chart(fig_mae, use_container_width=True)
+                    
+                    # RMSE Bar Chart
+                    fig_rmse = px.bar(
+                        sorted_metrics,
+                        x='area_name_en',
+                        y='RMSE',
+                        title='RMSE by Area',
+                        color='RMSE',
+                        color_continuous_scale='reds'
+                    )
+                    fig_rmse.update_layout(xaxis_tickangle=-45, height=400)
+                    st.plotly_chart(fig_rmse, use_container_width=True)
+                
+                with col2:
+                    # MAPE Bar Chart
+                    fig_mape = px.bar(
+                        sorted_metrics,
+                        x='area_name_en',
+                        y='MAPE',
+                        title='MAPE by Area (%)',
+                        color='MAPE',
+                        color_continuous_scale='greens'
+                    )
+                    fig_mape.update_layout(xaxis_tickangle=-45, height=400)
+                    st.plotly_chart(fig_mape, use_container_width=True)
+                    
+                    # Summary statistics
+                    st.subheader("Metrics Summary")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Average MAE", f"{metrics_df['MAE'].mean():.2f}")
+                    with col2:
+                        st.metric("Average RMSE", f"{metrics_df['RMSE'].mean():.2f}")
+                    with col3:
+                        st.metric("Average MAPE", f"{metrics_df['MAPE'].mean():.2f}%")
 
 
     ###############################################################################################################################################################################################################################
