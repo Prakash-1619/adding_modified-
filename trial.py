@@ -2268,18 +2268,39 @@ if sidebar_option == "📈 Model Results":
                     with open("train_columns.pkl", "rb") as f:
                         train_columns = pickle.load(f)
                     
-                    # Load growth factors - FIXED: Ensure we're using quarterly data
+                    # Load growth factors - FIXED: Handle different date formats
                     growth_df = pd.read_csv('arima_areas_growth_6M.csv')
                     
-                    # Convert date strings to proper datetime and ensure quarterly format
-                    growth_df['ds'] = pd.to_datetime(growth_df['ds'], format='%d-%m-%Y')
+                    # Convert date strings to proper datetime - handle multiple possible formats
+                    try:
+                        # Try parsing with dayfirst format first
+                        growth_df['ds'] = pd.to_datetime(growth_df['ds'], dayfirst=True, errors='coerce')
+                    except:
+                        try:
+                            # Try ISO format
+                            growth_df['ds'] = pd.to_datetime(growth_df['ds'], format='ISO8601', errors='coerce')
+                        except:
+                            # Try mixed format inference
+                            growth_df['ds'] = pd.to_datetime(growth_df['ds'], infer_datetime_format=True, errors='coerce')
                     
-                    # Filter to ensure we only have quarterly data (remove any half-yearly data)
-                    growth_df = growth_df[growth_df['ds'].isin(pd.to_datetime([
-                        '30-09-2025', '31-12-2025', '31-03-2026', '30-06-2026',
-                        '30-09-2026', '31-12-2026', '31-03-2027', '30-06-2027',
-                        '30-09-2027', '31-12-2027', '31-03-2028', '30-06-2028'
-                    ], format='%d-%m-%Y'))]
+                    # Check if we have valid dates
+                    if growth_df['ds'].isna().any():
+                        st.warning("Some dates could not be parsed. Using string representation.")
+                        # If dates can't be parsed, keep them as strings for column names
+                        growth_df['ds'] = growth_df['ds'].astype(str)
+                    else:
+                        # Format dates consistently for column names
+                        growth_df['ds'] = growth_df['ds'].dt.strftime('%Y-%m-%d')
+                    
+                    # Define the expected quarterly dates
+                    expected_quarters = [
+                        '2025-09-30', '2025-12-31', '2026-03-31', '2026-06-30',
+                        '2026-09-30', '2026-12-31', '2027-03-31', '2027-06-30',
+                        '2027-09-30', '2027-12-31', '2028-03-31', '2028-06-30'
+                    ]
+                    
+                    # Filter to ensure we only have the expected quarterly data
+                    growth_df = growth_df[growth_df['ds'].isin(expected_quarters)]
                     
                     growth_df = growth_df[['ds', 'area_name_en', 'growth_factor', 'growth_factor_lower', 'growth_factor_upper']]
                     
@@ -2434,7 +2455,7 @@ if sidebar_option == "📈 Model Results":
                         overall_forecast_lower_df = overall_forecast_lower_df.merge(historical_pivot, on='area_name_en', how='left')
                         overall_forecast_upper_df = overall_forecast_upper_df.merge(historical_pivot, on='area_name_en', how='left')
                     
-                    # Apply growth factors to future quarters - FIXED: Proper quarterly application
+                    # Apply growth factors to future quarters
                     future_quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
                     
                     # Sort the future quarters chronologically
@@ -2465,16 +2486,22 @@ if sidebar_option == "📈 Model Results":
                 # =========================
                 st.success(f"✅ Forecast generated for {selected_area}")
                 
-                # Helper function for formatting quarters - FIXED: Proper quarterly formatting
+                # Helper function for formatting quarters
                 def format_quarter_label(quarter_str):
-                    if isinstance(quarter_str, pd.Timestamp):
-                        # Format as "Q# YYYY" (e.g., "Q3 2025")
-                        return f"Q{quarter_str.quarter} {quarter_str.year}"
-                    elif '-' in quarter_str:
-                        parts = quarter_str.split('-')
+                    if isinstance(quarter_str, str) and '-' in quarter_str:
+                        try:
+                            # Try to parse as date and format as "Q# YYYY"
+                            date_obj = pd.to_datetime(quarter_str)
+                            quarter_num = (date_obj.month - 1) // 3 + 1
+                            return f"Q{quarter_num} {date_obj.year}"
+                        except:
+                            # If parsing fails, use the string as is
+                            return quarter_str
+                    elif '-' in str(quarter_str):
+                        parts = str(quarter_str).split('-')
                         if len(parts) == 2 and parts[1].startswith('Q'):
                             return f"{parts[1]} {parts[0]}"  # "Q1 2023" format
-                    return quarter_str.replace('_', ' ').title()
+                    return str(quarter_str).replace('_', ' ').title()
                 
                 # Helper function to prepare forecast data for plotting
                 def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical, include_actual=True):
@@ -2616,69 +2643,7 @@ if sidebar_option == "📈 Model Results":
                     # Display growth information
                     st.info(f"**Growth Factors Applied:** Future prices are calculated as: **Current Prediction × Growth Factor**")
                 
-                # 2️⃣ Actual vs Predicted Comparison Chart
-                if show_actual_vs_predicted:
-                    st.subheader("📊 Actual vs Predicted Comparison")
-                    
-                    # Create a detailed comparison for current period
-                    comparison_data = []
-                    for idx, (pred, actual) in enumerate(zip(y_pred, actual_values)):
-                        comparison_data.append({
-                            'Instance': f'Property {idx+1}',
-                            'Predicted': pred,
-                            'Actual': actual,
-                            'Difference': actual - pred,
-                            'Error_Percentage': ((actual - pred) / actual) * 100 if actual != 0 else 0
-                        })
-                    
-                    comparison_df = pd.DataFrame(comparison_data)
-                    
-                    # Create comparison chart
-                    fig_comparison = go.Figure()
-                    
-                    fig_comparison.add_trace(go.Scatter(
-                        x=comparison_df['Instance'],
-                        y=comparison_df['Predicted'],
-                        mode='lines+markers',
-                        name='Predicted',
-                        line=dict(color='red', width=2),
-                        marker=dict(size=6, color='red')
-                    ))
-                    
-                    fig_comparison.add_trace(go.Scatter(
-                        x=comparison_df['Instance'],
-                        y=comparison_df['Actual'],
-                        mode='lines+markers',
-                        name='Actual',
-                        line=dict(color='green', width=2),
-                        marker=dict(size=6, color='green')
-                    ))
-                    
-                    fig_comparison.update_layout(
-                        title=f"Actual vs Predicted Prices - {selected_area}",
-                        xaxis_title="Property Instances",
-                        yaxis_title="Price (AED)",
-                        height=400,
-                        template="plotly_white",
-                        showlegend=True
-                    )
-                    
-                    st.plotly_chart(fig_comparison, use_container_width=True)
-                    
-                    # Display accuracy metrics
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    mae = np.mean(np.abs(comparison_df['Difference']))
-                    mape = np.mean(np.abs(comparison_df['Error_Percentage']))
-                    rmse = np.sqrt(np.mean(comparison_df['Difference']**2))
-                    accuracy = 100 - mape
-                    
-                    col1.metric("Mean Absolute Error", f"AED {mae:,.0f}")
-                    col2.metric("Mean Absolute % Error", f"{mape:.1f}%")
-                    col3.metric("RMSE", f"AED {rmse:,.0f}")
-                    col4.metric("Accuracy", f"{accuracy:.1f}%")
-                
-                # 3️⃣ Growth Factors Display
+                # 2️⃣ Growth Factors Display
                 st.subheader("📈 Applied Growth Factors")
                 
                 # Display the growth factors used for forecasting
@@ -2705,7 +2670,7 @@ if sidebar_option == "📈 Model Results":
                         growth_df_display = pd.DataFrame(growth_data)
                         st.dataframe(growth_df_display, use_container_width=True, hide_index=True)
                 
-                # 4️⃣ Data Table with Actual and Predicted
+                # 3️⃣ Data Table with Actual and Predicted
                 st.subheader("📊 Forecast Data with Growth Factors")
                 
                 # Create a clean data table
