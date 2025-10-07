@@ -1504,7 +1504,7 @@ elif page == "V2.1":
             # --- Display chart ---
             st.plotly_chart(fig, use_container_width=True)
 
-             st.dataframe(pareto_df)
+            st.dataframe(pareto_df)
             
         # --- Test Data Tab ---
         with tab4:
