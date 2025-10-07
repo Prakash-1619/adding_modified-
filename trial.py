@@ -1496,25 +1496,27 @@ elif page == "V2.1":
                 df['sort_key'] = df['instance_date']
             elif time_period == 'Weekly':
                 df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
-                df['sort_key'] = df['instance_date'].dt.to_period('W')
+                df['sort_key'] = df['instance_date'] - pd.to_timedelta(df['instance_date'].dt.weekday, unit='d')  # Monday of week
             elif time_period == 'Monthly':
                 df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
-                df['sort_key'] = df['instance_date'].dt.to_period('M')
+                df['sort_key'] = df['instance_date'].values.astype('datetime64[M]')
             elif time_period == 'Quarterly':
                 df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
-                df['sort_key'] = df['instance_date'].dt.to_period('Q')
+                df['sort_key'] = pd.PeriodIndex(df['instance_date'], freq='Q').start_time
             elif time_period == 'Half-Yearly':
                 df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
                 df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                # Sort key as first day of half-year
                 df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
+                df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-' + ((df['half_year']-1)*6 + 1).astype(str) + '-01')
             elif time_period == 'Yearly':
                 df['time_period'] = df['instance_date'].dt.strftime('%Y')
-                df['sort_key'] = df['instance_date'].dt.to_period('Y')
+                df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-01-01')
             
             return df
         
         # -------------------------
-        # 2️⃣ Create box + median + record count plot
+        # 2️⃣ Create area box plot function
         # -------------------------
         def create_area_box_plot(df, time_period, plot_title="Area Analysis"):
             df = create_time_period_column(df, time_period)
@@ -1543,12 +1545,17 @@ elif page == "V2.1":
                     'imputed_median': s_imputed.median(),
                     'n_records': len(vals),
                     'lower': lower,
-                    'upper': upper
+                    'upper': upper,
+                    'sort_key': group['sort_key'].min()  # Use for ordering
                 })
+            
+            # Sort by sort_key
+            box_stats = sorted(box_stats, key=lambda x: x['sort_key'])
             
             x_periods = [p['period'] for p in box_stats]
             y_original = [p['median'] for p in box_stats]
             y_imputed = [p['imputed_median'] for p in box_stats]
+            x_keys = [p['sort_key'] for p in box_stats]
             
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             
@@ -1556,7 +1563,7 @@ elif page == "V2.1":
             for i, stats in enumerate(box_stats):
                 fig.add_trace(go.Box(
                     y=stats['vals'],
-                    x=[stats['period']]*len(stats['vals']),
+                    x=[stats['sort_key']]*len(stats['vals']),
                     name='Box Plot',
                     marker_color='lightblue',
                     line=dict(color='blue'),
@@ -1573,9 +1580,9 @@ elif page == "V2.1":
                     )
                 ), secondary_y=False)
                 
-                # Record count bar
+                # Record count bars
                 fig.add_trace(go.Bar(
-                    x=[stats['period']],
+                    x=[stats['sort_key']],
                     y=[stats['n_records']],
                     name='No. of Records',
                     marker_color='lightgray',
@@ -1585,7 +1592,7 @@ elif page == "V2.1":
             
             # Original median line
             fig.add_trace(go.Scatter(
-                x=x_periods,
+                x=x_keys,
                 y=y_original,
                 mode='lines+markers',
                 name='Original Median',
@@ -1595,7 +1602,7 @@ elif page == "V2.1":
             
             # Imputed median line
             fig.add_trace(go.Scatter(
-                x=x_periods,
+                x=x_keys,
                 y=y_imputed,
                 mode='lines+markers',
                 name='Imputed Median',
@@ -1603,6 +1610,7 @@ elif page == "V2.1":
                 marker=dict(size=8)
             ), secondary_y=False)
             
+            # Layout
             fig.update_layout(
                 title=plot_title,
                 xaxis_title="Period",
@@ -1612,6 +1620,13 @@ elif page == "V2.1":
                 boxmode='group',
                 height=600,
                 legend=dict(x=0, y=1)
+            )
+            
+            # Show proper period labels
+            fig.update_xaxes(
+                tickvals=x_keys,
+                ticktext=x_periods,
+                tickangle=45
             )
             
             return fig
@@ -1625,7 +1640,7 @@ elif page == "V2.1":
             # Dataset selection
             st.sidebar.header("Dataset Selection")
             dataset_options = {
-                "Fore_model_data" : "forcast_model_16_25.csv",
+                "fore_cast_raw_data" : "forcast_model_16_25.csv"
                 "Actual_data": "over_all_dataset_og.csv",
                 #"Data without_outliers": "over_all_dataset.csv",
                 "Areas with 6000": "df_trained_dataset_6000.csv"
@@ -1669,6 +1684,7 @@ elif page == "V2.1":
         
         if __name__ == "__main__":
             main()
+
 
 
 
