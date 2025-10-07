@@ -2268,11 +2268,22 @@ if sidebar_option == "📈 Model Results":
                     with open("train_columns.pkl", "rb") as f:
                         train_columns = pickle.load(f)
                     
-                    # Load growth factors
+                    # Load growth factors - FIXED: Ensure we're using quarterly data
                     growth_df = pd.read_csv('arima_areas_growth_6M.csv')
+                    
+                    # Convert date strings to proper datetime and ensure quarterly format
+                    growth_df['ds'] = pd.to_datetime(growth_df['ds'], format='%d-%m-%Y')
+                    
+                    # Filter to ensure we only have quarterly data (remove any half-yearly data)
+                    growth_df = growth_df[growth_df['ds'].isin(pd.to_datetime([
+                        '30-09-2025', '31-12-2025', '31-03-2026', '30-06-2026',
+                        '30-09-2026', '31-12-2026', '31-03-2027', '30-06-2027',
+                        '30-09-2027', '31-12-2027', '31-03-2028', '30-06-2028'
+                    ], format='%d-%m-%Y'))]
+                    
                     growth_df = growth_df[['ds', 'area_name_en', 'growth_factor', 'growth_factor_lower', 'growth_factor_upper']]
                     
-                    # Create pivot tables for all three growth factors
+                    # Create pivot tables for all three growth factors with proper quarterly dates
                     growth_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor').reset_index()
                     growth_lower_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_lower').reset_index()
                     growth_upper_pivot = growth_df.pivot(index='area_name_en', columns='ds', values='growth_factor_upper').reset_index()
@@ -2423,10 +2434,15 @@ if sidebar_option == "📈 Model Results":
                         overall_forecast_lower_df = overall_forecast_lower_df.merge(historical_pivot, on='area_name_en', how='left')
                         overall_forecast_upper_df = overall_forecast_upper_df.merge(historical_pivot, on='area_name_en', how='left')
                     
-                    # Apply growth factors to future quarters
+                    # Apply growth factors to future quarters - FIXED: Proper quarterly application
                     future_quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
-                    for q in future_quarter_cols:
+                    
+                    # Sort the future quarters chronologically
+                    future_quarter_cols_sorted = sorted(future_quarter_cols)
+                    
+                    for q in future_quarter_cols_sorted:
                         if q in overall_forecast_df.columns:
+                            # Apply growth factor to predicted price
                             overall_forecast_df[q] = overall_forecast_df['prediction'] * overall_forecast_df[q]
                             overall_forecast_lower_df[q] = overall_forecast_lower_df['prediction'] * overall_forecast_lower_df[q]
                             overall_forecast_upper_df[q] = overall_forecast_upper_df['prediction'] * overall_forecast_upper_df[q]
@@ -2436,9 +2452,9 @@ if sidebar_option == "📈 Model Results":
                     if show_historical and historical_pivot is not None:
                         available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
                         selected_historical = available_historical[-num_historical_quarters:]
-                        all_quarter_cols = selected_historical + ['prediction', 'actual'] + future_quarter_cols
+                        all_quarter_cols = selected_historical + ['prediction', 'actual'] + future_quarter_cols_sorted
                     else:
-                        all_quarter_cols = ['prediction', 'actual'] + future_quarter_cols
+                        all_quarter_cols = ['prediction', 'actual'] + future_quarter_cols_sorted
                     
                     final_overall_forecast = overall_forecast_df[['area_name_en'] + all_quarter_cols]
                     final_overall_forecast_lower = overall_forecast_lower_df[['area_name_en'] + all_quarter_cols]
@@ -2449,12 +2465,15 @@ if sidebar_option == "📈 Model Results":
                 # =========================
                 st.success(f"✅ Forecast generated for {selected_area}")
                 
-                # Helper function for formatting quarters
+                # Helper function for formatting quarters - FIXED: Proper quarterly formatting
                 def format_quarter_label(quarter_str):
-                    if '-' in quarter_str:
+                    if isinstance(quarter_str, pd.Timestamp):
+                        # Format as "Q# YYYY" (e.g., "Q3 2025")
+                        return f"Q{quarter_str.quarter} {quarter_str.year}"
+                    elif '-' in quarter_str:
                         parts = quarter_str.split('-')
-                        if len(parts) == 2:
-                            return f"{parts[0]} {parts[1]}"
+                        if len(parts) == 2 and parts[1].startswith('Q'):
+                            return f"{parts[1]} {parts[0]}"  # "Q1 2023" format
                     return quarter_str.replace('_', ' ').title()
                 
                 # Helper function to prepare forecast data for plotting
@@ -2472,15 +2491,16 @@ if sidebar_option == "📈 Model Results":
                             predicted_prices.append(np.nan)  # No predictions for historical
                     
                     # Add current prediction and actual
-                    time_periods.append('Current')
+                    time_periods.append('Current Prediction')
                     predicted_prices.append(forecast_row['prediction'])
                     if include_actual and 'actual' in forecast_row and pd.notna(forecast_row['actual']):
                         actual_prices.append(forecast_row['actual'])
                     else:
                         actual_prices.append(np.nan)
                     
-                    # Add future quarters
-                    for fq in future_quarter_cols:
+                    # Add future quarters in chronological order
+                    sorted_future_cols = sorted(future_quarter_cols)
+                    for fq in sorted_future_cols:
                         if fq in forecast_row.index and pd.notna(forecast_row[fq]):
                             time_periods.append(format_quarter_label(fq))
                             predicted_prices.append(forecast_row[fq])
@@ -2489,7 +2509,7 @@ if sidebar_option == "📈 Model Results":
                     return time_periods, predicted_prices, actual_prices
                 
                 # 1️⃣ Main Forecast Visualization with Actual vs Predicted
-                st.subheader(f"📈 Price Forecast for {selected_area}")
+                st.subheader(f"📈 Quarterly Price Forecast for {selected_area}")
                 
                 if not final_overall_forecast.empty:
                     row = final_overall_forecast.iloc[0]
@@ -2537,14 +2557,14 @@ if sidebar_option == "📈 Model Results":
                         marker=dict(size=12, color='red', symbol='star')
                     ))
                     
-                    # Add future forecast
+                    # Add future forecast with growth factors applied
                     future_start_idx = current_idx + 1
                     if future_start_idx < len(time_periods):
                         fig_main.add_trace(go.Scatter(
                             x=time_periods[future_start_idx:],
                             y=predicted_prices[future_start_idx:],
                             mode='lines+markers',
-                            name='Future Forecast',
+                            name='Future Forecast (with Growth Factors)',
                             line=dict(color='orange', width=3, dash='solid'),
                             marker=dict(size=8, color='orange')
                         ))
@@ -2573,12 +2593,13 @@ if sidebar_option == "📈 Model Results":
                         ))
                     
                     fig_main.update_layout(
-                        title=f"Price Forecast with Actual vs Predicted - {selected_area}",
-                        xaxis_title="Time Period",
+                        title=f"Quarterly Price Forecast with Growth Factors - {selected_area}",
+                        xaxis_title="Time Period (Quarterly)",
                         yaxis_title="Price (AED)",
                         height=500,
                         template="plotly_white",
-                        showlegend=True
+                        showlegend=True,
+                        xaxis=dict(tickangle=45)
                     )
                     
                     if show_historical and historical_points > 0:
@@ -2587,10 +2608,13 @@ if sidebar_option == "📈 Model Results":
                             line_width=2,
                             line_dash="dot",
                             line_color="gray",
-                            annotation_text="Historical → Current"
+                            annotation_text="Historical → Forecast"
                         )
                     
                     st.plotly_chart(fig_main, use_container_width=True)
+                    
+                    # Display growth information
+                    st.info(f"**Growth Factors Applied:** Future prices are calculated as: **Current Prediction × Growth Factor**")
                 
                 # 2️⃣ Actual vs Predicted Comparison Chart
                 if show_actual_vs_predicted:
@@ -2654,122 +2678,35 @@ if sidebar_option == "📈 Model Results":
                     col3.metric("RMSE", f"AED {rmse:,.0f}")
                     col4.metric("Accuracy", f"{accuracy:.1f}%")
                 
-                # 3️⃣ Clean Minimal Heatmap
-                st.subheader("🔥 Market Overview Heatmap")
+                # 3️⃣ Growth Factors Display
+                st.subheader("📈 Applied Growth Factors")
                 
-                # Prepare heatmap data for all areas (base scenario only)
-                heatmap_data = []
-                row_labels = []
-                time_periods_heatmap = []
-                
-                if show_historical:
-                    available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
-                    selected_historical = available_historical[-num_historical_quarters:]
-                    historical_labels = [format_quarter_label(hq) for hq in selected_historical]
-                    time_periods_heatmap.extend(historical_labels)
-                
-                time_periods_heatmap.append('Current Actual')
-                time_periods_heatmap.append('Current Predicted')
-                future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
-                time_periods_heatmap.extend(future_labels)
-                
-                # Add selected area first
-                if not final_overall_forecast.empty:
-                    area_data = final_overall_forecast[final_overall_forecast['area_name_en'] == selected_area]
-                    if not area_data.empty:
-                        row = area_data.iloc[0]
-                        area_prices = []
-                        
-                        # Historical prices
-                        if show_historical:
-                            for hq in selected_historical:
-                                if hq in row and pd.notna(row[hq]):
-                                    area_prices.append(row[hq])
-                                else:
-                                    area_prices.append(np.nan)
-                        
-                        # Current actual and predicted
-                        area_prices.append(row['actual'])
-                        area_prices.append(row['prediction'])
-                        
-                        # Future prices
-                        for fq in future_quarter_cols:
-                            if fq in row and pd.notna(row[fq]):
-                                area_prices.append(row[fq])
-                            else:
-                                area_prices.append(np.nan)
-                        
-                        if len(area_prices) == len(time_periods_heatmap):
-                            heatmap_data.append(area_prices)
-                            row_labels.append(f"⭐ {selected_area}")
-                
-                # Add other areas for comparison (top 5 other areas)
-                other_areas = [area for area in available_areas if area != selected_area][:5]
-                
-                for area in other_areas:
-                    # Simple prediction for other areas
-                    area_mask = test_samples_forecast['area_name_en'] == area
-                    X_other_area = X_test_forecast.loc[area_mask]
+                # Display the growth factors used for forecasting
+                if not overall_forecast_df.empty:
+                    growth_data = []
+                    row = overall_forecast_df.iloc[0]
                     
-                    if len(X_other_area) > 0 and area in area_models:
-                        other_model = area_models[area]
-                        other_pred = other_model.predict(X_other_area)
-                        other_actual = test_samples_forecast.loc[area_mask, 'meter_sale_price'].values
-                        other_mean_pred = np.mean(other_pred)
-                        other_mean_actual = np.mean(other_actual)
-                        
-                        area_prices = []
-                        
-                        # Historical prices
-                        if show_historical and historical_pivot is not None:
-                            area_historical = historical_pivot[historical_pivot['area_name_en'] == area]
-                            if not area_historical.empty:
-                                for hq in selected_historical:
-                                    if hq in area_historical.columns and pd.notna(area_historical[hq].iloc[0]):
-                                        area_prices.append(area_historical[hq].iloc[0])
-                                    else:
-                                        area_prices.append(np.nan)
-                            else:
-                                area_prices.extend([np.nan] * len(selected_historical))
-                        
-                        # Current actual and predicted
-                        area_prices.append(other_mean_actual)
-                        area_prices.append(other_mean_pred)
-                        
-                        # Future prices (simplified - using average growth)
-                        avg_growth = 1.02  # 2% average growth per quarter
-                        future_price = other_mean_pred
-                        for _ in future_quarter_cols:
-                            future_price = future_price * avg_growth
-                            area_prices.append(future_price)
-                        
-                        if len(area_prices) == len(time_periods_heatmap):
-                            heatmap_data.append(area_prices)
-                            row_labels.append(area)
-                
-                if heatmap_data:
-                    fig_heatmap = go.Figure(data=go.Heatmap(
-                        z=heatmap_data,
-                        x=time_periods_heatmap,
-                        y=row_labels,
-                        colorscale='Viridis',
-                        colorbar=dict(title='Price (AED)'),
-                        hoverinfo='z',
-                        hovertemplate='Price: %{z:.0f} AED<extra></extra>'
-                    ))
+                    for q in future_quarter_cols_sorted:
+                        if q in row and pd.notna(row[q]):
+                            original_pred = row['prediction']
+                            forecasted_price = row[q]
+                            growth_factor = forecasted_price / original_pred if original_pred != 0 else 1
+                            growth_percentage = (growth_factor - 1) * 100
+                            
+                            growth_data.append({
+                                'Quarter': format_quarter_label(q),
+                                'Growth Factor': f"{growth_factor:.4f}",
+                                'Growth Percentage': f"{growth_percentage:.2f}%",
+                                'Base Price (AED)': f"{original_pred:,.0f}",
+                                'Forecasted Price (AED)': f"{forecasted_price:,.0f}"
+                            })
                     
-                    fig_heatmap.update_layout(
-                        title="Market Price Comparison (Actual & Predicted)",
-                        xaxis_title="Time Period",
-                        yaxis_title="Areas",
-                        height=400,
-                        template="plotly_white"
-                    )
-                    
-                    st.plotly_chart(fig_heatmap, use_container_width=True)
+                    if growth_data:
+                        growth_df_display = pd.DataFrame(growth_data)
+                        st.dataframe(growth_df_display, use_container_width=True, hide_index=True)
                 
                 # 4️⃣ Data Table with Actual and Predicted
-                st.subheader("📊 Forecast Data with Actual Values")
+                st.subheader("📊 Forecast Data with Growth Factors")
                 
                 # Create a clean data table
                 display_data = []
@@ -2785,7 +2722,7 @@ if sidebar_option == "📈 Model Results":
                                     'Type': 'Historical',
                                     'Actual Price (AED)': f"{row[hq]:,.0f}",
                                     'Predicted Price (AED)': '-',
-                                    'Difference': '-'
+                                    'Growth Factor': '-'
                                 })
                     
                     # Current prediction and actual
@@ -2794,23 +2731,33 @@ if sidebar_option == "📈 Model Results":
                         'Type': 'Current',
                         'Actual Price (AED)': f"{row['actual']:,.0f}" if pd.notna(row['actual']) else '-',
                         'Predicted Price (AED)': f"{row['prediction']:,.0f}",
-                        'Difference': f"{row['actual'] - row['prediction']:,.0f}" if pd.notna(row['actual']) else '-'
+                        'Growth Factor': '1.0000 (Base)'
                     })
                     
-                    # Future forecasts
-                    for fq in future_quarter_cols:
+                    # Future forecasts with growth factors
+                    for fq in future_quarter_cols_sorted:
                         if fq in row and pd.notna(row[fq]):
+                            growth_factor = row[fq] / row['prediction'] if row['prediction'] != 0 else 1
                             display_data.append({
                                 'Period': format_quarter_label(fq),
                                 'Type': 'Forecast',
                                 'Actual Price (AED)': '-',
                                 'Predicted Price (AED)': f"{row[fq]:,.0f}",
-                                'Difference': '-'
+                                'Growth Factor': f"{growth_factor:.4f}"
                             })
                 
                 if display_data:
                     display_df = pd.DataFrame(display_data)
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    
+                    # Explanation
+                    st.markdown("""
+                    **Explanation:**
+                    - **Historical**: Actual historical prices from training data
+                    - **Current**: Model predictions vs actual values from test data  
+                    - **Forecast**: Future prices calculated as: **Current Prediction × Growth Factor**
+                    - **Growth Factor**: Multiplier applied to base prediction for future quarters
+                    """)
                     #####################################################################################################################_____________________________________+++++++++++++++++++++++++++++++++++++++++++++++++
         with tab2:
             import streamlit as st
