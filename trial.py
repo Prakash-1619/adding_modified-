@@ -1640,7 +1640,7 @@ elif page == "V2.1":
             # Dataset selection
             st.sidebar.header("Dataset Selection")
             dataset_options = {
-                "fore_cast_raw_data" : "forcast_model_16_25.csv"
+                "fore_cast_raw_data" : "forcast_model_16_25.csv",
                 "Actual_data": "over_all_dataset_og.csv",
                 #"Data without_outliers": "over_all_dataset.csv",
                 "Areas with 6000": "df_trained_dataset_6000.csv"
