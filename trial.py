@@ -1685,21 +1685,50 @@ elif page == "V2.1":
             if __name__ == "__main__":
                 main()
 
-
-
-
-        with main_tabs[1]:
+                
+        import streamlit as st
+        import pandas as pd
+        import plotly.express as px
+        
+        # =========================
+        # Load datasets
+        # =========================
+        df_before = pd.read_csv("over_all_dataset_og.csv")
+        df_before = df_before.drop(columns=[col for col in drop_col if col in df_before.columns])
+        df_after = pd.read_csv("over_all_dataset.csv")
+        df_after = df_after.drop(columns=[col for col in drop_col if col in df_after.columns])
+        
+        
+        # Select which dataset to view
+        dataset_choice = st.radio(
+            "Choose Dataset:",
+            ("Before Outlier Removal", "After Outlier Removal"),
+            horizontal=True
+        )
+        
+        # Assign based on choice
+        if dataset_choice == "Before Outlier Removal":
+            df_train = df_before.copy()
+        else:
+            df_train = df_after.copy()
+        
+        # =========================
+        # Main Tabs
+        # =========================
+        main_tabs = st.tabs(["Distributions & Metrics", "Area-wise Analysis"])
+        
+        # =========================
+        # 1️⃣ Distributions & Metrics
+        # =========================
+        with main_tabs[0]:
             sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
             
             # --- Distribution Tab ---
             with sub_tab1:
-                st.subheader("Categorical Columns Distribution")
+                st.subheader(f"Categorical Columns Distribution — {dataset_choice}")
                 
-                # Original list of categorical columns
                 cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
                             'metro','has_parking','area_name_en','property_sub_type_en']
-                
-                # Filter columns that exist in df_train
                 cat_cols_existing = [col for col in cat_cols if col in df_train.columns]
                 
                 if not cat_cols_existing:
@@ -1712,7 +1741,7 @@ elif page == "V2.1":
                         ).reset_index()
                         
                         fig = px.bar(chart_df, x=col, y='nRecords', color=col,
-                                     title=f"{col} Distribution vs Avg Meter Sale Price")
+                                     title=f"{col} Distribution vs Avg Meter Sale Price — {dataset_choice}")
                         fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
                                         mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
                         fig.update_layout(
@@ -1722,7 +1751,7 @@ elif page == "V2.1":
             
             # --- Metrics Tab ---
             with sub_tab2:
-                st.subheader("Metrics on meter_sale_price & procedure_area")
+                st.subheader(f"Metrics on meter_sale_price & procedure_area — {dataset_choice}")
                 
                 numeric_cols = ['meter_sale_price', 'procedure_area']
                 numeric_cols_existing = [col for col in numeric_cols if col in df_train.columns]
@@ -1730,40 +1759,37 @@ elif page == "V2.1":
                 if not numeric_cols_existing:
                     st.warning("No numeric columns found in the dataset.")
                 else:
-                    # Plot histogram + boxplot for each numeric column
                     for col in numeric_cols_existing:
                         st.markdown(f"### {col} Distribution")
                         fig_hist = px.histogram(df_train, x=col, nbins=50, marginal="box",
-                                                title=f"{col} Distribution with Boxplot")
+                                                title=f"{col} Distribution with Boxplot — {dataset_choice}")
                         st.plotly_chart(fig_hist, use_container_width=True)
                     
-                    # Show descriptive statistics once
                     st.dataframe(df_train[numeric_cols_existing].describe().round(2))
         
         # =========================
         # 2️⃣ Area-wise Analysis
         # =========================
-        with main_tabs[2]:
-            st.subheader("Area-wise Analysis")
+        with main_tabs[1]:
+            st.subheader(f"Area-wise Analysis — {dataset_choice}")
             
             if 'area_name_en' not in df_train.columns:
                 st.warning("'area_name_en' column not found in dataset.")
             else:
                 areas = df_train['area_name_en'].unique().tolist()
-                # Add a unique key to avoid duplication
-                selected_area = st.selectbox("Select Area", areas, key="select_area_area_wise")
+                selected_area = st.selectbox("Select Area", areas, key=f"select_area_{dataset_choice}")
                 df_area = df_train[df_train['area_name_en'] == selected_area]
                 
                 area_tabs = st.tabs(["Dimensions", "Metrics", "Categorical Distributions"])
                 
                 # --- Dimensions Tab ---
                 with area_tabs[0]:
-                    st.subheader(f"Dimensions for {selected_area}")
+                    st.subheader(f"Dimensions for {selected_area} — {dataset_choice}")
                     st.dataframe(df_area.describe(include='all').transpose())
                 
                 # --- Metrics Tab ---
                 with area_tabs[1]:
-                    st.subheader(f"Metrics on meter_sale_price & procedure_area for {selected_area}")
+                    st.subheader(f"Metrics on meter_sale_price & procedure_area for {selected_area} — {dataset_choice}")
                     
                     numeric_cols = ['meter_sale_price', 'procedure_area']
                     numeric_cols_existing = [col for col in numeric_cols if col in df_area.columns]
@@ -1774,14 +1800,14 @@ elif page == "V2.1":
                         for col in numeric_cols_existing:
                             st.markdown(f"### {col} Distribution for {selected_area}")
                             fig_area = px.histogram(df_area, x=col, nbins=50, marginal="box",
-                                                    title=f"{col} Distribution with Boxplot for {selected_area}")
+                                                    title=f"{col} Distribution with Boxplot for {selected_area} — {dataset_choice}")
                             st.plotly_chart(fig_area, use_container_width=True)
                         
                         st.dataframe(df_area[numeric_cols_existing].describe().round(2))
                 
                 # --- Categorical Distributions Tab ---
                 with area_tabs[2]:
-                    st.subheader(f"Categorical Column Distributions for {selected_area}")
+                    st.subheader(f"Categorical Column Distributions for {selected_area} — {dataset_choice}")
                     
                     cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
                                 'metro','has_parking','property_sub_type_en']
@@ -1797,14 +1823,14 @@ elif page == "V2.1":
                             ).reset_index()
                             
                             fig = px.bar(chart_df, x=col, y='nRecords', color=col,
-                                         title=f"{col} Distribution vs Avg Meter Sale Price for {selected_area}")
+                                         title=f"{col} Distribution vs Avg Meter Sale Price for {selected_area} — {dataset_choice}")
                             fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
                                             mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
                             fig.update_layout(
                                 yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
                             )
-                            # Use a unique key per plot
-                            st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}")
+                            st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}_{dataset_choice}")
+
 
 import pandas as pd
 import numpy as np
