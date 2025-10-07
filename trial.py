@@ -1324,7 +1324,7 @@ elif page == "V2.1":
     
     # Sidebar navigation
     sidebar_option = st.sidebar.radio("Choose Section", [
-        "📂 Data Files",
+        "📂 Data Understanding",
         "📊 EDA & Feature Engineering",
         "📈 Model Results",
         "validation",
@@ -1363,11 +1363,11 @@ elif page == "V2.1":
 
         
     # --- Data Files Tab with inner tabs ---
-    if sidebar_option == "📂 Data Files":
+    if sidebar_option == "📂 Data Understanding":
         st.header("📂 Data Files Overview")
         
         # Create inner tabs for Training and Test data
-        tab1, tab2,tab3 = st.tabs(["Overview","Train Data","Test Data"])
+        tab1, tab2,tab3,tab4 = st.tabs(["Overview","Train Data","pareto_analysis","forecast_data_raw"])
         
         # --- Training Data Tab ---
         with tab1:  
@@ -1435,10 +1435,79 @@ elif page == "V2.1":
             summary = data_summary(df_train)
             st.dataframe(summary)
 
+        with tab3:
+            
+            import streamlit as st
+            import plotly.graph_objects as go
+            pareto_df = pd.read_csv('pareto_df_22_25.csv')
+            pareto_df = pareto_df.drop(columns=[col for col in drop_col if col in pareto_df.columns])
+            st.subheader("📈 Area Wise Records")
+            
+            # --- Find the 80% threshold from your existing table ---
+            threshold_index = pareto_df[pareto_df['cum_percent'] >= 80].index.min()
+            threshold_area = pareto_df.loc[threshold_index, 'area_name_en']
+            threshold_value = pareto_df.loc[threshold_index, 'cum_percent']
+            
+            # --- Build Plotly chart ---
+            fig = go.Figure()
+            
+            # Bar chart for record counts
+            fig.add_trace(go.Bar(
+                x=pareto_df['area_name_en'],
+                y=pareto_df['count'],
+                name='Record Count',
+                marker_color='steelblue',
+                yaxis='y1'
+            ))
+            
+            # Line chart for cumulative %
+            fig.add_trace(go.Scatter(
+                x=pareto_df['area_name_en'],
+                y=pareto_df['cum_percent'],
+                name='Cumulative %',
+                yaxis='y2',
+                mode='lines+markers',
+                marker=dict(color='darkorange'),
+                line=dict(width=2)
+            ))
+            
+            # --- Add 80% horizontal line ---
+            fig.add_hline(
+                y=80,
+                line_dash="dash",
+                line_color="red",
+                annotation_text="80% Threshold",
+                annotation_position="top left"
+            )
+            
+            # --- Add vertical line at threshold area ---
+            fig.add_vline(
+                x=threshold_index,
+                line_dash="dot",
+                line_color="red",
+                annotation_text=f"{threshold_area} ({threshold_value:.1f}%)",
+                annotation_position="top right"
+            )
+            
+            # --- Layout settings ---
+            fig.update_layout(
+                title='Pareto Chart - Area Wise Records (with 80% Line)',
+                xaxis=dict(title='Area Name', tickangle=45, showgrid=False),
+                yaxis=dict(title='Record Count'),
+                yaxis2=dict(title='Cumulative %', overlaying='y', side='right', range=[0, 110]),
+                legend=dict(x=0.75, y=1.15, orientation='h'),
+                height=650,
+                width=1100,
+                template='plotly_white'
+            )
+            
+            # --- Display chart ---
+            st.plotly_chart(fig, use_container_width=True)
 
+             st.dataframe(pareto_df)
             
         # --- Test Data Tab ---
-        with tab3:
+        with tab4:
             import streamlit as st
             import pandas as pd
             
