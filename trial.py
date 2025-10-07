@@ -1364,7 +1364,7 @@ elif page == "V2.1":
         
     # --- Data Files Tab with inner tabs ---
     if sidebar_option == "📂 Data Understanding":
-        st.header("📂 Data Files Overview")
+        #st.header("📂 Data Files Overview")
         
         # Create inner tabs for Training and Test data
         tab1, tab2,tab3,tab4 = st.tabs(["Overview","Train Data","pareto_analysis","forecast_data_raw"])
@@ -1419,7 +1419,7 @@ elif page == "V2.1":
                 })
                 return summary
             
-            st.title("📊 Dataset Summary")
+            #st.title("📊 Dataset Summary")
             
             # Example: load your dataset
             # df_train = pd.read_csv("your_dataset.csv")
@@ -1443,7 +1443,7 @@ elif page == "V2.1":
             import plotly.graph_objects as go
             pareto_df = pd.read_csv('pareto_df_22_25.csv')
             pareto_df = pareto_df.drop(columns=[col for col in drop_col if col in pareto_df.columns])
-            st.subheader("📈 Area Wise Records")
+            #st.subheader("📈 Area Wise Records")
             
             # --- Find the 80% threshold from your existing table ---
             threshold_index = pareto_df[pareto_df['cum_percent'] >= 80].index.min()
@@ -1547,7 +1547,7 @@ elif page == "V2.1":
     if sidebar_option == "📊 EDA & Feature Engineering":
         #st.header("📊 EDA & Feature Engineering")
         
-        main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis", "Area-wise Analysis"])
+        main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis"])
         with main_tabs[0]:
             import streamlit as st
             import pandas as pd
@@ -1706,7 +1706,7 @@ elif page == "V2.1":
             # 3️⃣ Main Streamlit App
             # -------------------------
             def main():
-                st.title("📊 Area-wise Meter Sale Price Analysis")
+               # st.title("📊 Area-wise Meter Sale Price Analysis")
                 
                 # Dataset selection
                 st.sidebar.header("Dataset Selection")
@@ -1756,151 +1756,151 @@ elif page == "V2.1":
             if __name__ == "__main__":
                 main()
 
-                
-        import streamlit as st
-        import pandas as pd
-        import plotly.express as px
-        
-        # =========================
-        # Load datasets
-        # =========================
-        df_before = pd.read_csv("over_all_dataset_og.csv")
-        df_before = df_before.drop(columns=[col for col in drop_col if col in df_before.columns])
-        df_after = pd.read_csv("over_all_dataset.csv")
-        df_after = df_after.drop(columns=[col for col in drop_col if col in df_after.columns])
-        
-        
-        # Select which dataset to view
-        dataset_choice = st.radio(
-            "Choose Dataset:",
-            ("Before Outlier Removal", "After Outlier Removal"),
-            horizontal=True
-        )
-        
-        # Assign based on choice
-        if dataset_choice == "Before Outlier Removal":
-            df_train = df_before.copy()
-        else:
-            df_train = df_after.copy()
-        
-        # =========================
-        # Main Tabs
-        # =========================
-        main_tabs = st.tabs(["Distributions & Metrics", "Area-wise Analysis"])
-        
-        # =========================
-        # 1️⃣ Distributions & Metrics
-        # =========================
-        with main_tabs[0]:
-            sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
+        with main_tabs[1]:            
+            import streamlit as st
+            import pandas as pd
+            import plotly.express as px
             
-            # --- Distribution Tab ---
-            with sub_tab1:
-                st.subheader(f"Categorical Columns Distribution — {dataset_choice}")
-                
-                cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
-                            'metro','has_parking','area_name_en','property_sub_type_en']
-                cat_cols_existing = [col for col in cat_cols if col in df_train.columns]
-                
-                if not cat_cols_existing:
-                    st.warning("No categorical columns found in the dataset.")
-                else:
-                    for col in cat_cols_existing:
-                        chart_df = df_train.groupby(col).agg(
-                            nRecords=('meter_sale_price','count'),
-                            Avg_Meter_Sale_Price=('meter_sale_price','mean')
-                        ).reset_index()
-                        
-                        fig = px.bar(chart_df, x=col, y='nRecords', color=col,
-                                     title=f"{col} Distribution vs Avg Meter Sale Price — {dataset_choice}")
-                        fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
-                                        mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
-                        fig.update_layout(
-                            yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+            # =========================
+            # Load datasets
+            # =========================
+            df_before = pd.read_csv("over_all_dataset_og.csv")
+            df_before = df_before.drop(columns=[col for col in drop_col if col in df_before.columns])
+            df_after = pd.read_csv("over_all_dataset.csv")
+            df_after = df_after.drop(columns=[col for col in drop_col if col in df_after.columns])
             
-            # --- Metrics Tab ---
-            with sub_tab2:
-                st.subheader(f"Metrics on meter_sale_price & procedure_area — {dataset_choice}")
-                
-                numeric_cols = ['meter_sale_price', 'procedure_area']
-                numeric_cols_existing = [col for col in numeric_cols if col in df_train.columns]
-                
-                if not numeric_cols_existing:
-                    st.warning("No numeric columns found in the dataset.")
-                else:
-                    for col in numeric_cols_existing:
-                        st.markdown(f"### {col} Distribution")
-                        fig_hist = px.histogram(df_train, x=col, nbins=50, marginal="box",
-                                                title=f"{col} Distribution with Boxplot — {dataset_choice}")
-                        st.plotly_chart(fig_hist, use_container_width=True)
-                    
-                    st.dataframe(df_train[numeric_cols_existing].describe().round(2))
-        
-        # =========================
-        # 2️⃣ Area-wise Analysis
-        # =========================
-        with main_tabs[1]:
-            st.subheader(f"Area-wise Analysis — {dataset_choice}")
             
-            if 'area_name_en' not in df_train.columns:
-                st.warning("'area_name_en' column not found in dataset.")
+            # Select which dataset to view
+            dataset_choice = st.radio(
+                "Choose Dataset:",
+                ("Before Outlier Removal", "After Outlier Removal"),
+                horizontal=True
+            )
+            
+            # Assign based on choice
+            if dataset_choice == "Before Outlier Removal":
+                df_train = df_before.copy()
             else:
-                areas = df_train['area_name_en'].unique().tolist()
-                selected_area = st.selectbox("Select Area", areas, key=f"select_area_{dataset_choice}")
-                df_area = df_train[df_train['area_name_en'] == selected_area]
+                df_train = df_after.copy()
+            
+            # =========================
+            # Main Tabs
+            # =========================
+            main_tabs = st.tabs(["Distributions & Metrics", "Area-wise Analysis"])
+            
+            # =========================
+            # 1️⃣ Distributions & Metrics
+            # =========================
+            with main_tabs[0]:
+                sub_tab1, sub_tab2 = st.tabs(["Distribution", "Metrics"])
                 
-                area_tabs = st.tabs(["Dimensions", "Metrics", "Categorical Distributions"])
-                
-                # --- Dimensions Tab ---
-                with area_tabs[0]:
-                    st.subheader(f"Dimensions for {selected_area} — {dataset_choice}")
-                    st.dataframe(df_area.describe(include='all').transpose())
-                
-                # --- Metrics Tab ---
-                with area_tabs[1]:
-                    st.subheader(f"Metrics on meter_sale_price & procedure_area for {selected_area} — {dataset_choice}")
-                    
-                    numeric_cols = ['meter_sale_price', 'procedure_area']
-                    numeric_cols_existing = [col for col in numeric_cols if col in df_area.columns]
-                    
-                    if not numeric_cols_existing:
-                        st.warning("No numeric columns found in the area dataset.")
-                    else:
-                        for col in numeric_cols_existing:
-                            st.markdown(f"### {col} Distribution for {selected_area}")
-                            fig_area = px.histogram(df_area, x=col, nbins=50, marginal="box",
-                                                    title=f"{col} Distribution with Boxplot for {selected_area} — {dataset_choice}")
-                            st.plotly_chart(fig_area, use_container_width=True)
-                        
-                        st.dataframe(df_area[numeric_cols_existing].describe().round(2))
-                
-                # --- Categorical Distributions Tab ---
-                with area_tabs[2]:
-                    st.subheader(f"Categorical Column Distributions for {selected_area} — {dataset_choice}")
+                # --- Distribution Tab ---
+                with sub_tab1:
+                    #st.subheader(f"Categorical Columns Distribution — {dataset_choice}")
                     
                     cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
-                                'metro','has_parking','property_sub_type_en']
-                    cat_cols_existing = [col for col in cat_cols if col in df_area.columns]
+                                'metro','has_parking','area_name_en','property_sub_type_en']
+                    cat_cols_existing = [col for col in cat_cols if col in df_train.columns]
                     
                     if not cat_cols_existing:
-                        st.warning("No categorical columns found for this area.")
+                        st.warning("No categorical columns found in the dataset.")
                     else:
                         for col in cat_cols_existing:
-                            chart_df = df_area.groupby(col).agg(
+                            chart_df = df_train.groupby(col).agg(
                                 nRecords=('meter_sale_price','count'),
                                 Avg_Meter_Sale_Price=('meter_sale_price','mean')
                             ).reset_index()
                             
                             fig = px.bar(chart_df, x=col, y='nRecords', color=col,
-                                         title=f"{col} Distribution vs Avg Meter Sale Price for {selected_area} — {dataset_choice}")
+                                         title=f"{col} Distribution vs Avg Meter Sale Price — {dataset_choice}")
                             fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
                                             mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
                             fig.update_layout(
                                 yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
                             )
-                            st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}_{dataset_choice}")
+                            st.plotly_chart(fig, use_container_width=True)
+                
+                # --- Metrics Tab ---
+                with sub_tab2:
+                    #st.subheader(f"Metrics on meter_sale_price & procedure_area — {dataset_choice}")
+                    
+                    numeric_cols = ['meter_sale_price', 'procedure_area']
+                    numeric_cols_existing = [col for col in numeric_cols if col in df_train.columns]
+                    
+                    if not numeric_cols_existing:
+                        st.warning("No numeric columns found in the dataset.")
+                    else:
+                        for col in numeric_cols_existing:
+                            st.markdown(f"### {col} Distribution")
+                            fig_hist = px.histogram(df_train, x=col, nbins=50, marginal="box",
+                                                    title=f"{col} Distribution with Boxplot — {dataset_choice}")
+                            st.plotly_chart(fig_hist, use_container_width=True)
+                        
+                        st.dataframe(df_train[numeric_cols_existing].describe().round(2))
+            
+            # =========================
+            # 2️⃣ Area-wise Analysis
+            # =========================
+            with main_tabs[1]:
+                #st.subheader(f"Area-wise Analysis — {dataset_choice}")
+                
+                if 'area_name_en' not in df_train.columns:
+                    st.warning("'area_name_en' column not found in dataset.")
+                else:
+                    areas = df_train['area_name_en'].unique().tolist()
+                    selected_area = st.selectbox("Select Area", areas, key=f"select_area_{dataset_choice}")
+                    df_area = df_train[df_train['area_name_en'] == selected_area]
+                    
+                    area_tabs = st.tabs(["Dimensions", "Metrics", "Categorical Distributions"])
+                    
+                    # --- Dimensions Tab ---
+                    with area_tabs[0]:
+                        #st.subheader(f"Dimensions for {selected_area} — {dataset_choice}")
+                        st.dataframe(df_area.describe(include='all').transpose())
+                    
+                    # --- Metrics Tab ---
+                    with area_tabs[1]:
+                        #st.subheader(f"Metrics on meter_sale_price & procedure_area for {selected_area} — {dataset_choice}")
+                        
+                        numeric_cols = ['meter_sale_price', 'procedure_area']
+                        numeric_cols_existing = [col for col in numeric_cols if col in df_area.columns]
+                        
+                        if not numeric_cols_existing:
+                            st.warning("No numeric columns found in the area dataset.")
+                        else:
+                            for col in numeric_cols_existing:
+                                st.markdown(f"### {col} Distribution for {selected_area}")
+                                fig_area = px.histogram(df_area, x=col, nbins=50, marginal="box",
+                                                        title=f"{col} Distribution with Boxplot for {selected_area} — {dataset_choice}")
+                                st.plotly_chart(fig_area, use_container_width=True)
+                            
+                            st.dataframe(df_area[numeric_cols_existing].describe().round(2))
+                    
+                    # --- Categorical Distributions Tab ---
+                    with area_tabs[2]:
+                       # st.subheader(f"Categorical Column Distributions for {selected_area} — {dataset_choice}")
+                        
+                        cat_cols = ['rooms_en','floor_bin','swimming_pool','balcony','elevator', 
+                                    'metro','has_parking','property_sub_type_en']
+                        cat_cols_existing = [col for col in cat_cols if col in df_area.columns]
+                        
+                        if not cat_cols_existing:
+                            st.warning("No categorical columns found for this area.")
+                        else:
+                            for col in cat_cols_existing:
+                                chart_df = df_area.groupby(col).agg(
+                                    nRecords=('meter_sale_price','count'),
+                                    Avg_Meter_Sale_Price=('meter_sale_price','mean')
+                                ).reset_index()
+                                
+                                fig = px.bar(chart_df, x=col, y='nRecords', color=col,
+                                             title=f"{col} Distribution vs Avg Meter Sale Price for {selected_area} — {dataset_choice}")
+                                fig.add_scatter(x=chart_df[col], y=chart_df['Avg_Meter_Sale_Price'],
+                                                mode='lines+markers', name='Avg Meter Sale Price', yaxis='y2')
+                                fig.update_layout(
+                                    yaxis2=dict(title='Avg Meter Sale Price', overlaying='y', side='right')
+                                )
+                                st.plotly_chart(fig, use_container_width=True, key=f"{col}_{selected_area}_{dataset_choice}")
 
 
 import pandas as pd
@@ -1981,10 +1981,10 @@ if sidebar_option == "📈 Model Results":
         #st.write("Area-wise model performance analysis")
         
         # Create tabs for different functionalities
-        tab1, tab2, tab3 = st.tabs(["📊 Predictions & Analysis","🔮 Forecasting_year_trends","Regression+forcasting"])
+        tab1, tab2, tab3 = st.tabs(["📊 Regression Model Prection","🔮 Forcasting Model","Regression+Forcasting"])
         
         with tab1:
-            st.header("📊 Model Predictions & Performance Analysis")
+            #st.header("📊 Model Predictions & Performance Analysis")
             import pandas as pd
             
             # =========================
@@ -2074,7 +2074,7 @@ if sidebar_option == "📈 Model Results":
                                 st.error(f"❌ Error predicting for {area}: {e}")
                                 continue
             
-                    status_text.text("✅ Prediction completed!")
+                    #status_text.text("✅ Prediction completed!")
                     progress_bar.empty()
             
                     # =========================
@@ -2129,15 +2129,15 @@ if sidebar_option == "📈 Model Results":
                         st.subheader("📊 Prediction Visualizations")
                         
                         # Tab for different visualizations
-                        viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📈 Performance Metrics", "🔍 Actual vs Predicted", "📊 Area Comparison"])
+                        viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📈 Performance Metrics", "🔍 Actual vs Predicted", "📊 Area wise Comparison"])
                         
                         with viz_tab1:
                             # R2 Score Bar Chart
                             fig_r2 = px.bar(
                                 x=test_metrics_df.index,
                                 y=test_metrics_df['R2'],
-                                title="R² Scores by Area",
-                                labels={'x': 'Area', 'y': 'R² Score'},
+                                title="R² Scores by area_name_en",
+                                labels={'x': 'area_name_en', 'y': 'R² Score'},
                                 color=test_metrics_df['R2'],
                                 color_continuous_scale="RdYlGn"
                             )
@@ -2194,7 +2194,7 @@ if sidebar_option == "📈 Model Results":
                             fig_prices = go.Figure()
                             fig_prices.add_trace(go.Bar(name='Actual Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Actual_Price']))
                             fig_prices.add_trace(go.Bar(name='Predicted Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Predicted_Price']))
-                            fig_prices.update_layout(title="Average Actual vs Predicted Prices by Area", barmode='group', height=500)
+                            fig_prices.update_layout(title="Average Actual vs Predicted Prices by area_name_en", barmode='group', height=500)
                             st.plotly_chart(fig_prices, use_container_width=True)
                             
                             # Error percentage by area
@@ -2202,7 +2202,7 @@ if sidebar_option == "📈 Model Results":
                             fig_error_pct = px.bar(
                                 x=error_percentage.index,
                                 y=error_percentage.values,
-                                title="Absolute Error Percentage by Area",
+                                title="Absolute Error Percentage by area_name_en",
                                 labels={'x': 'Area', 'y': 'Error %'},
                                 color=error_percentage.values,
                                 color_continuous_scale="Reds"
@@ -2312,12 +2312,6 @@ if sidebar_option == "📈 Model Results":
             # Load models and preprocessing
             area_models, ohe = load_models_and_preprocessing()
             
-            # Display loaded areas for debugging
-            st.sidebar.markdown("### 🔍 Loaded Areas")
-            if area_models:
-                st.sidebar.success(f"✅ {len(area_models)} areas loaded")
-            else:
-                st.sidebar.error("❌ No areas loaded")
             
             # =========================
             # LOAD DATA FOR FORECASTING TAB
@@ -2555,7 +2549,7 @@ if sidebar_option == "📈 Model Results":
                 # =========================
                 # VISUALIZATIONS
                 # =========================
-                st.success(f"✅ Forecast generated for {selected_area}")
+                #st.success(f"✅ Forecast generated for {selected_area}")
                 
                 # Helper function for formatting quarters
                 def format_quarter_label(quarter_str):
@@ -2607,7 +2601,7 @@ if sidebar_option == "📈 Model Results":
                     return time_periods, predicted_prices, actual_prices
                 
                 # 1️⃣ Main Forecast Visualization with Actual vs Predicted
-                st.subheader(f"📈 Quarterly Price Forecast for {selected_area}")
+               # st.subheader(f"📈 Quarterly Price Forecast for {selected_area}")
                 
                 if not final_overall_forecast.empty:
                     row = final_overall_forecast.iloc[0]
@@ -2693,7 +2687,7 @@ if sidebar_option == "📈 Model Results":
                     fig_main.update_layout(
                         title=f"Quarterly Price Forecast with Growth Factors - {selected_area}",
                         xaxis_title="Time Period (Quarterly)",
-                        yaxis_title="Price (AED)",
+                        yaxis_title="Meter Sale Price",
                         height=500,
                         template="plotly_white",
                         showlegend=True,
@@ -3057,7 +3051,7 @@ if sidebar_option == "validation":
     df_test_forcast = pd.read_csv('df_test_forcast.csv')
     df_test_forcast['diff_%'] = (df_test_forcast['median_growth'] - df_test_forcast['actual_median']) / df_test_forcast['median_growth'] * 100
     
-    st.title("📊 Predicted vs Actual Median Prices with Difference %")
+    #st.title("📊 Predicted vs Actual Median Prices with Difference %")
     
     fig = go.Figure()
     
@@ -3086,8 +3080,8 @@ if sidebar_option == "validation":
     # --- Layout ---
     fig.update_layout(
         title="Predicted vs Actual Median Prices with Diff %",
-        xaxis=dict(title="Area"),
-        yaxis=dict(title="Price"),
+        xaxis=dict(title="area_name_en"),
+        yaxis=dict(title="Meter sale price"),
         yaxis2=dict(
             title="Difference %",
             overlaying="y",
