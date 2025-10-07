@@ -1477,213 +1477,213 @@ elif page == "V2.1":
         #st.header("📊 EDA & Feature Engineering")
         
         main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis", "Area-wise Analysis"])
-        
-        import streamlit as st
-        import pandas as pd
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-        import os
-        
-        # -------------------------
-        # 1️⃣ Time period helper
-        # -------------------------
-        def create_time_period_column(df, time_period):
-            df = df.copy()
-            df['instance_date'] = pd.to_datetime(df['instance_date'])
+        with main_tabs[0]:
+            import streamlit as st
+            import pandas as pd
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            import os
             
-            if time_period == 'Daily':
-                df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
-                df['sort_key'] = df['instance_date']
-            elif time_period == 'Weekly':
-                df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
-                df['sort_key'] = df['instance_date'] - pd.to_timedelta(df['instance_date'].dt.weekday, unit='d')  # Monday of week
-            elif time_period == 'Monthly':
-                df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
-                df['sort_key'] = df['instance_date'].values.astype('datetime64[M]')
-            elif time_period == 'Quarterly':
-                df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
-                df['sort_key'] = pd.PeriodIndex(df['instance_date'], freq='Q').start_time
-            elif time_period == 'Half-Yearly':
-                df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
-                df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
-                # Sort key as first day of half-year
-                df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
-                df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-' + ((df['half_year']-1)*6 + 1).astype(str) + '-01')
-            elif time_period == 'Yearly':
-                df['time_period'] = df['instance_date'].dt.strftime('%Y')
-                df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-01-01')
-            
-            return df
-        
-        # -------------------------
-        # 2️⃣ Create area box plot function
-        # -------------------------
-        def create_area_box_plot(df, time_period, plot_title="Area Analysis"):
-            df = create_time_period_column(df, time_period)
-            
-            # Calculate stats per period
-            box_stats = []
-            for period, group in df.groupby('time_period'):
-                vals = group['meter_sale_price']
-                q1 = vals.quantile(0.25)
-                q3 = vals.quantile(0.75)
-                iqr = q3 - q1
-                lower = q1 - 1.5*iqr
-                upper = q3 + 1.5*iqr
-                median = vals.median()
-                outliers = vals[(vals < lower) | (vals > upper)]
+            # -------------------------
+            # 1️⃣ Time period helper
+            # -------------------------
+            def create_time_period_column(df, time_period):
+                df = df.copy()
+                df['instance_date'] = pd.to_datetime(df['instance_date'])
                 
-                # Impute outliers
-                s_imputed = vals.copy()
-                if len(outliers) > 0:
-                    s_imputed[outliers.index] = vals.rolling(window=3, center=True, min_periods=1).median().loc[outliers.index]
+                if time_period == 'Daily':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
+                    df['sort_key'] = df['instance_date']
+                elif time_period == 'Weekly':
+                    df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
+                    df['sort_key'] = df['instance_date'] - pd.to_timedelta(df['instance_date'].dt.weekday, unit='d')  # Monday of week
+                elif time_period == 'Monthly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
+                    df['sort_key'] = df['instance_date'].values.astype('datetime64[M]')
+                elif time_period == 'Quarterly':
+                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    df['sort_key'] = pd.PeriodIndex(df['instance_date'], freq='Q').start_time
+                elif time_period == 'Half-Yearly':
+                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
+                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    # Sort key as first day of half-year
+                    df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-' + ((df['half_year']-1)*6 + 1).astype(str) + '-01')
+                elif time_period == 'Yearly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y')
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-01-01')
                 
-                box_stats.append({
-                    'period': period,
-                    'vals': vals,
-                    'median': median,
-                    'imputed_median': s_imputed.median(),
-                    'n_records': len(vals),
-                    'lower': lower,
-                    'upper': upper,
-                    'sort_key': group['sort_key'].min()  # Use for ordering
-                })
+                return df
             
-            # Sort by sort_key
-            box_stats = sorted(box_stats, key=lambda x: x['sort_key'])
-            
-            x_periods = [p['period'] for p in box_stats]
-            y_original = [p['median'] for p in box_stats]
-            y_imputed = [p['imputed_median'] for p in box_stats]
-            x_keys = [p['sort_key'] for p in box_stats]
-            
-            fig = make_subplots(specs=[[{"secondary_y": True}]])
-            
-            # Box plots
-            for i, stats in enumerate(box_stats):
-                fig.add_trace(go.Box(
-                    y=stats['vals'],
-                    x=[stats['sort_key']]*len(stats['vals']),
-                    name='Box Plot',
-                    marker_color='lightblue',
+            # -------------------------
+            # 2️⃣ Create area box plot function
+            # -------------------------
+            def create_area_box_plot(df, time_period, plot_title="Area Analysis"):
+                df = create_time_period_column(df, time_period)
+                
+                # Calculate stats per period
+                box_stats = []
+                for period, group in df.groupby('time_period'):
+                    vals = group['meter_sale_price']
+                    q1 = vals.quantile(0.25)
+                    q3 = vals.quantile(0.75)
+                    iqr = q3 - q1
+                    lower = q1 - 1.5*iqr
+                    upper = q3 + 1.5*iqr
+                    median = vals.median()
+                    outliers = vals[(vals < lower) | (vals > upper)]
+                    
+                    # Impute outliers
+                    s_imputed = vals.copy()
+                    if len(outliers) > 0:
+                        s_imputed[outliers.index] = vals.rolling(window=3, center=True, min_periods=1).median().loc[outliers.index]
+                    
+                    box_stats.append({
+                        'period': period,
+                        'vals': vals,
+                        'median': median,
+                        'imputed_median': s_imputed.median(),
+                        'n_records': len(vals),
+                        'lower': lower,
+                        'upper': upper,
+                        'sort_key': group['sort_key'].min()  # Use for ordering
+                    })
+                
+                # Sort by sort_key
+                box_stats = sorted(box_stats, key=lambda x: x['sort_key'])
+                
+                x_periods = [p['period'] for p in box_stats]
+                y_original = [p['median'] for p in box_stats]
+                y_imputed = [p['imputed_median'] for p in box_stats]
+                x_keys = [p['sort_key'] for p in box_stats]
+                
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                
+                # Box plots
+                for i, stats in enumerate(box_stats):
+                    fig.add_trace(go.Box(
+                        y=stats['vals'],
+                        x=[stats['sort_key']]*len(stats['vals']),
+                        name='Box Plot',
+                        marker_color='lightblue',
+                        line=dict(color='blue'),
+                        boxpoints='outliers',
+                        showlegend=True if i==0 else False,
+                        width=0.4,
+                        hovertemplate=(
+                            f"<b>Period:</b> {stats['period']}<br>"
+                            f"Min: {stats['lower']:.1f}<br>"
+                            f"Median: {stats['median']:.1f}<br>"
+                            f"Max: {stats['upper']:.1f}<br>"
+                            f"Outliers: {len(stats['vals'][(stats['vals'] < stats['lower']) | (stats['vals'] > stats['upper'])])}<br>"
+                            f"Records: {stats['n_records']}"
+                        )
+                    ), secondary_y=False)
+                    
+                    # Record count bars
+                    fig.add_trace(go.Bar(
+                        x=[stats['sort_key']],
+                        y=[stats['n_records']],
+                        name='No. of Records',
+                        marker_color='lightgray',
+                        opacity=0.5,
+                        showlegend=False
+                    ), secondary_y=True)
+                
+                # Original median line
+                fig.add_trace(go.Scatter(
+                    x=x_keys,
+                    y=y_original,
+                    mode='lines+markers',
+                    name='Original Median',
                     line=dict(color='blue'),
-                    boxpoints='outliers',
-                    showlegend=True if i==0 else False,
-                    width=0.4,
-                    hovertemplate=(
-                        f"<b>Period:</b> {stats['period']}<br>"
-                        f"Min: {stats['lower']:.1f}<br>"
-                        f"Median: {stats['median']:.1f}<br>"
-                        f"Max: {stats['upper']:.1f}<br>"
-                        f"Outliers: {len(stats['vals'][(stats['vals'] < stats['lower']) | (stats['vals'] > stats['upper'])])}<br>"
-                        f"Records: {stats['n_records']}"
-                    )
+                    marker=dict(size=8)
                 ), secondary_y=False)
                 
-                # Record count bars
-                fig.add_trace(go.Bar(
-                    x=[stats['sort_key']],
-                    y=[stats['n_records']],
-                    name='No. of Records',
-                    marker_color='lightgray',
-                    opacity=0.5,
-                    showlegend=False
-                ), secondary_y=True)
-            
-            # Original median line
-            fig.add_trace(go.Scatter(
-                x=x_keys,
-                y=y_original,
-                mode='lines+markers',
-                name='Original Median',
-                line=dict(color='blue'),
-                marker=dict(size=8)
-            ), secondary_y=False)
-            
-            # Imputed median line
-            fig.add_trace(go.Scatter(
-                x=x_keys,
-                y=y_imputed,
-                mode='lines+markers',
-                name='Imputed Median',
-                line=dict(color='orange', dash='dash'),
-                marker=dict(size=8)
-            ), secondary_y=False)
-            
-            # Layout
-            fig.update_layout(
-                title=plot_title,
-                xaxis_title="Period",
-                yaxis_title="Meter Sale Price",
-                yaxis2_title="No. of Records",
-                template="plotly_white",
-                boxmode='group',
-                height=600,
-                legend=dict(x=0, y=1)
-            )
-            
-            # Show proper period labels
-            fig.update_xaxes(
-                tickvals=x_keys,
-                ticktext=x_periods,
-                tickangle=45
-            )
-            
-            return fig
-        
-        # -------------------------
-        # 3️⃣ Main Streamlit App
-        # -------------------------
-        def main():
-            st.title("📊 Area-wise Meter Sale Price Analysis")
-            
-            # Dataset selection
-            st.sidebar.header("Dataset Selection")
-            dataset_options = {
-                "fore_cast_raw_data" : "forcast_model_16_25.csv",
-                "Actual_data": "over_all_dataset_og.csv",
-                #"Data without_outliers": "over_all_dataset.csv",
-                "Areas with 6000": "df_trained_dataset_6000.csv"
-            }
-            
-            selected_dataset = st.sidebar.selectbox("Choose Dataset", options=list(dataset_options.keys()))
-            file_path = dataset_options[selected_dataset]
-            
-            if not os.path.exists(file_path):
-                st.error(f"File not found: {file_path}")
-                return
-            
-            df = pd.read_csv(file_path)
-            required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
-            missing = [c for c in required_columns if c not in df.columns]
-            if missing:
-                st.error(f"Missing required columns: {', '.join(missing)}")
-                return
-            
-            tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
-            
-            # Whole Data Tab
-            with tabs[0]:
-                time_period_whole = st.selectbox("Select Time Period", ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'], index=2, key="whole_time_period")
-                st.plotly_chart(create_area_box_plot(df, time_period_whole, "Whole Dataset Analysis"), use_container_width=True)
-            
-            # Area-wise Tab
-            with tabs[1]:
-                areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
-                selected_area = st.selectbox("Select Area", areas_all, index=0, key="area_select")
-                time_period_area = st.selectbox("Select Time Period", ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'], index=2, key="area_time_period")
+                # Imputed median line
+                fig.add_trace(go.Scatter(
+                    x=x_keys,
+                    y=y_imputed,
+                    mode='lines+markers',
+                    name='Imputed Median',
+                    line=dict(color='orange', dash='dash'),
+                    marker=dict(size=8)
+                ), secondary_y=False)
                 
-                if selected_area != "All Areas":
-                    df_area = df[df['area_name_en'] == selected_area]
-                    title = f"{selected_area} Analysis"
-                else:
-                    df_area = df.copy()
-                    title = "All Areas Analysis"
+                # Layout
+                fig.update_layout(
+                    title=plot_title,
+                    xaxis_title="Period",
+                    yaxis_title="Meter Sale Price",
+                    yaxis2_title="No. of Records",
+                    template="plotly_white",
+                    boxmode='group',
+                    height=600,
+                    legend=dict(x=0, y=1)
+                )
                 
-                st.plotly_chart(create_area_box_plot(df_area, time_period_area, title), use_container_width=True)
-        
-        if __name__ == "__main__":
-            main()
+                # Show proper period labels
+                fig.update_xaxes(
+                    tickvals=x_keys,
+                    ticktext=x_periods,
+                    tickangle=45
+                )
+                
+                return fig
+            
+            # -------------------------
+            # 3️⃣ Main Streamlit App
+            # -------------------------
+            def main():
+                st.title("📊 Area-wise Meter Sale Price Analysis")
+                
+                # Dataset selection
+                st.sidebar.header("Dataset Selection")
+                dataset_options = {
+                    "fore_cast_raw_data" : "forcast_model_16_25.csv",
+                    "Actual_data": "over_all_dataset_og.csv",
+                    #"Data without_outliers": "over_all_dataset.csv",
+                    "Areas with 6000": "df_trained_dataset_6000.csv"
+                }
+                
+                selected_dataset = st.sidebar.selectbox("Choose Dataset", options=list(dataset_options.keys()))
+                file_path = dataset_options[selected_dataset]
+                
+                if not os.path.exists(file_path):
+                    st.error(f"File not found: {file_path}")
+                    return
+                
+                df = pd.read_csv(file_path)
+                required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
+                missing = [c for c in required_columns if c not in df.columns]
+                if missing:
+                    st.error(f"Missing required columns: {', '.join(missing)}")
+                    return
+                
+                tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
+                
+                # Whole Data Tab
+                with tabs[0]:
+                    time_period_whole = st.selectbox("Select Time Period", ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'], index=2, key="whole_time_period")
+                    st.plotly_chart(create_area_box_plot(df, time_period_whole, "Whole Dataset Analysis"), use_container_width=True)
+                
+                # Area-wise Tab
+                with tabs[1]:
+                    areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
+                    selected_area = st.selectbox("Select Area", areas_all, index=0, key="area_select")
+                    time_period_area = st.selectbox("Select Time Period", ['Daily','Weekly','Monthly','Quarterly','Half-Yearly','Yearly'], index=2, key="area_time_period")
+                    
+                    if selected_area != "All Areas":
+                        df_area = df[df['area_name_en'] == selected_area]
+                        title = f"{selected_area} Analysis"
+                    else:
+                        df_area = df.copy()
+                        title = "All Areas Analysis"
+                    
+                    st.plotly_chart(create_area_box_plot(df_area, time_period_area, title), use_container_width=True)
+            
+            if __name__ == "__main__":
+                main()
 
 
 
