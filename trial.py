@@ -1396,8 +1396,10 @@ elif page == "V2.1":
             
             st.subheader("🤖 Models Used")
             st.markdown("""
-            1. **Decision Tree** – for regression (price prediction).  
-            2. **Auto ARIMA** – for time series forecasting.  
+            1. **Decision Tree** – for regression (price prediction). (2022-2025)
+            2. **Auto ARIMA** – for time series forecasting.  (2016-2025)
+            -----------------------------------------------------------------
+            3. **Final prediction = regresion prediction * Growth factor (forcast Model)
             """)
 
     
