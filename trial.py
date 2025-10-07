@@ -2294,14 +2294,14 @@ if sidebar_option == "📈 Model Results":
                     recent_quarters = sorted(historical_mean['year_quarter'].unique())
                     historical_pivot_recent = historical_pivot[['area_name_en'] + recent_quarters]
                     
-                    return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, growth_lower_pivot, growth_upper_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot
+                    return test_samples_forecast, X_test_forecast, train_columns, growth_pivot, growth_lower_pivot, growth_upper_pivot, historical_pivot_recent, recent_quarters, overall_historical_pivot, train_data
                 except Exception as e:
                     st.error(f"Error loading forecasting data: {str(e)}")
-                    return None, None, None, None, None, None, None, None, None
+                    return None, None, None, None, None, None, None, None, None, None
             
             # Load data
             with st.spinner("Loading forecasting data..."):
-                test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, growth_lower_pivot, growth_upper_pivot, historical_pivot, historical_quarters, overall_historical_pivot = load_forecasting_data()
+                test_samples_forecast, X_test_forecast_raw, train_columns, growth_pivot, growth_lower_pivot, growth_upper_pivot, historical_pivot, historical_quarters, overall_historical_pivot, train_data = load_forecasting_data()
             
             if test_samples_forecast is None:
                 st.error("❌ Failed to load forecasting data")
@@ -2356,6 +2356,7 @@ if sidebar_option == "📈 Model Results":
             st.sidebar.markdown("---")
             st.sidebar.subheader("📊 Display Options")
             show_historical = st.sidebar.checkbox("Show Historical Quarterly Trends", value=True)
+            show_actual_vs_predicted = st.sidebar.checkbox("Show Actual vs Predicted", value=True)
             show_growth_scenarios = st.sidebar.checkbox("Show Growth Scenarios", value=True)
             num_historical_quarters = st.sidebar.slider("Number of Historical Quarters to Show", min_value=1, max_value=12, value=4)
             
@@ -2383,29 +2384,37 @@ if sidebar_option == "📈 Model Results":
                     # Generate predictions
                     y_pred = model.predict(X_area_test)
                     
+                    # Get actual values from test data
+                    actual_values = test_samples_forecast.loc[mask, 'meter_sale_price'].values
+                    
                     # Create overall predictions dataframe
                     overall_pred_df = pd.DataFrame({
                         'area_name_en': [selected_area] * len(y_pred), 
-                        'prediction': y_pred
+                        'prediction': y_pred,
+                        'actual': actual_values
                     })
                     
-                    # Calculate overall mean prediction
-                    overall_mean = overall_pred_df['prediction'].mean()
+                    # Calculate overall mean prediction and actual
+                    overall_mean_pred = overall_pred_df['prediction'].mean()
+                    overall_mean_actual = overall_pred_df['actual'].mean()
                     
                     # Merge with growth factors
                     overall_forecast_df = pd.DataFrame({
                         'area_name_en': [selected_area],
-                        'prediction': [overall_mean]
+                        'prediction': [overall_mean_pred],
+                        'actual': [overall_mean_actual]
                     }).merge(growth_pivot, on='area_name_en', how='left')
                     
                     overall_forecast_lower_df = pd.DataFrame({
                         'area_name_en': [selected_area],
-                        'prediction': [overall_mean]
+                        'prediction': [overall_mean_pred],
+                        'actual': [overall_mean_actual]
                     }).merge(growth_lower_pivot, on='area_name_en', how='left')
                     
                     overall_forecast_upper_df = pd.DataFrame({
                         'area_name_en': [selected_area],
-                        'prediction': [overall_mean]
+                        'prediction': [overall_mean_pred],
+                        'actual': [overall_mean_actual]
                     }).merge(growth_upper_pivot, on='area_name_en', how='left')
                     
                     # Merge with historical data
@@ -2427,9 +2436,9 @@ if sidebar_option == "📈 Model Results":
                     if show_historical and historical_pivot is not None:
                         available_historical = [col for col in historical_pivot.columns if col != 'area_name_en']
                         selected_historical = available_historical[-num_historical_quarters:]
-                        all_quarter_cols = selected_historical + ['prediction'] + future_quarter_cols
+                        all_quarter_cols = selected_historical + ['prediction', 'actual'] + future_quarter_cols
                     else:
-                        all_quarter_cols = ['prediction'] + future_quarter_cols
+                        all_quarter_cols = ['prediction', 'actual'] + future_quarter_cols
                     
                     final_overall_forecast = overall_forecast_df[['area_name_en'] + all_quarter_cols]
                     final_overall_forecast_lower = overall_forecast_lower_df[['area_name_en'] + all_quarter_cols]
@@ -2449,30 +2458,37 @@ if sidebar_option == "📈 Model Results":
                     return quarter_str.replace('_', ' ').title()
                 
                 # Helper function to prepare forecast data for plotting
-                def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical):
+                def prepare_forecast_data(forecast_row, selected_historical, future_quarter_cols, show_historical, include_actual=True):
                     time_periods = []
-                    prices = []
+                    predicted_prices = []
+                    actual_prices = []
                     
                     # Add historical quarters
                     if show_historical:
                         historical_cols = [col for col in selected_historical if col in forecast_row.index and pd.notna(forecast_row[col])]
                         for hq in historical_cols:
                             time_periods.append(format_quarter_label(hq))
-                            prices.append(forecast_row[hq])
+                            actual_prices.append(forecast_row[hq])
+                            predicted_prices.append(np.nan)  # No predictions for historical
                     
-                    # Add current prediction
+                    # Add current prediction and actual
                     time_periods.append('Current')
-                    prices.append(forecast_row['prediction'])
+                    predicted_prices.append(forecast_row['prediction'])
+                    if include_actual and 'actual' in forecast_row and pd.notna(forecast_row['actual']):
+                        actual_prices.append(forecast_row['actual'])
+                    else:
+                        actual_prices.append(np.nan)
                     
                     # Add future quarters
                     for fq in future_quarter_cols:
                         if fq in forecast_row.index and pd.notna(forecast_row[fq]):
                             time_periods.append(format_quarter_label(fq))
-                            prices.append(forecast_row[fq])
+                            predicted_prices.append(forecast_row[fq])
+                            actual_prices.append(np.nan)  # No actual values for future
                     
-                    return time_periods, prices
+                    return time_periods, predicted_prices, actual_prices
                 
-                # 1️⃣ Main Forecast Visualization
+                # 1️⃣ Main Forecast Visualization with Actual vs Predicted
                 st.subheader(f"📈 Price Forecast for {selected_area}")
                 
                 if not final_overall_forecast.empty:
@@ -2480,30 +2496,44 @@ if sidebar_option == "📈 Model Results":
                     available_historical = [col for col in historical_pivot.columns if col != 'area_name_en'] if historical_pivot is not None else []
                     selected_historical = available_historical[-num_historical_quarters:] if show_historical else []
                     
-                    time_periods, base_prices = prepare_forecast_data(row, selected_historical, future_quarter_cols, show_historical)
+                    time_periods, predicted_prices, actual_prices = prepare_forecast_data(
+                        row, selected_historical, future_quarter_cols, show_historical, include_actual=True
+                    )
                     
                     fig_main = go.Figure()
                     
-                    # Add historical data
+                    # Add historical actual data
                     if show_historical:
                         historical_points = len([hq for hq in selected_historical if hq in row and pd.notna(row[hq])])
                         if historical_points > 0:
                             fig_main.add_trace(go.Scatter(
                                 x=time_periods[:historical_points],
-                                y=base_prices[:historical_points],
+                                y=actual_prices[:historical_points],
                                 mode='lines+markers',
-                                name='Historical Trend',
+                                name='Historical Actual',
                                 line=dict(color='blue', width=3),
                                 marker=dict(size=8, color='blue')
                             ))
                     
-                    # Add current prediction
+                    # Add current actual vs predicted
                     current_idx = len([hq for hq in selected_historical if hq in row and pd.notna(row[hq])]) if show_historical else 0
+                    
+                    # Current actual value
+                    if pd.notna(actual_prices[current_idx]):
+                        fig_main.add_trace(go.Scatter(
+                            x=[time_periods[current_idx]],
+                            y=[actual_prices[current_idx]],
+                            mode='markers',
+                            name='Current Actual',
+                            marker=dict(size=12, color='green', symbol='diamond')
+                        ))
+                    
+                    # Current predicted value
                     fig_main.add_trace(go.Scatter(
                         x=[time_periods[current_idx]],
-                        y=[base_prices[current_idx]],
+                        y=[predicted_prices[current_idx]],
                         mode='markers',
-                        name='Current Prediction',
+                        name='Current Predicted',
                         marker=dict(size=12, color='red', symbol='star')
                     ))
                     
@@ -2512,11 +2542,11 @@ if sidebar_option == "📈 Model Results":
                     if future_start_idx < len(time_periods):
                         fig_main.add_trace(go.Scatter(
                             x=time_periods[future_start_idx:],
-                            y=base_prices[future_start_idx:],
+                            y=predicted_prices[future_start_idx:],
                             mode='lines+markers',
                             name='Future Forecast',
-                            line=dict(color='green', width=3, dash='solid'),
-                            marker=dict(size=8, color='green')
+                            line=dict(color='orange', width=3, dash='solid'),
+                            marker=dict(size=8, color='orange')
                         ))
                     
                     # Add confidence intervals if showing scenarios
@@ -2524,8 +2554,8 @@ if sidebar_option == "📈 Model Results":
                         row_lower = final_overall_forecast_lower.iloc[0]
                         row_upper = final_overall_forecast_upper.iloc[0]
                         
-                        _, lower_prices = prepare_forecast_data(row_lower, selected_historical, future_quarter_cols, show_historical)
-                        _, upper_prices = prepare_forecast_data(row_upper, selected_historical, future_quarter_cols, show_historical)
+                        _, lower_prices, _ = prepare_forecast_data(row_lower, selected_historical, future_quarter_cols, show_historical, include_actual=False)
+                        _, upper_prices, _ = prepare_forecast_data(row_upper, selected_historical, future_quarter_cols, show_historical, include_actual=False)
                         
                         # Add confidence area for future periods
                         future_time_periods = time_periods[future_start_idx:]
@@ -2536,14 +2566,14 @@ if sidebar_option == "📈 Model Results":
                             x=future_time_periods + future_time_periods[::-1],
                             y=future_upper + future_lower[::-1],
                             fill='toself',
-                            fillcolor='rgba(0,100,80,0.2)',
+                            fillcolor='rgba(255,165,0,0.2)',
                             line=dict(color='rgba(255,255,255,0)'),
                             name='Confidence Interval',
                             showlegend=True
                         ))
                     
                     fig_main.update_layout(
-                        title=f"Price Forecast Trend - {selected_area}",
+                        title=f"Price Forecast with Actual vs Predicted - {selected_area}",
                         xaxis_title="Time Period",
                         yaxis_title="Price (AED)",
                         height=500,
@@ -2557,12 +2587,74 @@ if sidebar_option == "📈 Model Results":
                             line_width=2,
                             line_dash="dot",
                             line_color="gray",
-                            annotation_text="Historical → Forecast"
+                            annotation_text="Historical → Current"
                         )
                     
                     st.plotly_chart(fig_main, use_container_width=True)
                 
-                # 2️⃣ Clean Minimal Heatmap
+                # 2️⃣ Actual vs Predicted Comparison Chart
+                if show_actual_vs_predicted:
+                    st.subheader("📊 Actual vs Predicted Comparison")
+                    
+                    # Create a detailed comparison for current period
+                    comparison_data = []
+                    for idx, (pred, actual) in enumerate(zip(y_pred, actual_values)):
+                        comparison_data.append({
+                            'Instance': f'Property {idx+1}',
+                            'Predicted': pred,
+                            'Actual': actual,
+                            'Difference': actual - pred,
+                            'Error_Percentage': ((actual - pred) / actual) * 100 if actual != 0 else 0
+                        })
+                    
+                    comparison_df = pd.DataFrame(comparison_data)
+                    
+                    # Create comparison chart
+                    fig_comparison = go.Figure()
+                    
+                    fig_comparison.add_trace(go.Scatter(
+                        x=comparison_df['Instance'],
+                        y=comparison_df['Predicted'],
+                        mode='lines+markers',
+                        name='Predicted',
+                        line=dict(color='red', width=2),
+                        marker=dict(size=6, color='red')
+                    ))
+                    
+                    fig_comparison.add_trace(go.Scatter(
+                        x=comparison_df['Instance'],
+                        y=comparison_df['Actual'],
+                        mode='lines+markers',
+                        name='Actual',
+                        line=dict(color='green', width=2),
+                        marker=dict(size=6, color='green')
+                    ))
+                    
+                    fig_comparison.update_layout(
+                        title=f"Actual vs Predicted Prices - {selected_area}",
+                        xaxis_title="Property Instances",
+                        yaxis_title="Price (AED)",
+                        height=400,
+                        template="plotly_white",
+                        showlegend=True
+                    )
+                    
+                    st.plotly_chart(fig_comparison, use_container_width=True)
+                    
+                    # Display accuracy metrics
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    mae = np.mean(np.abs(comparison_df['Difference']))
+                    mape = np.mean(np.abs(comparison_df['Error_Percentage']))
+                    rmse = np.sqrt(np.mean(comparison_df['Difference']**2))
+                    accuracy = 100 - mape
+                    
+                    col1.metric("Mean Absolute Error", f"AED {mae:,.0f}")
+                    col2.metric("Mean Absolute % Error", f"{mape:.1f}%")
+                    col3.metric("RMSE", f"AED {rmse:,.0f}")
+                    col4.metric("Accuracy", f"{accuracy:.1f}%")
+                
+                # 3️⃣ Clean Minimal Heatmap
                 st.subheader("🔥 Market Overview Heatmap")
                 
                 # Prepare heatmap data for all areas (base scenario only)
@@ -2576,7 +2668,8 @@ if sidebar_option == "📈 Model Results":
                     historical_labels = [format_quarter_label(hq) for hq in selected_historical]
                     time_periods_heatmap.extend(historical_labels)
                 
-                time_periods_heatmap.append('Current')
+                time_periods_heatmap.append('Current Actual')
+                time_periods_heatmap.append('Current Predicted')
                 future_labels = [format_quarter_label(fq) for fq in future_quarter_cols]
                 time_periods_heatmap.extend(future_labels)
                 
@@ -2595,7 +2688,8 @@ if sidebar_option == "📈 Model Results":
                                 else:
                                     area_prices.append(np.nan)
                         
-                        # Current price
+                        # Current actual and predicted
+                        area_prices.append(row['actual'])
                         area_prices.append(row['prediction'])
                         
                         # Future prices
@@ -2613,14 +2707,16 @@ if sidebar_option == "📈 Model Results":
                 other_areas = [area for area in available_areas if area != selected_area][:5]
                 
                 for area in other_areas:
-                    # Simple prediction for other areas (you might want to load their actual forecasts)
+                    # Simple prediction for other areas
                     area_mask = test_samples_forecast['area_name_en'] == area
                     X_other_area = X_test_forecast.loc[area_mask]
                     
                     if len(X_other_area) > 0 and area in area_models:
                         other_model = area_models[area]
                         other_pred = other_model.predict(X_other_area)
-                        other_mean = np.mean(other_pred)
+                        other_actual = test_samples_forecast.loc[area_mask, 'meter_sale_price'].values
+                        other_mean_pred = np.mean(other_pred)
+                        other_mean_actual = np.mean(other_actual)
                         
                         area_prices = []
                         
@@ -2636,12 +2732,13 @@ if sidebar_option == "📈 Model Results":
                             else:
                                 area_prices.extend([np.nan] * len(selected_historical))
                         
-                        # Current price
-                        area_prices.append(other_mean)
+                        # Current actual and predicted
+                        area_prices.append(other_mean_actual)
+                        area_prices.append(other_mean_pred)
                         
                         # Future prices (simplified - using average growth)
                         avg_growth = 1.02  # 2% average growth per quarter
-                        future_price = other_mean
+                        future_price = other_mean_pred
                         for _ in future_quarter_cols:
                             future_price = future_price * avg_growth
                             area_prices.append(future_price)
@@ -2662,7 +2759,7 @@ if sidebar_option == "📈 Model Results":
                     ))
                     
                     fig_heatmap.update_layout(
-                        title="Market Price Comparison",
+                        title="Market Price Comparison (Actual & Predicted)",
                         xaxis_title="Time Period",
                         yaxis_title="Areas",
                         height=400,
@@ -2671,8 +2768,8 @@ if sidebar_option == "📈 Model Results":
                     
                     st.plotly_chart(fig_heatmap, use_container_width=True)
                 
-                # 3️⃣ Data Table
-                st.subheader("📊 Forecast Data")
+                # 4️⃣ Data Table with Actual and Predicted
+                st.subheader("📊 Forecast Data with Actual Values")
                 
                 # Create a clean data table
                 display_data = []
@@ -2686,14 +2783,18 @@ if sidebar_option == "📈 Model Results":
                                 display_data.append({
                                     'Period': format_quarter_label(hq),
                                     'Type': 'Historical',
-                                    'Price (AED)': f"{row[hq]:,.0f}"
+                                    'Actual Price (AED)': f"{row[hq]:,.0f}",
+                                    'Predicted Price (AED)': '-',
+                                    'Difference': '-'
                                 })
                     
-                    # Current prediction
+                    # Current prediction and actual
                     display_data.append({
                         'Period': 'Current',
-                        'Type': 'Prediction',
-                        'Price (AED)': f"{row['prediction']:,.0f}"
+                        'Type': 'Current',
+                        'Actual Price (AED)': f"{row['actual']:,.0f}" if pd.notna(row['actual']) else '-',
+                        'Predicted Price (AED)': f"{row['prediction']:,.0f}",
+                        'Difference': f"{row['actual'] - row['prediction']:,.0f}" if pd.notna(row['actual']) else '-'
                     })
                     
                     # Future forecasts
@@ -2702,7 +2803,9 @@ if sidebar_option == "📈 Model Results":
                             display_data.append({
                                 'Period': format_quarter_label(fq),
                                 'Type': 'Forecast',
-                                'Price (AED)': f"{row[fq]:,.0f}"
+                                'Actual Price (AED)': '-',
+                                'Predicted Price (AED)': f"{row[fq]:,.0f}",
+                                'Difference': '-'
                             })
                 
                 if display_data:
