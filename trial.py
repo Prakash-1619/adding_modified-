@@ -1927,6 +1927,8 @@ if sidebar_option == "📈 Model Results":
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
         import plotly.express as px
+        import pandas as pd
+        import pickle
         
         # =========================
         # 1️⃣ LOAD ONEHOT ENCODER
@@ -1938,14 +1940,17 @@ if sidebar_option == "📈 Model Results":
         except Exception as e:
             st.error(f"❌ Error loading OneHot encoder: {e}")
             st.stop()
+        
         file_options = {
             "Test_data": "test_data_20 areas_1.csv",
-            "Test_data_sample_50": "all_values_area_data_test.csv" , # change this to your second file path
-            "all_data_sample_50": "all_values_area_data.csv"}
+            "Test_data_sample_50": "all_values_area_data_test.csv",
+            "all_data_sample_50": "all_values_area_data.csv"
+        }
         
         # Create selectbox
-        selected_file_label = st.selectbox("Choose data file to load:",options=list(file_options.keys()))
+        selected_file_label = st.selectbox("Choose data file to load:", options=list(file_options.keys()))
         file_path = file_options[selected_file_label]
+        
         # =========================
         # 2️⃣ LOAD AREA-WISE MODELS
         # =========================
@@ -1977,138 +1982,149 @@ if sidebar_option == "📈 Model Results":
         # =========================
         # 3️⃣ STREAMLIT UI
         # =========================
-        #st.title("🏠 Dubai Real Estate Price Predictor")
-        #st.write("Area-wise model performance analysis")
-        
         # Create tabs for different functionalities
-        tab1, tab2, tab3 = st.tabs(["📊 Regression Model Prection","🔮 Forcasting Model","Regression+Forcasting"])
+        tab1, tab2, tab3 = st.tabs(["📊 Regression Model Prection", "🔮 Forcasting Model", "Regression+Forcasting"])
         
         with tab1:
-            #st.header("📊 Model Predictions & Performance Analysis")
-
-            import plotly.graph_objects as go
+            # Define drop_cols (you need to define this based on your actual columns)
+            drop_cols = ['Unnamed: 0', 'instance_date', 'quarter', 'Year']  # Add your actual columns to drop
+            
+            # Create sub-tabs for Regression Model Prediction
+            reg_tab1, reg_tab2 = st.tabs(["Model Metrics", "Feature Importance"])
             
             # -----------------------------
-            # Example Data
+            # Load Data for Tab1
             # -----------------------------
+            try:
+                # Model metrics per area
+                metrics_df = pd.read_csv('area_train_metrics.csv')  # Fixed: added .csv extension
+                metrics_df = metrics_df.drop(columns=[col for col in drop_cols if col in metrics_df.columns])
+                
+                # Feature importance per area
+                feature_importance_df = pd.read_csv('area_feature_importances.csv')  # Fixed: added .csv extension
+                feature_importance_df = feature_importance_df.drop(columns=[col for col in drop_cols if col in feature_importance_df.columns])
+                
+            except FileNotFoundError as e:
+                st.error(f"❌ Data file not found: {e}")
+            except Exception as e:
+                st.error(f"❌ Error loading data: {e}")
             
-            # Model metrics per area
-            metrics_df = pd.read_csv('area_train_metrics')
-            metrics_df = metrics_df.drop(columns=[col for col in drop_col if col in metrics_df.columns])
-            # Feature importance per area
-            feature_importance_df = pd.read_csv('area_feature_importances.csv')
-            feature_importance_df = feature_importance_df.drop(columns=[col for col in drop_col if col in feature_importance_df.columns])
-            
             # -----------------------------
-            # Create Tabs
+            # Sub-tab 1: Model Metrics
             # -----------------------------
-            tab1, tab2 = st.tabs(["Model Metrics", "Feature Importance"])
-            
-            # -----------------------------
-            # Tab 1: Model Metrics
-            # -----------------------------
-            with tab1:
+            with reg_tab1:
                 st.subheader("📊 Model Metrics Comparison by Area")
-            
-                fig = go.Figure()
-            
-                # R² (left axis)
-                fig.add_trace(go.Bar(
-                    x=metrics_df['area_name_en'],
-                    y=metrics_df['r2'],
-                    name='R²',
-                    marker_color='royalblue',
-                    yaxis='y1'
-                ))
-            
-                # MAPE (left axis)
-                fig.add_trace(go.Bar(
-                    x=metrics_df['area_name_en'],
-                    y=metrics_df['mape'],
-                    name='MAPE (%)',
-                    marker_color='lightseagreen',
-                    yaxis='y1'
-                ))
-            
-                # RMSE (right axis)
-                fig.add_trace(go.Bar(
-                    x=metrics_df['area_name_en'],
-                    y=metrics_df['rmse'],
-                    name='RMSE',
-                    marker_color='firebrick',
-                    yaxis='y2'
-                ))
-            
-                # Layout
-                fig.update_layout(
-                    title='Model Performance by Area (R², MAPE, RMSE)',
-                    xaxis=dict(title='Area Name', tickangle=45),
-                    yaxis=dict(title='R² / MAPE (%)', side='left'),
-                    yaxis2=dict(title='RMSE', overlaying='y', side='right', showgrid=False),
-                    barmode='group',
-                    legend=dict(title='Metrics', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                    template='plotly_white',
-                    height=500
-                )
-            
-                st.plotly_chart(fig, use_container_width=True)
-            
-                # Optional: Show table
-                with st.expander("📋 View Actual Metrics Table"):
-                    st.dataframe(metrics_df.style.format({
-                        'r2': "{:.3f}",
-                        'rmse': "{:,.0f}",
-                        'mape': "{:.2f}%"
-                    }))
-            
-            # -----------------------------
-            # Tab 2: Feature Importance
-            # -----------------------------
-            with tab2:
-                st.subheader("📊 Feature Importance by Area")
-            
-                fig2 = go.Figure()
-            
-                # Add each feature as a bar
-                for feature in feature_importance_df.columns[1:]:
-                    fig2.add_trace(go.Bar(
-                        x=feature_importance_df['area_name_en'],
-                        y=feature_importance_df[feature],
-                        name=feature
+                
+                # Check if required columns exist
+                required_cols = ['area_name_en', 'r2', 'mape', 'rmse']
+                if all(col in metrics_df.columns for col in required_cols):
+                    fig = go.Figure()
+        
+                    # R² (left axis)
+                    fig.add_trace(go.Bar(
+                        x=metrics_df['area_name_en'],
+                        y=metrics_df['r2'],
+                        name='R²',
+                        marker_color='royalblue',
+                        yaxis='y1'
                     ))
+        
+                    # MAPE (left axis)
+                    fig.add_trace(go.Bar(
+                        x=metrics_df['area_name_en'],
+                        y=metrics_df['mape'],
+                        name='MAPE (%)',
+                        marker_color='lightseagreen',
+                        yaxis='y1'
+                    ))
+        
+                    # RMSE (right axis)
+                    fig.add_trace(go.Bar(
+                        x=metrics_df['area_name_en'],
+                        y=metrics_df['rmse'],
+                        name='RMSE',
+                        marker_color='firebrick',
+                        yaxis='y2'
+                    ))
+        
+                    # Layout
+                    fig.update_layout(
+                        title='Model Performance by Area (R², MAPE, RMSE)',
+                        xaxis=dict(title='Area Name', tickangle=45),
+                        yaxis=dict(title='R² / MAPE (%)', side='left'),
+                        yaxis2=dict(title='RMSE', overlaying='y', side='right', showgrid=False),
+                        barmode='group',
+                        legend=dict(title='Metrics', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                        template='plotly_white',
+                        height=500
+                    )
+        
+                    st.plotly_chart(fig, use_container_width=True)
+        
+                    # Optional: Show table
+                    with st.expander("📋 View Actual Metrics Table"):
+                        st.dataframe(metrics_df.style.format({
+                            'r2': "{:.3f}",
+                            'rmse': "{:,.0f}",
+                            'mape': "{:.2f}%"
+                        }))
+                else:
+                    st.error("❌ Required columns not found in metrics data")
             
-                fig2.update_layout(
-                    barmode='group',
-                    title='Feature Importance per Area',
-                    xaxis=dict(title='Area Name', tickangle=45),
-                    yaxis=dict(title='Importance Value'),
-                    template='plotly_white',
-                    height=500,
-                    legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-                )
+            # -----------------------------
+            # Sub-tab 2: Feature Importance
+            # -----------------------------
+            with reg_tab2:
+                st.subheader("📊 Feature Importance by Area")
+                
+                # Check if required columns exist
+                if 'area_name_en' in feature_importance_df.columns and len(feature_importance_df.columns) > 1:
+                    fig2 = go.Figure()
+        
+                    # Add each feature as a bar (skip the first column which is area_name_en)
+                    for feature in feature_importance_df.columns[1:]:
+                        fig2.add_trace(go.Bar(
+                            x=feature_importance_df['area_name_en'],
+                            y=feature_importance_df[feature],
+                            name=feature
+                        ))
+        
+                    fig2.update_layout(
+                        barmode='group',
+                        title='Feature Importance per Area',
+                        xaxis=dict(title='Area Name', tickangle=45),
+                        yaxis=dict(title='Importance Value'),
+                        template='plotly_white',
+                        height=500,
+                        legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+                    )
+        
+                    st.plotly_chart(fig2, use_container_width=True)
+        
+                    # Optional: Show table
+                    with st.expander("📋 View Feature Importance Table"):
+                        st.dataframe(feature_importance_df.style.format("{:.3f}"))
+                else:
+                    st.error("❌ Required columns not found in feature importance data")
             
-                st.plotly_chart(fig2, use_container_width=True)
+            # -----------------------------
+            # Predictions Section
+            # -----------------------------
+            st.header("🎯 Model Predictions on Test Data")
             
-                # Optional: Show table
-                with st.expander("📋 View Feature Importance Table"):
-                    st.dataframe(feature_importance_df.style.format("{:.3f}"))
-
-            # =========================
-            # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
-            # =========================
             try:
                 test_samples = pd.read_csv(file_path)
-                test_samples = test_samples.drop(columns=[col for col in drop_col if col in test_samples.columns])
-                st.dataframe(test_samples)
+                test_samples = test_samples.drop(columns=[col for col in drop_cols if col in test_samples.columns])
+                
+                st.subheader("📁 Test Data Preview")
+                st.dataframe(test_samples.head())
+                
                 # Remove unwanted columns including 'Unnamed: 0'
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
                 columns_to_drop = [col for col in columns_to_drop if col in test_samples.columns]
                 
                 X_test = test_samples.drop(columns=columns_to_drop + ['meter_sale_price'], errors='ignore')
                 y_test = test_samples['meter_sale_price']
-                
-                #st.success(f"✅ Test data loaded: {X_test.shape[0]} samples, {X_test.shape[1]} features")
-                #st.dataframe(test_samples.head(), use_container_width=True)
                 
                 # Identify categorical columns
                 cat_cols = X_test.select_dtypes(include='object').columns.tolist()
@@ -2124,7 +2140,7 @@ if sidebar_option == "📈 Model Results":
                 X_test = X_test.select_dtypes(include=[np.number])
                 
                 # =========================
-                # 5️⃣ PREDICTION & METRICS
+                # PREDICTION & METRICS
                 # =========================
                 if st.button("🚀 Run Predictions", type="primary", key="predict_btn"):
                     if len(area_models) == 0:
@@ -2134,10 +2150,10 @@ if sidebar_option == "📈 Model Results":
                     y_pred_total = pd.Series(index=test_samples.index, dtype=float)
                     test_metrics = {}
                     area_predictions = {}
-            
+        
                     progress_bar = st.progress(0)
                     status_text = st.empty()
-            
+        
                     areas = test_samples['area_name_en'].unique()
                     for i, area in enumerate(areas):
                         status_text.text(f"Processing {area}... ({i+1}/{len(areas)})")
@@ -2146,22 +2162,22 @@ if sidebar_option == "📈 Model Results":
                         if area not in area_models:
                             st.warning(f"⚠️ Skipping area '{area}' (model not available)")
                             continue
-            
+        
                         model = area_models[area]
                         mask = test_samples['area_name_en'] == area
                         X_area_test = X_test.loc[mask]
                         y_area_test = y_test.loc[mask]
-            
+        
                         if len(X_area_test) > 0:
                             try:
                                 y_pred = model.predict(X_area_test)
                                 y_pred_total.loc[mask] = y_pred
-            
+        
                                 # Metrics
                                 r2 = r2_score(y_area_test, y_pred)
                                 rmse = np.sqrt(mean_squared_error(y_area_test, y_pred))
                                 mae = mean_absolute_error(y_area_test, y_pred)
-            
+        
                                 test_metrics[area] = {
                                     'R2': round(r2, 4), 
                                     'RMSE': round(rmse, 2), 
@@ -2179,12 +2195,12 @@ if sidebar_option == "📈 Model Results":
                             except Exception as e:
                                 st.error(f"❌ Error predicting for {area}: {e}")
                                 continue
-            
-                    #status_text.text("✅ Prediction completed!")
+        
                     progress_bar.empty()
-            
+                    status_text.text("✅ Prediction completed!")
+        
                     # =========================
-                    # 6️⃣ DISPLAY RESULTS
+                    # DISPLAY RESULTS
                     # =========================
                     if test_metrics:
                         test_metrics_df = pd.DataFrame(test_metrics).T
@@ -2230,7 +2246,7 @@ if sidebar_option == "📈 Model Results":
                                      f"{test_metrics_df['R2'].idxmin()}")
                         
                         # =========================
-                        # 7️⃣ VISUALIZATIONS FOR PREDICTIONS TAB
+                        # VISUALIZATIONS FOR PREDICTIONS
                         # =========================
                         st.subheader("📊 Prediction Visualizations")
                         
@@ -2242,8 +2258,8 @@ if sidebar_option == "📈 Model Results":
                             fig_r2 = px.bar(
                                 x=test_metrics_df.index,
                                 y=test_metrics_df['R2'],
-                                title="R² Scores by area_name_en",
-                                labels={'x': 'area_name_en', 'y': 'R² Score'},
+                                title="R² Scores by Area",
+                                labels={'x': 'Area', 'y': 'R² Score'},
                                 color=test_metrics_df['R2'],
                                 color_continuous_scale="RdYlGn"
                             )
@@ -2283,24 +2299,13 @@ if sidebar_option == "📈 Model Results":
                                 
                                 fig_scatter.update_layout(height=500)
                                 st.plotly_chart(fig_scatter, use_container_width=True)
-                                
-                                # Residual plot
-                                residuals = actual - predicted
-                                fig_residual = px.scatter(
-                                    x=predicted, y=residuals,
-                                    title=f"Residual Plot - {selected_area}",
-                                    labels={'x': 'Predicted Price', 'y': 'Residuals'}
-                                )
-                                fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
-                                fig_residual.update_layout(height=400)
-                                #st.plotly_chart(fig_residual, use_container_width=True)
                         
                         with viz_tab3:
                             # Price comparison chart
                             fig_prices = go.Figure()
                             fig_prices.add_trace(go.Bar(name='Actual Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Actual_Price']))
                             fig_prices.add_trace(go.Bar(name='Predicted Price', x=test_metrics_df.index, y=test_metrics_df['Avg_Predicted_Price']))
-                            fig_prices.update_layout(title="Average Actual vs Predicted Prices by area_name_en", barmode='group', height=500)
+                            fig_prices.update_layout(title="Average Actual vs Predicted Prices by Area", barmode='group', height=500)
                             st.plotly_chart(fig_prices, use_container_width=True)
                             
                             # Error percentage by area
@@ -2308,7 +2313,7 @@ if sidebar_option == "📈 Model Results":
                             fig_error_pct = px.bar(
                                 x=error_percentage.index,
                                 y=error_percentage.values,
-                                title="Absolute Error Percentage by area_name_en",
+                                title="Absolute Error Percentage by Area",
                                 labels={'x': 'Area', 'y': 'Error %'},
                                 color=error_percentage.values,
                                 color_continuous_scale="Reds"
@@ -2334,10 +2339,10 @@ if sidebar_option == "📈 Model Results":
                         st.warning("No predictions were made. Check if area names match the trained models.")
                         
             except FileNotFoundError:
-                st.error("❌ Test data file 'test_data_20 areas_1.csv' not found. Please make sure the file exists in the same directory.")
+                st.error(f"❌ Test data file '{file_path}' not found. Please make sure the file exists.")
             except Exception as e:
                 st.error(f"❌ Error loading test data: {str(e)}")
-        
+                
     
     ####################################################################________________________>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>______________________________________################################################
         with tab3:
