@@ -1996,7 +1996,7 @@ if sidebar_option == "📈 Model Results":
             metrics_df = pd.read_csv('area_train_metrics')
             metrics_df = metrics_df.drop(columns=[col for col in drop_col if col in metrics_df.columns])
             # Feature importance per area
-            feature_importance_df = pd.read('area_feature_importances.csv')
+            feature_importance_df = pd.read_csv('area_feature_importances.csv')
             feature_importance_df = feature_importance_df.drop(columns=[col for col in drop_col if col in feature_importance_df.columns])
             
             # -----------------------------
@@ -2453,16 +2453,16 @@ if sidebar_option == "📈 Model Results":
                             if not growth_df['ds'].isna().all():
                                 break
                     
-                    # Get current date to separate historical from future
-                    current_date = pd.Timestamp.now()
+                    # Define the base prediction quarter (2025 Q2)
+                    base_prediction_quarter = pd.Timestamp('2025-06-30')  # 2025 Q2 end
                     
-                    # Filter to ONLY FUTURE quarters (after current date)
-                    growth_df = growth_df[growth_df['ds'] > current_date]
+                    # Filter to include 2025 Q3 and beyond (quarters after base prediction)
+                    growth_df = growth_df[growth_df['ds'] >= base_prediction_quarter]
                     
                     # Ensure we only have quarterly data (end of quarter)
                     growth_df = growth_df[growth_df['ds'].dt.is_quarter_end]
                     
-                    # Limit forecast to end of 2026
+                    # Limit forecast to end of 2028
                     target_end_date = pd.Timestamp('2026-12-31')
                     growth_df = growth_df[growth_df['ds'] <= target_end_date]
                     
@@ -2476,9 +2476,8 @@ if sidebar_option == "📈 Model Results":
                     # Check if we have any future data
                     if len(growth_df) == 0:
                         st.warning("⚠️ No future forecast data found in ARIMA file. Generating default future quarters.")
-                        # Create default future quarters starting from next quarter
-                        next_quarter = pd.Timestamp.now() + pd.offsets.QuarterEnd(1)
-                        future_dates = pd.date_range(start=next_quarter, end=target_end_date, freq='Q')
+                        # Create default future quarters starting from 2025 Q3
+                        future_dates = pd.date_range(start=pd.Timestamp('2025-09-30'), end=target_end_date, freq='Q')
                         
                         # Create default growth data (no growth)
                         default_growth_data = []
@@ -2626,7 +2625,7 @@ if sidebar_option == "📈 Model Results":
                     if selected_area not in growth_pivot['area_name_en'].values:
                         st.warning(f"⚠️ No growth factors found for area: {selected_area}. Using default growth factor of 1.0")
                         
-                        # Create default growth factors for future quarters only
+                        # Create default growth factors for future quarters only (starting from 2025 Q3)
                         future_quarters = [col for col in growth_pivot.columns if col != 'area_name_en']
                         default_growth_data = {'area_name_en': [selected_area]}
                         for q in future_quarters:
@@ -2670,12 +2669,8 @@ if sidebar_option == "📈 Model Results":
                         forecast_lower_df = forecast_lower_df.merge(historical_pivot, on='area_name_en', how='left')
                         forecast_upper_df = forecast_upper_df.merge(historical_pivot, on='area_name_en', how='left')
                     
-                    # Get future quarter columns from growth factors - ONLY FUTURE DATES
+                    # Get future quarter columns from growth factors
                     future_quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
-                    
-                    # Filter out any historical dates that might have slipped through
-                    current_date = pd.Timestamp.now()
-                    future_quarter_cols = [col for col in future_quarter_cols if pd.to_datetime(col) > current_date]
                     
                     # Sort the future quarters chronologically
                     future_quarter_cols_sorted = sorted(future_quarter_cols)
@@ -2684,7 +2679,16 @@ if sidebar_option == "📈 Model Results":
                     if future_quarter_cols_sorted:
                         start_quarter = future_quarter_cols_sorted[0]
                         end_quarter = future_quarter_cols_sorted[-1]
-                        st.info(f"**Forecast Period:** {start_quarter} to {end_quarter} ({len(future_quarter_cols_sorted)} quarters)")
+                        
+                        # Format quarter labels for display
+                        def format_quarter_display(quarter_str):
+                            if isinstance(quarter_str, pd.Timestamp):
+                                quarter_num = (quarter_str.month - 1) // 3 + 1
+                                return f"Q{quarter_num} {quarter_str.year}"
+                            return str(quarter_str)
+                        
+                        st.info(f"**Forecast Period:** {format_quarter_display(start_quarter)} to {format_quarter_display(end_quarter)} ({len(future_quarter_cols_sorted)} quarters)")
+                        st.info(f"**Base Prediction:** Current model prediction represents 2025 Q2")
                     else:
                         st.warning("⚠️ No future quarters found for forecasting")
                         future_quarter_cols_sorted = []
@@ -2744,15 +2748,15 @@ if sidebar_option == "📈 Model Results":
                             actual_prices.append(forecast_row[hq])
                             predicted_prices.append(np.nan)
                     
-                    # Add current prediction and actual
-                    time_periods.append('Current')
+                    # Add current prediction and actual (2025 Q2)
+                    time_periods.append('2025 Q2 (Current)')
                     predicted_prices.append(forecast_row['prediction'])
                     if include_actual and 'actual' in forecast_row and pd.notna(forecast_row['actual']):
                         actual_prices.append(forecast_row['actual'])
                     else:
                         actual_prices.append(np.nan)
                     
-                    # Add future quarters in chronological order
+                    # Add future quarters in chronological order (starting from 2025 Q3)
                     sorted_future_cols = sorted(future_quarter_cols)
                     for fq in sorted_future_cols:
                         if fq in forecast_row.index and pd.notna(forecast_row[fq]):
@@ -2789,7 +2793,7 @@ if sidebar_option == "📈 Model Results":
                                 marker=dict(size=8, color='blue')
                             ))
                     
-                    # Add current actual vs predicted
+                    # Add current actual vs predicted (2025 Q2)
                     current_idx = len([hq for hq in selected_historical if hq in row and pd.notna(row[hq])]) if show_historical and selected_historical else 0
                     
                     # Current actual value
@@ -2798,7 +2802,7 @@ if sidebar_option == "📈 Model Results":
                             x=[time_periods[current_idx]],
                             y=[actual_prices[current_idx]],
                             mode='markers',
-                            name='Current Actual',
+                            name='2025 Q2 Actual',
                             marker=dict(size=12, color='green', symbol='diamond')
                         ))
                     
@@ -2807,11 +2811,11 @@ if sidebar_option == "📈 Model Results":
                         x=[time_periods[current_idx]],
                         y=[predicted_prices[current_idx]],
                         mode='markers',
-                        name='Current Predicted',
+                        name='2025 Q2 Predicted',
                         marker=dict(size=12, color='red', symbol='star')
                     ))
                     
-                    # Add future forecast with growth factors applied
+                    # Add future forecast with growth factors applied (starting from 2025 Q3)
                     future_start_idx = current_idx + 1
                     if future_start_idx < len(time_periods) and len(future_quarter_cols_sorted) > 0:
                         fig_main.add_trace(go.Scatter(
@@ -2862,10 +2866,10 @@ if sidebar_option == "📈 Model Results":
                     # Display forecast summary
                     col1, col2, col3 = st.columns(3)
                     with col1:
-                        st.metric("Current Prediction", f"AED {mean_prediction:,.0f}")
+                        st.metric("2025 Q2 Prediction", f"AED {mean_prediction:,.0f}")
                     with col2:
                         if pd.notna(mean_actual):
-                            st.metric("Current Actual", f"AED {mean_actual:,.0f}")
+                            st.metric("2025 Q2 Actual", f"AED {mean_actual:,.0f}")
                     with col3:
                         future_quarters_count = len(future_quarter_cols_sorted)
                         st.metric("Future Quarters", f"{future_quarters_count}")
@@ -2914,9 +2918,9 @@ if sidebar_option == "📈 Model Results":
                                     'Growth Factor': '-'
                                 })
                     
-                    # Current prediction and actual
+                    # Current prediction and actual (2025 Q2)
                     display_data.append({
-                        'Period': 'Current',
+                        'Period': '2025 Q2',
                         'Type': 'Prediction',
                         'Price (AED)': f"{row['prediction']:,.0f}",
                         'Growth Factor': '1.0000 (Base)'
@@ -2924,13 +2928,13 @@ if sidebar_option == "📈 Model Results":
                     
                     if pd.notna(row['actual']):
                         display_data.append({
-                            'Period': 'Current',
+                            'Period': '2025 Q2',
                             'Type': 'Actual',
                             'Price (AED)': f"{row['actual']:,.0f}",
                             'Growth Factor': '-'
                         })
                     
-                    # Future forecasts with growth factors
+                    # Future forecasts with growth factors (starting from 2025 Q3)
                     for fq in future_quarter_cols_sorted:
                         if fq in row and pd.notna(row[fq]):
                             growth_factor = row[fq] / row['prediction'] if row['prediction'] != 0 else 1
