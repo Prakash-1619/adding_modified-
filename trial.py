@@ -2238,10 +2238,14 @@ if sidebar_option == "📈 Model Results":
             #st.header("🔮 Price Forecasting")
             #st.markdown("Area-wise predictions with growth factor projections")
             
+            import streamlit as st
+            import pandas as pd
+            import numpy as np
             import pickle
             import plotly.express as px
             import plotly.graph_objects as go
             import os
+            from datetime import datetime
             
             # =========================
             # INITIALIZATION & SETUP
@@ -2343,11 +2347,17 @@ if sidebar_option == "📈 Model Results":
                             if not growth_df['ds'].isna().all():
                                 break
                     
-                    # Filter to ensure we only have quarterly data (end of quarter)
+                    # Get current date to separate historical from future
+                    current_date = pd.Timestamp.now()
+                    
+                    # Filter to ONLY FUTURE quarters (after current date)
+                    growth_df = growth_df[growth_df['ds'] > current_date]
+                    
+                    # Ensure we only have quarterly data (end of quarter)
                     growth_df = growth_df[growth_df['ds'].dt.is_quarter_end]
                     
-                    # Extend forecast period to 2028 Q4
-                    target_end_date = pd.Timestamp('2028-12-31')
+                    # Limit forecast to end of 2026
+                    target_end_date = pd.Timestamp('2026-12-31')
                     growth_df = growth_df[growth_df['ds'] <= target_end_date]
                     
                     # Check if we have the required growth factor columns
@@ -2356,6 +2366,27 @@ if sidebar_option == "📈 Model Results":
                     if missing_cols:
                         st.error(f"❌ Missing required columns in ARIMA data: {missing_cols}")
                         return None, None, None, None, None, None, None, None, None, None
+                    
+                    # Check if we have any future data
+                    if len(growth_df) == 0:
+                        st.warning("⚠️ No future forecast data found in ARIMA file. Generating default future quarters.")
+                        # Create default future quarters starting from next quarter
+                        next_quarter = pd.Timestamp.now() + pd.offsets.QuarterEnd(1)
+                        future_dates = pd.date_range(start=next_quarter, end=target_end_date, freq='Q')
+                        
+                        # Create default growth data (no growth)
+                        default_growth_data = []
+                        for area in growth_df['area_name_en'].unique():
+                            for date in future_dates:
+                                default_growth_data.append({
+                                    'ds': date,
+                                    'area_name_en': area,
+                                    'growth_factor': 1.0,
+                                    'growth_factor_lower': 0.95,
+                                    'growth_factor_upper': 1.05
+                                })
+                        
+                        growth_df = pd.DataFrame(default_growth_data)
                     
                     growth_df = growth_df[['ds', 'area_name_en', 'growth_factor', 'growth_factor_lower', 'growth_factor_upper']]
                     
@@ -2489,7 +2520,7 @@ if sidebar_option == "📈 Model Results":
                     if selected_area not in growth_pivot['area_name_en'].values:
                         st.warning(f"⚠️ No growth factors found for area: {selected_area}. Using default growth factor of 1.0")
                         
-                        # Create default growth factors (no growth)
+                        # Create default growth factors for future quarters only
                         future_quarters = [col for col in growth_pivot.columns if col != 'area_name_en']
                         default_growth_data = {'area_name_en': [selected_area]}
                         for q in future_quarters:
@@ -2533,11 +2564,24 @@ if sidebar_option == "📈 Model Results":
                         forecast_lower_df = forecast_lower_df.merge(historical_pivot, on='area_name_en', how='left')
                         forecast_upper_df = forecast_upper_df.merge(historical_pivot, on='area_name_en', how='left')
                     
-                    # Get future quarter columns from growth factors
+                    # Get future quarter columns from growth factors - ONLY FUTURE DATES
                     future_quarter_cols = [col for col in growth_pivot.columns if col != 'area_name_en']
+                    
+                    # Filter out any historical dates that might have slipped through
+                    current_date = pd.Timestamp.now()
+                    future_quarter_cols = [col for col in future_quarter_cols if pd.to_datetime(col) > current_date]
                     
                     # Sort the future quarters chronologically
                     future_quarter_cols_sorted = sorted(future_quarter_cols)
+                    
+                    # Display forecast period information
+                    if future_quarter_cols_sorted:
+                        start_quarter = future_quarter_cols_sorted[0]
+                        end_quarter = future_quarter_cols_sorted[-1]
+                        st.info(f"**Forecast Period:** {start_quarter} to {end_quarter} ({len(future_quarter_cols_sorted)} quarters)")
+                    else:
+                        st.warning("⚠️ No future quarters found for forecasting")
+                        future_quarter_cols_sorted = []
                     
                     # Apply growth factors to future quarters based on actual prediction
                     for q in future_quarter_cols_sorted:
@@ -2621,7 +2665,7 @@ if sidebar_option == "📈 Model Results":
                     selected_historical = available_historical[-num_historical_quarters:] if show_historical and available_historical else []
                     
                     time_periods, predicted_prices, actual_prices = prepare_forecast_data(
-                        row, selected_historical, future_quarter_cols, show_historical, include_actual=True
+                        row, selected_historical, future_quarter_cols_sorted, show_historical, include_actual=True
                     )
                     
                     fig_main = go.Figure()
@@ -2663,7 +2707,7 @@ if sidebar_option == "📈 Model Results":
                     
                     # Add future forecast with growth factors applied
                     future_start_idx = current_idx + 1
-                    if future_start_idx < len(time_periods):
+                    if future_start_idx < len(time_periods) and len(future_quarter_cols_sorted) > 0:
                         fig_main.add_trace(go.Scatter(
                             x=time_periods[future_start_idx:],
                             y=predicted_prices[future_start_idx:],
@@ -2674,12 +2718,12 @@ if sidebar_option == "📈 Model Results":
                         ))
                     
                     # Add confidence intervals if showing scenarios
-                    if show_growth_scenarios and not final_forecast_lower.empty and not final_forecast_upper.empty:
+                    if show_growth_scenarios and not final_forecast_lower.empty and not final_forecast_upper.empty and len(future_quarter_cols_sorted) > 0:
                         row_lower = final_forecast_lower.iloc[0]
                         row_upper = final_forecast_upper.iloc[0]
                         
-                        _, lower_prices, _ = prepare_forecast_data(row_lower, selected_historical, future_quarter_cols, show_historical, include_actual=False)
-                        _, upper_prices, _ = prepare_forecast_data(row_upper, selected_historical, future_quarter_cols, show_historical, include_actual=False)
+                        _, lower_prices, _ = prepare_forecast_data(row_lower, selected_historical, future_quarter_cols_sorted, show_historical, include_actual=False)
+                        _, upper_prices, _ = prepare_forecast_data(row_upper, selected_historical, future_quarter_cols_sorted, show_historical, include_actual=False)
                         
                         # Add confidence area for future periods
                         future_time_periods = time_periods[future_start_idx:]
@@ -2718,32 +2762,33 @@ if sidebar_option == "📈 Model Results":
                             st.metric("Current Actual", f"AED {mean_actual:,.0f}")
                     with col3:
                         future_quarters_count = len(future_quarter_cols_sorted)
-                        st.metric("Forecast Period", f"{future_quarters_count} Quarters")
+                        st.metric("Future Quarters", f"{future_quarters_count}")
                 
                 # 2️⃣ Growth Factors Display
-                st.subheader("📊 Applied Growth Factors")
-                
-                if not forecast_df.empty:
-                    growth_data = []
-                    row = forecast_df.iloc[0]
+                if future_quarter_cols_sorted:
+                    st.subheader("📊 Applied Growth Factors")
                     
-                    for q in future_quarter_cols_sorted:
-                        if q in row and pd.notna(row[q]):
-                            original_pred = row['prediction']
-                            forecasted_price = row[q]
-                            growth_factor = forecasted_price / original_pred if original_pred != 0 else 1
-                            growth_percentage = (growth_factor - 1) * 100
-                            
-                            growth_data.append({
-                                'Quarter': format_quarter_label(q),
-                                'Growth Factor': f"{growth_factor:.4f}",
-                                'Growth %': f"{growth_percentage:+.2f}%",
-                                'Forecasted Price (AED)': f"{forecasted_price:,.0f}"
-                            })
-                    
-                    if growth_data:
-                        growth_df_display = pd.DataFrame(growth_data)
-                        st.dataframe(growth_df_display, use_container_width=True, hide_index=True)
+                    if not forecast_df.empty:
+                        growth_data = []
+                        row = forecast_df.iloc[0]
+                        
+                        for q in future_quarter_cols_sorted:
+                            if q in row and pd.notna(row[q]):
+                                original_pred = row['prediction']
+                                forecasted_price = row[q]
+                                growth_factor = forecasted_price / original_pred if original_pred != 0 else 1
+                                growth_percentage = (growth_factor - 1) * 100
+                                
+                                growth_data.append({
+                                    'Quarter': format_quarter_label(q),
+                                    'Growth Factor': f"{growth_factor:.4f}",
+                                    'Growth %': f"{growth_percentage:+.2f}%",
+                                    'Forecasted Price (AED)': f"{forecasted_price:,.0f}"
+                                })
+                        
+                        if growth_data:
+                            growth_df_display = pd.DataFrame(growth_data)
+                            st.dataframe(growth_df_display, use_container_width=True, hide_index=True)
                 
                 # 3️⃣ Detailed Forecast Data
                 st.subheader("📈 Detailed Forecast Data")
@@ -2793,6 +2838,8 @@ if sidebar_option == "📈 Model Results":
                 if display_data:
                     display_df = pd.DataFrame(display_data)
                     st.dataframe(display_df, use_container_width=True, hide_index=True)
+                else:
+                    st.warning("No forecast data available to display")
             
             else:
                 st.info("👆 Select an area and click 'Generate Forecast' to see predictions")
