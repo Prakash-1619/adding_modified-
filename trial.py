@@ -2089,40 +2089,42 @@ if sidebar_option == "📈 Model Results":
             # Sub-tab 2: Feature Importance
             # -----------------------------
             with reg_tab2:
-                #st.subheader("📊 Feature Importance by Area")
+                st.subheader("📊 Feature Importance by Area")
                 
                 # Check if required columns exist
                 if 'area_name_en' in feature_importance_df.columns and len(feature_importance_df.columns) > 1:
                     fig2 = go.Figure()
             
-                    # Add each feature as a bar (skip the first column which is area_name_en)
+                    # Add each feature as a line (skip the first column which is area_name_en)
                     for feature in feature_importance_df.columns[1:]:
-                        fig2.add_trace(go.Bar(
+                        fig2.add_trace(go.Scatter(
                             x=feature_importance_df['area_name_en'],
                             y=feature_importance_df[feature],
-                            name=feature
+                            name=feature,
+                            mode='lines+markers',  # This creates both lines and markers
+                            line=dict(width=3),
+                            marker=dict(size=8)
                         ))
             
                     fig2.update_layout(
-                        barmode='group',
-                        title='Feature Importance per Area',
+                        title='Feature Importance Trends Across Areas',
                         xaxis=dict(title='Area Name', tickangle=45),
                         yaxis=dict(title='Importance Value'),
                         template='plotly_white',
                         height=500,
-                        legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+                        legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                        hovermode='x unified'  # Shows all values for a given area on hover
                     )
             
                     st.plotly_chart(fig2, use_container_width=True)
             
-                    # Optional: Show table - FIXED THE ERROR HERE
+                    # Optional: Show table
                     with st.expander("📋 View Feature Importance Table"):
                         # Only format numeric columns, exclude the first column (area_name_en)
                         numeric_cols = feature_importance_df.columns[1:]
                         st.dataframe(feature_importance_df.style.format("{:.3f}", subset=numeric_cols))
                 else:
                     st.error("❌ Required columns not found in feature importance data")
-            
             # -----------------------------
             # Predictions Section
             # -----------------------------
@@ -3015,7 +3017,8 @@ if sidebar_option == "📈 Model Results":
                 ]
             }
             
-            metrics_df = pd.DataFrame(metrics_data)
+            metrics_df = pd.read_csv('arima_fitted_metrics_all_areas.csv')
+            metrics_df = metrics_df.drop(columns=[col for col in drop_col if col in metrics_df.columns])
             
             # Create tabs
             tab1, tab2 = st.tabs(["Forecast", "Metrics"])
