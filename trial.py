@@ -2063,13 +2063,19 @@ if sidebar_option == "📈 Model Results":
         
                     # Optional: Show table
                     with st.expander("📋 View Actual Metrics Table"):
-                        st.dataframe(metrics_df.style.format({
-                            'r2': "{:.3f}",
-                            'rmse': "{:,.0f}",
-                            'mape': "{:.2f}%"
-                        }))
-                else:
-                    st.error("❌ Required columns not found in metrics data")
+                        # Only format numeric columns that exist in the dataframe
+                        format_dict = {}
+                        if 'r2' in metrics_df.columns:
+                            format_dict['r2'] = "{:.3f}"
+                        if 'rmse' in metrics_df.columns:
+                            format_dict['rmse'] = "{:,.0f}"
+                        if 'mape' in metrics_df.columns:
+                            format_dict['mape'] = "{:.2f}%"
+                        
+                        if format_dict:
+                            st.dataframe(metrics_df.style.format(format_dict))
+                        else:
+                            st.dataframe(metrics_df)
             
             # -----------------------------
             # Sub-tab 2: Feature Importance
@@ -2080,7 +2086,7 @@ if sidebar_option == "📈 Model Results":
                 # Check if required columns exist
                 if 'area_name_en' in feature_importance_df.columns and len(feature_importance_df.columns) > 1:
                     fig2 = go.Figure()
-        
+            
                     # Add each feature as a bar (skip the first column which is area_name_en)
                     for feature in feature_importance_df.columns[1:]:
                         fig2.add_trace(go.Bar(
@@ -2088,7 +2094,7 @@ if sidebar_option == "📈 Model Results":
                             y=feature_importance_df[feature],
                             name=feature
                         ))
-        
+            
                     fig2.update_layout(
                         barmode='group',
                         title='Feature Importance per Area',
@@ -2098,12 +2104,14 @@ if sidebar_option == "📈 Model Results":
                         height=500,
                         legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
                     )
-        
+            
                     st.plotly_chart(fig2, use_container_width=True)
-        
-                    # Optional: Show table
+            
+                    # Optional: Show table - FIXED THE ERROR HERE
                     with st.expander("📋 View Feature Importance Table"):
-                        st.dataframe(feature_importance_df.style.format("{:.3f}"))
+                        # Only format numeric columns, exclude the first column (area_name_en)
+                        numeric_cols = feature_importance_df.columns[1:]
+                        st.dataframe(feature_importance_df.style.format("{:.3f}", subset=numeric_cols))
                 else:
                     st.error("❌ Required columns not found in feature importance data")
             
@@ -2116,8 +2124,8 @@ if sidebar_option == "📈 Model Results":
                 test_samples = pd.read_csv(file_path)
                 test_samples = test_samples.drop(columns=[col for col in drop_cols if col in test_samples.columns])
                 
-                st.subheader("📁 Test Data Preview")
-                st.dataframe(test_samples.head())
+                #st.subheader("📁 Test Data Preview")
+                #st.dataframe(test_samples.head())
                 
                 # Remove unwanted columns including 'Unnamed: 0'
                 columns_to_drop = ['Unnamed: 0', 'instance_date', 'quarter', 'area_name_en', 'Year']
