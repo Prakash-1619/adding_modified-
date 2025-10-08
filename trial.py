@@ -1999,7 +1999,15 @@ if sidebar_option == "📈 Model Results":
                 # Model metrics per area
                 metrics_df = pd.read_csv('area_train_metrics.csv')  # Fixed: added .csv extension
                 metrics_df = metrics_df.drop(columns=[col for col in drop_cols if col in metrics_df.columns])
+                # Rename columns to match what the code expects
+                column_mapping = {
+                    'R2': 'r2',
+                    'RMSE': 'rmse', 
+                    'MAPE': 'mape'
+                    # 'area_name_en' stays the same
+                }
                 
+                metrics_df = metrics_df.rename(columns=column_mapping)
                 # Feature importance per area
                 feature_importance_df = pd.read_csv('area_feature_importances.csv')  # Fixed: added .csv extension
                 feature_importance_df = feature_importance_df.drop(columns=[col for col in drop_cols if col in feature_importance_df.columns])
@@ -2013,7 +2021,7 @@ if sidebar_option == "📈 Model Results":
             # Sub-tab 1: Model Metrics
             # -----------------------------
             with reg_tab1:
-                st.subheader("📊 Model Metrics Comparison by Area")
+                #st.subheader("📊 Model Metrics Comparison by Area")
                 
                 # Check if required columns exist
                 required_cols = ['area_name_en', 'r2', 'mape', 'rmse']
@@ -2081,7 +2089,7 @@ if sidebar_option == "📈 Model Results":
             # Sub-tab 2: Feature Importance
             # -----------------------------
             with reg_tab2:
-                st.subheader("📊 Feature Importance by Area")
+                #st.subheader("📊 Feature Importance by Area")
                 
                 # Check if required columns exist
                 if 'area_name_en' in feature_importance_df.columns and len(feature_importance_df.columns) > 1:
