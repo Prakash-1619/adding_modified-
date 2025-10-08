@@ -1985,8 +1985,114 @@ if sidebar_option == "📈 Model Results":
         
         with tab1:
             #st.header("📊 Model Predictions & Performance Analysis")
-            import pandas as pd
+
+            import plotly.graph_objects as go
             
+            # -----------------------------
+            # Example Data
+            # -----------------------------
+            
+            # Model metrics per area
+            metrics_df = pd.read_csv('area_train_metrics')
+            metrics_df = metrics_df.drop(columns=[col for col in drop_col if col in metrics_df.columns])
+            # Feature importance per area
+            feature_importance_df = pd.read('area_feature_importances.csv')
+            feature_importance_df = feature_importance_df.drop(columns=[col for col in drop_col if col in feature_importance_df.columns])
+            
+            # -----------------------------
+            # Create Tabs
+            # -----------------------------
+            tab1, tab2 = st.tabs(["Model Metrics", "Feature Importance"])
+            
+            # -----------------------------
+            # Tab 1: Model Metrics
+            # -----------------------------
+            with tab1:
+                st.subheader("📊 Model Metrics Comparison by Area")
+            
+                fig = go.Figure()
+            
+                # R² (left axis)
+                fig.add_trace(go.Bar(
+                    x=metrics_df['area_name_en'],
+                    y=metrics_df['r2'],
+                    name='R²',
+                    marker_color='royalblue',
+                    yaxis='y1'
+                ))
+            
+                # MAPE (left axis)
+                fig.add_trace(go.Bar(
+                    x=metrics_df['area_name_en'],
+                    y=metrics_df['mape'],
+                    name='MAPE (%)',
+                    marker_color='lightseagreen',
+                    yaxis='y1'
+                ))
+            
+                # RMSE (right axis)
+                fig.add_trace(go.Bar(
+                    x=metrics_df['area_name_en'],
+                    y=metrics_df['rmse'],
+                    name='RMSE',
+                    marker_color='firebrick',
+                    yaxis='y2'
+                ))
+            
+                # Layout
+                fig.update_layout(
+                    title='Model Performance by Area (R², MAPE, RMSE)',
+                    xaxis=dict(title='Area Name', tickangle=45),
+                    yaxis=dict(title='R² / MAPE (%)', side='left'),
+                    yaxis2=dict(title='RMSE', overlaying='y', side='right', showgrid=False),
+                    barmode='group',
+                    legend=dict(title='Metrics', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                    template='plotly_white',
+                    height=500
+                )
+            
+                st.plotly_chart(fig, use_container_width=True)
+            
+                # Optional: Show table
+                with st.expander("📋 View Actual Metrics Table"):
+                    st.dataframe(metrics_df.style.format({
+                        'r2': "{:.3f}",
+                        'rmse': "{:,.0f}",
+                        'mape': "{:.2f}%"
+                    }))
+            
+            # -----------------------------
+            # Tab 2: Feature Importance
+            # -----------------------------
+            with tab2:
+                st.subheader("📊 Feature Importance by Area")
+            
+                fig2 = go.Figure()
+            
+                # Add each feature as a bar
+                for feature in feature_importance_df.columns[1:]:
+                    fig2.add_trace(go.Bar(
+                        x=feature_importance_df['area_name_en'],
+                        y=feature_importance_df[feature],
+                        name=feature
+                    ))
+            
+                fig2.update_layout(
+                    barmode='group',
+                    title='Feature Importance per Area',
+                    xaxis=dict(title='Area Name', tickangle=45),
+                    yaxis=dict(title='Importance Value'),
+                    template='plotly_white',
+                    height=500,
+                    legend=dict(title='Features', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+                )
+            
+                st.plotly_chart(fig2, use_container_width=True)
+            
+                # Optional: Show table
+                with st.expander("📋 View Feature Importance Table"):
+                    st.dataframe(feature_importance_df.style.format("{:.3f}"))
+
             # =========================
             # 4️⃣ LOAD AND PREPARE TEST DATA FOR PREDICTIONS TAB
             # =========================
