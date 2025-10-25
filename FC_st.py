@@ -46,38 +46,38 @@ if app_choice ==  "Auto Arima with Lowess":
         
         # Actual (LOWESS)
         fig_fc.add_trace(go.Scatter(
-            x=area_forecast['month'],
-            y=area_forecast['actual_smoothed'],
+            x=area_forecast['Month'],
+            y=area_forecast['Actual_smoothed'],
             mode='lines',
             name='Actual (LOWESS)',
             line=dict(color='blue', dash='dot')
         ))
         
         # Combine train, test, forecast into continuous line
-        area_forecast_sorted = area_forecast.sort_values('month')
-        df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train','test','forecast'])]
+        area_forecast_sorted = area_forecast.sort_values('Month')
+        df_predicted = area_forecast_sorted[area_forecast_sorted['Phase'].isin(['train','test','forecast'])]
         
         fig_fc.add_trace(go.Scatter(
-            x=df_predicted['month'],
-            y=df_predicted['predicted'],
+            x=df_predicted['Month'],
+            y=df_predicted['Predicted'],
             mode='lines+markers',
             name='Forecast',
             line=dict(color='green', width=2)
         ))
         
         # Vertical line marking end of training period (works with datetime)
-        train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
+        train_end = area_forecast[area_forecast['Phase'] == 'train']['Month'].max()
         if pd.notna(train_end):
             fig_fc.add_shape(
                 type='line',
                 x0=train_end, x1=train_end,
-                y0=area_forecast['predicted'].min(),
-                y1=area_forecast['predicted'].max(),
+                y0=area_forecast['Predicted'].min(),
+                y1=area_forecast['Predicted'].max(),
                 line=dict(color='gray', dash='dash'),
                 xref='x', yref='y'
             )
             fig_fc.add_annotation(
-                x=train_end, y=area_forecast['predicted'].max(),
+                x=train_end, y=area_forecast['Predicted'].max(),
                 text="Train End", showarrow=False, yshift=10, font=dict(size=12, color="gray")
             )
         
