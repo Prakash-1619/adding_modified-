@@ -38,67 +38,76 @@ if app_choice ==  "Auto Arima with Lowess":
     # TAB 1: Forecast & Metrics
     # ------------------------------
     with tab1:
-        st.subheader("Forecast vs Actual (LOWESS)")
+        # ------------------------------
+        # FORECAST PLOT - Continuous with Clear Phase Colors
+        # ------------------------------
         fig_fc = go.Figure()
+        
+        # Add smoothed actual line
         fig_fc.add_trace(go.Scatter(
-            x=area_forecast['month'], y=area_forecast['actual_smoothed'],
-            mode='lines', name='Actual (LOWESS)', line=dict(color='blue', dash='dot')
+            x=area_forecast['month'],
+            y=area_forecast['actual_smoothed'],
+            mode='lines',
+            name='Actual (LOWESS)',
+            line=dict(color='blue', width=2)
         ))
-        for phase, color in zip(['train','test','forecast'], ['red','orange','green']):
-            df_phase = area_forecast[area_forecast['phase']==phase]
-            fig_fc.add_trace(go.Scatter(
-                x=df_phase['month'], y=df_phase['predicted'],
-                mode='lines+markers', name=f'{phase.capitalize()} Predicted',
-                line=dict(color=color, dash='dash')
-            ))
+        
+        # Create a continuous predicted line from train → test → forecast
+        phase_colors = {
+            'train': 'red',
+            'test': 'orange',
+            'forecast': 'green'
+        }
+        
+        # Sort by month (to ensure continuity)
+        area_forecast = area_forecast.sort_values('month')
+        
+        # Add predicted continuous line
+        fig_fc.add_trace(go.Scatter(
+            x=area_forecast['month'],
+            y=area_forecast['predicted'],
+            mode='lines+markers',
+            name='Predicted (Continuous)',
+            line=dict(color='black', width=2),
+            marker=dict(size=5)
+        ))
+        
+        # Add shaded backgrounds or vertical separators for phases
+        for phase, color in phase_colors.items():
+            df_phase = area_forecast[area_forecast['phase'] == phase]
+            if not df_phase.empty:
+                fig_fc.add_trace(go.Scatter(
+                    x=df_phase['month'],
+                    y=df_phase['predicted'],
+                    mode='lines',
+                    name=f'{phase.capitalize()} Phase',
+                    line=dict(color=color, dash='dot', width=2),
+                    showlegend=True
+                ))
+        
+        # Highlight transition points
+        train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
+        test_end = area_forecast[area_forecast['phase'] == 'test']['month'].max()
+        
+        # Add vertical markers for clarity
+        if not pd.isna(train_end):
+            fig_fc.add_vline(x=train_end, line_dash='dash', line_color='red',
+                             annotation_text='Train End', annotation_position='top left')
+        if not pd.isna(test_end):
+            fig_fc.add_vline(x=test_end, line_dash='dash', line_color='orange',
+                             annotation_text='Test End', annotation_position='top left')
+        
+        # Layout
         fig_fc.update_layout(
+            title=f'{selected_area} - Forecast (Continuous from Training End)',
             xaxis_title='Month',
             yaxis_title='Median Price',
-            title=f'{selected_area} - Forecast vs Actual (LOWESS)',
-            template='plotly_white'
+            template='plotly_white',
+            legend=dict(orientation='h', yanchor='bottom', y=-0.3, xanchor='center', x=0.5)
         )
+        
         st.plotly_chart(fig_fc, use_container_width=True)
-    
-        st.subheader("Train/Test Metrics")
-        metrics_plot = area_metrics[['Train_MAE','Train_RMSE','Train_R2','Test_MAE','Test_RMSE','Test_R2']].T
-        metrics_plot.columns = ['Value']
-        metrics_plot.index.name = 'Metric'
-        metrics_plot.reset_index(inplace=True)
-        colors = ['red' if 'Train' in m else 'orange' for m in metrics_plot['Metric']]
-        fig_metrics = go.Figure(go.Bar(
-            x=metrics_plot['Metric'],
-            y=metrics_plot['Value'],
-            marker_color=colors,
-            text=metrics_plot['Value'].round(3),
-            textposition='auto'
-        ))
-        fig_metrics.update_layout(
-            title=f'{selected_area} - Train/Test Metrics',
-            yaxis_title='Metric Value',
-            template='plotly_white'
-        )
-        st.plotly_chart(fig_metrics, use_container_width=True)
-    
-        st.subheader("Actual vs Predicted Scatter Plots")
-        for phase in ['train','test']:
-            df_phase = area_forecast[area_forecast['phase']==phase].dropna()
-            X = df_phase['actual_smoothed'].values.reshape(-1,1)
-            y = df_phase['predicted'].values
-            r2 = r2_score(X, y)
-            lr = LinearRegression()
-            lr.fit(X, y)
-            y_line = lr.predict(X)
-            fig_scatter = go.Figure()
-            fig_scatter.add_trace(go.Scatter(x=X.flatten(), y=y, mode='markers', name='Data Points'))
-            fig_scatter.add_trace(go.Scatter(x=X.flatten(), y=y_line, mode='lines', 
-                                             name=f'Linear Fit (R²={r2:.3f})', line=dict(color='red', dash='dash')))
-            fig_scatter.update_layout(
-                title=f'{selected_area} - {phase.capitalize()} Scatter Plot',
-                xaxis_title='Actual (LOWESS)',
-                yaxis_title='Predicted',
-                template='plotly_white'
-            )
-            st.plotly_chart(fig_scatter, use_container_width=True)
+
     
     # ------------------------------
     # TAB 2: Model Summary
