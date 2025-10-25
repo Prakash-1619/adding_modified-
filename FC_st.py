@@ -139,8 +139,6 @@ if app_choice ==  "Previous models":
     metrics_df.columns = metrics_df.columns.str.strip()
     scatter_df.columns = scatter_df.columns.str.strip()
 
-    
-    
     # -----------------------------
     # Read data from uploaded file
     # -----------------------------
@@ -263,170 +261,178 @@ if app_choice ==  "Previous models":
         st.plotly_chart(fig_line, use_container_width=True)
     
         # -----------------------------
-        # Metrics table
+        # Metrics Plots (replaced table with plots)
         # -----------------------------
-        st.subheader("Metrics Table (Train/Test)")
+        st.subheader("Model Performance Metrics")
+    
         if metrics_area.empty:
             st.info("No metrics data available for this area.")
         else:
-            # Format metrics for better display
-            display_metrics = metrics_area.copy()
-            numeric_cols = ['MAE', 'MSE', 'RMSE', 'MAPE', 'R2']
-            for col in numeric_cols:
-                if col in display_metrics.columns:
-                    display_metrics[col] = display_metrics[col].round(4)
-            st.dataframe(display_metrics)
+            # Create separate plots for each metric
+            metrics_to_plot = ['MAE', 'RMSE', 'MAPE', 'R2']
+            metric_titles = {
+                'MAE': 'Mean Absolute Error (MAE)',
+                'RMSE': 'Root Mean Square Error (RMSE)', 
+                'MAPE': 'Mean Absolute Percentage Error (MAPE)',
+                'R2': 'R-squared (R²)'
+            }
+            
+            # Create 2x2 grid of metrics
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # MAE Plot
+                fig_mae = go.Figure()
+                for model in metrics_area['Model'].unique():
+                    model_data = metrics_area[metrics_area['Model'] == model]
+                    for dataset in ['Train', 'Test']:
+                        dataset_data = model_data[model_data['Dataset'] == dataset]
+                        if not dataset_data.empty:
+                            fig_mae.add_trace(go.Bar(
+                                name=f'{model} {dataset}',
+                                x=[f'{model} {dataset}'],
+                                y=[dataset_data['MAE'].values[0]],
+                                marker_color=colors.get(model, 'gray'),
+                                showlegend=True
+                            ))
+                fig_mae.update_layout(
+                    title='Mean Absolute Error (MAE)',
+                    yaxis_title='MAE',
+                    template='plotly_white',
+                    showlegend=True
+                )
+                st.plotly_chart(fig_mae, use_container_width=True)
+                
+                # RMSE Plot
+                fig_rmse = go.Figure()
+                for model in metrics_area['Model'].unique():
+                    model_data = metrics_area[metrics_area['Model'] == model]
+                    for dataset in ['Train', 'Test']:
+                        dataset_data = model_data[model_data['Dataset'] == dataset]
+                        if not dataset_data.empty:
+                            fig_rmse.add_trace(go.Bar(
+                                name=f'{model} {dataset}',
+                                x=[f'{model} {dataset}'],
+                                y=[dataset_data['RMSE'].values[0]],
+                                marker_color=colors.get(model, 'gray'),
+                                showlegend=False
+                            ))
+                fig_rmse.update_layout(
+                    title='Root Mean Square Error (RMSE)',
+                    yaxis_title='RMSE',
+                    template='plotly_white',
+                    showlegend=False
+                )
+                st.plotly_chart(fig_rmse, use_container_width=True)
+            
+            with col2:
+                # MAPE Plot
+                fig_mape = go.Figure()
+                for model in metrics_area['Model'].unique():
+                    model_data = metrics_area[metrics_area['Model'] == model]
+                    for dataset in ['Train', 'Test']:
+                        dataset_data = model_data[model_data['Dataset'] == dataset]
+                        if not dataset_data.empty:
+                            fig_mape.add_trace(go.Bar(
+                                name=f'{model} {dataset}',
+                                x=[f'{model} {dataset}'],
+                                y=[dataset_data['MAPE'].values[0]],
+                                marker_color=colors.get(model, 'gray'),
+                                showlegend=False
+                            ))
+                fig_mape.update_layout(
+                    title='Mean Absolute Percentage Error (MAPE)',
+                    yaxis_title='MAPE (%)',
+                    template='plotly_white',
+                    showlegend=False
+                )
+                st.plotly_chart(fig_mape, use_container_width=True)
+                
+                # R2 Plot
+                fig_r2 = go.Figure()
+                for model in metrics_area['Model'].unique():
+                    model_data = metrics_area[metrics_area['Model'] == model]
+                    for dataset in ['Train', 'Test']:
+                        dataset_data = model_data[model_data['Dataset'] == dataset]
+                        if not dataset_data.empty:
+                            fig_r2.add_trace(go.Bar(
+                                name=f'{model} {dataset}',
+                                x=[f'{model} {dataset}'],
+                                y=[dataset_data['R2'].values[0]],
+                                marker_color=colors.get(model, 'gray'),
+                                showlegend=False
+                            ))
+                fig_r2.update_layout(
+                    title='R-squared (R²)',
+                    yaxis_title='R²',
+                    template='plotly_white',
+                    showlegend=False
+                )
+                st.plotly_chart(fig_r2, use_container_width=True)
     
         # -----------------------------
-        # Metrics Comparison Plots
+        # Scatter plots: Actual vs Predicted
         # -----------------------------
-        st.subheader("Model Performance Metrics Comparison")
-        
-        if metrics_area.empty:
-            st.info("No metrics data available for visualization.")
-        else:
-            # Select which metrics to display
-            metric_options = ['MAE', 'RMSE', 'MAPE', 'R2']
-            selected_metrics = st.multiselect(
-                "Select metrics to display:",
-                metric_options,
-                default=metric_options
+        st.subheader("Actual vs Predicted — Scatter Plots with Linear Fit")
+    
+        for dataset in ['Train', 'Test']:
+            st.markdown(f"**{dataset} Dataset**")
+            fig_scatter = go.Figure()
+            
+            df_dataset = scatter_area[scatter_area['Dataset'] == dataset]
+            if df_dataset.empty:
+                st.info(f"No {dataset} data available for this area.")
+                continue
+                
+            for model in models:
+                df_sc = df_dataset[df_dataset['Model'] == model]
+                if len(df_sc) == 0:
+                    continue
+                    
+                # Remove any NaN values
+                df_sc = df_sc.dropna(subset=['Actual', 'Predicted'])
+                if len(df_sc) == 0:
+                    continue
+                    
+                x = df_sc['Actual'].values
+                y = df_sc['Predicted'].values
+                
+                # Scatter points
+                fig_scatter.add_trace(go.Scatter(
+                    x=x, y=y, mode='markers', name=model, 
+                    marker=dict(color=colors.get(model, 'gray'))
+                ))
+                
+                # Linear regression line
+                if len(x) > 1:  # Need at least 2 points for regression
+                    lr = LinearRegression()
+                    lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
+                    y_fit = lr.predict(x.reshape(-1, 1)).ravel()
+                    r2 = r2_score(y, y_fit)
+                    fig_scatter.add_trace(go.Scatter(
+                        x=x, y=y_fit, mode='lines', 
+                        name=f"{model} Fit (R²={r2:.3f})",
+                        line=dict(color=colors.get(model, 'gray'), dash='dash'),
+                        showlegend=True
+                    ))
+            
+            # y=x reference line
+            if not df_dataset.empty:
+                all_actual = df_dataset['Actual'].dropna()
+                all_predicted = df_dataset['Predicted'].dropna()
+                if len(all_actual) > 0 and len(all_predicted) > 0:
+                    min_val = min(all_actual.min(), all_predicted.min())
+                    max_val = max(all_actual.max(), all_predicted.max())
+                    fig_scatter.add_trace(go.Scatter(
+                        x=[min_val, max_val], y=[min_val, max_val], mode='lines',
+                        name='y=x', line=dict(color='black', dash='dot')
+                    ))
+            
+            fig_scatter.update_layout(
+                xaxis_title='Actual',
+                yaxis_title='Predicted',
+                legend_title='Legend',
+                template='plotly_white'
             )
             
-            if selected_metrics:
-                # Create separate plots for Train and Test datasets
-                for dataset in ['Train', 'Test']:
-                    st.markdown(f"**{dataset} Dataset**")
-                    
-                    dataset_metrics = metrics_area[metrics_area['Dataset'] == dataset]
-                    
-                    if dataset_metrics.empty:
-                        st.info(f"No {dataset} metrics available.")
-                        continue
-                    
-                    # Create subplots for selected metrics
-                    fig_metrics = go.Figure()
-                    
-                    for metric in selected_metrics:
-                        if metric in dataset_metrics.columns:
-                            for model in dataset_metrics['Model'].unique():
-                                model_data = dataset_metrics[dataset_metrics['Model'] == model]
-                                if not model_data.empty:
-                                    fig_metrics.add_trace(go.Bar(
-                                        name=f"{model} - {metric}",
-                                        x=[f"{model}"],
-                                        y=[model_data[metric].values[0]],
-                                        legendgroup=model,
-                                        marker_color=colors.get(model, 'gray'),
-                                        text=[f"{model_data[metric].values[0]:.4f}"],
-                                        textposition='auto',
-                                    ))
-                    
-                    # Update layout for better visualization
-                    fig_metrics.update_layout(
-                        title=f"{dataset} Dataset - Model Comparison",
-                        xaxis_title="Models",
-                        yaxis_title="Metric Values",
-                        barmode='group',
-                        template='plotly_white',
-                        showlegend=True
-                    )
-                    
-                    st.plotly_chart(fig_metrics, use_container_width=True)
-                    
-                    # Also create a radar chart for comprehensive model comparison
-                    if len(selected_metrics) >= 3:  # Radar chart needs at least 3 metrics
-                        st.markdown(f"**{dataset} Dataset - Radar Chart Comparison**")
-                        
-                        fig_radar = go.Figure()
-                        
-                        for model in dataset_metrics['Model'].unique():
-                            model_data = dataset_metrics[dataset_metrics['Model'] == model]
-                            if not model_data.empty:
-                                # Normalize metrics for radar chart (except R2 which is already normalized)
-                                values = []
-                                for metric in selected_metrics:
-                                    val = model_data[metric].values[0]
-                                    if metric == 'R2':
-                                        # R2 is already between 0-1 (or negative)
-                                        values.append(max(0, val))  # Ensure non-negative for radar
-                                    else:
-                                        # For error metrics, lower is better - invert for visualization
-                                        max_val = dataset_metrics[metric].max()
-                                        if max_val > 0:
-                                            # Normalize and invert so better performance = larger area
-                                            values.append(1 - (val / max_val))
-                                        else:
-                                            values.append(1)
-                                
-                                fig_radar.add_trace(go.Scatterpolar(
-                                    r=values,
-                                    theta=selected_metrics,
-                                    fill='toself',
-                                    name=model,
-                                    line=dict(color=colors.get(model, 'gray'))
-                                ))
-                        
-                        fig_radar.update_layout(
-                            polar=dict(
-                                radialaxis=dict(
-                                    visible=True,
-                                    range=[0, 1]
-                                )),
-                            showlegend=True,
-                            title=f"{dataset} Dataset - Radar Chart (Normalized, Higher = Better)"
-                        )
-                        
-                        st.plotly_chart(fig_radar, use_container_width=True)
-            
-            # -----------------------------
-            # Performance Summary
-            # -----------------------------
-            st.subheader("Performance Summary")
-            
-            # Create a summary table highlighting best performing model for each metric
-            summary_data = []
-            for dataset in ['Train', 'Test']:
-                dataset_metrics = metrics_area[metrics_area['Dataset'] == dataset]
-                if not dataset_metrics.empty:
-                    for metric in ['MAE', 'RMSE', 'MAPE', 'R2']:
-                        if metric in dataset_metrics.columns:
-                            if metric == 'R2':
-                                # For R2, higher is better
-                                best_idx = dataset_metrics[metric].idxmax()
-                                best_value = dataset_metrics.loc[best_idx, metric]
-                                best_model = dataset_metrics.loc[best_idx, 'Model']
-                            else:
-                                # For error metrics, lower is better
-                                best_idx = dataset_metrics[metric].idxmin()
-                                best_value = dataset_metrics.loc[best_idx, metric]
-                                best_model = dataset_metrics.loc[best_idx, 'Model']
-                            
-                            summary_data.append({
-                                'Dataset': dataset,
-                                'Metric': metric,
-                                'Best Model': best_model,
-                                'Value': f"{best_value:.4f}"
-                            })
-            
-            if summary_data:
-                summary_df = pd.DataFrame(summary_data)
-                st.dataframe(summary_df)
-                
-                # Add some insights
-                st.markdown("**Key Insights:**")
-                train_metrics = metrics_area[metrics_area['Dataset'] == 'Train']
-                test_metrics = metrics_area[metrics_area['Dataset'] == 'Test']
-                
-                if not train_metrics.empty and not test_metrics.empty:
-                    # Check for overfitting
-                    for model in models:
-                        train_r2 = train_metrics[train_metrics['Model'] == model]['R2']
-                        test_r2 = test_metrics[test_metrics['Model'] == model]['R2']
-                        if not train_r2.empty and not test_r2.empty:
-                            train_r2_val = train_r2.values[0]
-                            test_r2_val = test_r2.values[0]
-                            if train_r2_val > 0.8 and test_r2_val < 0.5:
-                                st.warning(f"⚠️ {model} shows potential overfitting (high train R²={train_r2_val:.3f}, low test R²={test_r2_val:.3f})")
-                            elif test_r2_val > 0.7:
-                                st.success(f"✅ {model} shows good generalization (test R²={test_r2_val:.3f})")
+            st.plotly_chart(fig_scatter, use_container_width=True)
