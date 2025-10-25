@@ -10,7 +10,7 @@ if app_choice ==  "Auto Arima with Lowess":
     # ------------------------------
     # LOAD DATA
     # ------------------------------
-    forecast_df = pd.read_csv("forecast_lowess_all_areas_extended.csv", parse_dates=["month"])
+    forecast_df = pd.read_csv("forecast_lowess_all_areas_extended.csv", parse_dates=["Month"])
     metrics_df = pd.read_csv("metrics_lowess_all_areas_extended.csv")
     summary_df = pd.read_csv("sarima_model_summary_all_areas_extended.csv")  # contains 'Area' and 'SARIMA_Summary'
     
