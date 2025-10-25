@@ -41,9 +41,10 @@ if app_choice ==  "Auto Arima with Lowess":
         # ------------------------------
         # FORECAST PLOT (continuous line)
         # ------------------------------
+        # Continuous forecast plot
         fig_fc = go.Figure()
         
-        # Actual (LOWESS smoothed)
+        # Actual line
         fig_fc.add_trace(go.Scatter(
             x=area_forecast['month'],
             y=area_forecast['actual_smoothed'],
@@ -52,11 +53,10 @@ if app_choice ==  "Auto Arima with Lowess":
             line=dict(color='blue', dash='dot')
         ))
         
-        # Combine test and forecast into one continuous prediction
+        # Combine train, test, forecast into one continuous prediction line
         area_forecast_sorted = area_forecast.sort_values('month')
         df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train','test','forecast'])]
         
-        # Continuous predicted line — smoothly connects all phases
         fig_fc.add_trace(go.Scatter(
             x=df_predicted['month'],
             y=df_predicted['predicted'],
@@ -65,77 +65,26 @@ if app_choice ==  "Auto Arima with Lowess":
             line=dict(color='green', width=2)
         ))
         
-        # Vertical line to mark where training ends (optional visual cue)
+        # Safely add vertical marker for train end (convert Timestamp → str)
         train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
-        fig_fc.add_vline(x=train_end, line=dict(color='gray', dash='dash'), 
-                         annotation_text="Train End", annotation_position="top right")
+        if pd.notna(train_end):
+            fig_fc.add_vline(
+                x=train_end.strftime('%Y-%m-%d'),
+                line=dict(color='gray', dash='dash'),
+                annotation_text="Train End",
+                annotation_position="top right"
+            )
         
         # Layout
         fig_fc.update_layout(
             xaxis_title='Month',
             yaxis_title='Median Price',
             title=f'{selected_area} - Forecast',
-            template='plotly_white',
-            showlegend=True
+            template='plotly_white'
         )
         
         st.plotly_chart(fig_fc, use_container_width=True)
-        
-        # ------------------------------
-        # TRAIN / TEST METRICS BAR CHART
-        # ------------------------------
-        st.subheader("Train/Test Metrics")
-        metrics_plot = area_metrics[['Train_MAE','Train_RMSE','Train_R2','Test_MAE','Test_RMSE','Test_R2']].T
-        metrics_plot.columns = ['Value']
-        metrics_plot.index.name = 'Metric'
-        metrics_plot.reset_index(inplace=True)
-        
-        colors = ['red' if 'Train' in m else 'orange' for m in metrics_plot['Metric']]
-        
-        fig_metrics = go.Figure(go.Bar(
-            x=metrics_plot['Metric'],
-            y=metrics_plot['Value'],
-            marker_color=colors,
-            text=metrics_plot['Value'].round(3),
-            textposition='auto'
-        ))
-        fig_metrics.update_layout(
-            title=f'{selected_area} - Train/Test Metrics',
-            yaxis_title='Metric Value',
-            template='plotly_white'
-        )
-        st.plotly_chart(fig_metrics, use_container_width=True)
-        
-        # ------------------------------
-        # ACTUAL vs PREDICTED SCATTER PLOTS
-        # ------------------------------
-        st.subheader("Actual vs Predicted Scatter Plots")
-        
-        for phase in ['train', 'test']:
-            df_phase = area_forecast[area_forecast['phase'] == phase].dropna()
-            if df_phase.empty:
-                continue
-        
-            X = df_phase['actual_smoothed'].values.reshape(-1, 1)
-            y = df_phase['predicted'].values
-            lr = LinearRegression()
-            lr.fit(X, y)
-            y_line = lr.predict(X)
-            r2 = r2_score(y, y_line)
-        
-            fig_scatter = go.Figure()
-            fig_scatter.add_trace(go.Scatter(x=X.flatten(), y=y, mode='markers', name='Data Points'))
-            fig_scatter.add_trace(go.Scatter(
-                x=X.flatten(), y=y_line, mode='lines',
-                name=f'Linear Fit (R²={r2:.3f})', line=dict(color='red', dash='dash')
-            ))
-            fig_scatter.update_layout(
-                title=f'{selected_area} - {phase.capitalize()} Scatter Plot',
-                xaxis_title='Actual (LOWESS)',
-                yaxis_title='Predicted',
-                template='plotly_white'
-            )
-            st.plotly_chart(fig_scatter, use_container_width=True)
+
 
 
     
