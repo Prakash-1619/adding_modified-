@@ -40,11 +40,10 @@ if app_choice ==  "Auto Arima with Lowess":
     with tab1:
         # ------------------------------
         # FORECAST PLOT (continuous line)
-        # ------------------------------
-        # Continuous forecast plot
+
         fig_fc = go.Figure()
         
-        # Actual line
+        # Actual (LOWESS)
         fig_fc.add_trace(go.Scatter(
             x=area_forecast['month'],
             y=area_forecast['actual_smoothed'],
@@ -53,7 +52,7 @@ if app_choice ==  "Auto Arima with Lowess":
             line=dict(color='blue', dash='dot')
         ))
         
-        # Combine train, test, forecast into one continuous prediction line
+        # Combine train, test, forecast into continuous line
         area_forecast_sorted = area_forecast.sort_values('month')
         df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train','test','forecast'])]
         
@@ -65,14 +64,20 @@ if app_choice ==  "Auto Arima with Lowess":
             line=dict(color='green', width=2)
         ))
         
-        # Safely add vertical marker for train end (convert Timestamp → str)
+        # Vertical line marking end of training period (works with datetime)
         train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
         if pd.notna(train_end):
-            fig_fc.add_vline(
-                x=train_end.strftime('%Y-%m-%d'),
+            fig_fc.add_shape(
+                type='line',
+                x0=train_end, x1=train_end,
+                y0=area_forecast['predicted'].min(),
+                y1=area_forecast['predicted'].max(),
                 line=dict(color='gray', dash='dash'),
-                annotation_text="Train End",
-                annotation_position="top right"
+                xref='x', yref='y'
+            )
+            fig_fc.add_annotation(
+                x=train_end, y=area_forecast['predicted'].max(),
+                text="Train End", showarrow=False, yshift=10, font=dict(size=12, color="gray")
             )
         
         # Layout
@@ -84,6 +89,7 @@ if app_choice ==  "Auto Arima with Lowess":
         )
         
         st.plotly_chart(fig_fc, use_container_width=True)
+
 
 
 
