@@ -113,7 +113,7 @@ if app_choice ==  "Auto Arima with Lowess":
     
         st.subheader("Actual vs Predicted Scatter Plots")
         for phase in ['train','test']:
-            df_phase = area_forecast[area_forecast['phase']==phase].dropna()
+            df_phase = area_forecast[area_forecast['Phase']==phase].dropna()
             X = df_phase['Actual_Smoothed'].values.reshape(-1,1)
             y = df_phase['Predicted'].values
             r2 = r2_score(X, y)
