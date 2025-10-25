@@ -15,7 +15,7 @@ metrics_df = pd.read_csv("metrics_lowess_all_areas.csv")
 # ------------------------------
 # STREAMLIT APP
 # ------------------------------
-st.title("Real Estate Forecast Analysis (Interactive Plotly)")
+st.title("Real Estate Forecast Analysis")
 st.markdown("Select an area to visualize forecast, metrics, and scatter plots.")
 
 # Area selection
