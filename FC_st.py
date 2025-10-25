@@ -1,7 +1,5 @@
-# streamlit_tabs_app.py
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -11,11 +9,12 @@ from sklearn.metrics import r2_score
 # ------------------------------
 forecast_df = pd.read_csv("forecast_lowess_all_areas.csv", parse_dates=["month"])
 metrics_df = pd.read_csv("metrics_lowess_all_areas.csv")
+summary_df = pd.read_csv("sarima_model_summary_all_areas.csv")  # contains 'Area' and 'SARIMA_Summary'
 
 # ------------------------------
 # STREAMLIT APP
 # ------------------------------
-st.title("Real Estate Forecast Analysis (Interactive Plotly with Tabs)")
+st.title("Real Estate Forecast Analysis with Model Summary")
 
 # Area selection
 areas = forecast_df['area'].unique()
@@ -24,6 +23,8 @@ selected_area = st.selectbox("Select Area", areas)
 # Filter data
 area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
 area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
+area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
+summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
 
 # ------------------------------
 # TABS
@@ -100,8 +101,5 @@ with tab1:
 # TAB 2: Model Summary
 # ------------------------------
 with tab2:
-    st.subheader(f"Model Summary for {selected_area}")
-    # Example: show ARIMA orders from metrics table
-    model_summary = area_metrics[['p','d','q','P','D','Q','m']].copy()
-    st.table(model_summary)
-    st.markdown("You can add more model details here, e.g., SARIMA summary, parameters, or diagnostics.")
+    st.subheader(f"SARIMA Model Summary for {selected_area}")
+    st.code(summary_text, language='text')  # keeps formatting and scrollable
