@@ -22,33 +22,37 @@ areas = forecast_df['Area'].unique()
 selected_area = st.selectbox("Select Area", areas)
 
 # Filter data for selected area
-forecast_area = forecast_df[forecast_df['Area'] == selected_area]
-metrics_area = metrics_df[metrics_df['Area'] == selected_area]
-avp_area = avp_df[avp_df['Area'] == selected_area]
+forecast_area = forecast_df[forecast_df['Area'] == selected_area].copy()
+metrics_area = metrics_df[metrics_df['Area'] == selected_area].copy()
+avp_area = avp_df[avp_df['Area'] == selected_area].copy()
 
 # -----------------------------
 # Forecast plot: Actual + Models
 # -----------------------------
 fig_forecast = go.Figure()
-
 colors = {'ARIMA':'green', 'SARIMA':'orange', 'Prophet':'blue'}
 
-# Plot Actual
+# Actual line
 fig_forecast.add_trace(go.Scatter(
     x=forecast_area['Date'], y=forecast_area['Actual'],
     mode='lines+markers', name='Actual', line=dict(color='black', width=2)
 ))
 
-# Plot models fitted + forecast
-for model in ['ARIMA', 'SARIMA', 'Prophet']:
-    # Fitted (dash)
+# Plot models
+for model in ['ARIMA','SARIMA','Prophet']:
+    # Fitted: only non-NaN and within original series
+    fitted_mask = ~forecast_area[f'{model}_Fitted'].isna() & ~forecast_area['Actual'].isna()
     fig_forecast.add_trace(go.Scatter(
-        x=forecast_area['Date'], y=forecast_area[f'{model}_Fitted'],
+        x=forecast_area.loc[fitted_mask,'Date'],
+        y=forecast_area.loc[fitted_mask,f'{model}_Fitted'],
         mode='lines', name=f'{model} Fitted', line=dict(color=colors[model], dash='dash')
     ))
-    # Forecast (solid)
+
+    # Forecast: only non-NaN points
+    forecast_mask = ~forecast_area[f'{model}_Forecast'].isna()
     fig_forecast.add_trace(go.Scatter(
-        x=forecast_area['Date'], y=forecast_area[f'{model}_Forecast'],
+        x=forecast_area.loc[forecast_mask,'Date'],
+        y=forecast_area.loc[forecast_mask,f'{model}_Forecast'],
         mode='lines', name=f'{model} Forecast', line=dict(color=colors[model])
     ))
 
@@ -109,4 +113,3 @@ for dataset in ['Train','Test']:
                               xaxis_title="Actual Median Price", yaxis_title="Predicted Median Price",
                               template="plotly_white")
     st.plotly_chart(fig_scatter, use_container_width=True)
-
