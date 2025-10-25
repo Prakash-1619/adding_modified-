@@ -6,7 +6,7 @@ from sklearn.metrics import r2_score
 
 app_choice = st.sidebar.selectbox("tab", ["Auto Arima with Lowess", "Previous models"])
 
-if app_choice = "Auto Arima with Lowess":
+if app_choice ==  "Auto Arima with Lowess":
     # ------------------------------
     # LOAD DATA
     # ------------------------------
