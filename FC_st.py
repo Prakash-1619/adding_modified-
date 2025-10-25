@@ -25,7 +25,7 @@ if app_choice ==  "Auto Arima with Lowess":
     selected_area = st.selectbox("Select Area", areas)
     
     # Filter data
-    area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
+    area_forecast = forecast_df[forecast_df['Area'] == selected_area].copy()
     area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
     area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
     summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
