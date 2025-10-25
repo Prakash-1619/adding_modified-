@@ -115,18 +115,79 @@ if app_choice ==  "Previous models":
     import plotly.express as px
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import r2_score
+    import streamlit as st
+    import pandas as pd
+    import numpy as np
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    
+    # -----------------------------
+    # Read data from uploaded file
+    # -----------------------------
     
     # -----------------------------
     # Load data
     # -----------------------------
-    forecast_df = pd.read_csv("all_areas_forecast.csv", parse_dates=['Date'])
+    #forecast_df = pd.read_csv("all_areas_forecast.csv", parse_dates=['Date'])
     metrics_df = pd.read_csv("all_areas_metrics.csv")
     scatter_df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
     
     # Strip column names to remove any extra spaces
-    forecast_df.columns = forecast_df.columns.str.strip()
+    #forecast_df.columns = forecast_df.columns.str.strip()
     metrics_df.columns = metrics_df.columns.str.strip()
     scatter_df.columns = scatter_df.columns.str.strip()
+
+    @st.cache_data
+    def load_data():
+        # Read the uploaded CSV file
+        df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
+        df.columns = df.columns.str.strip()
+        return df
+    
+    # Load the data
+    scatter_df = load_data()
+    
+    # -----------------------------
+    # Create forecast_df and metrics_df from scatter_df
+    # -----------------------------
+    # forecast_df is essentially the same as scatter_df for our purposes
+    forecast_df = scatter_df.copy()
+    
+    # Create metrics_df by calculating metrics from scatter_df
+    def calculate_metrics(df):
+        metrics = []
+        for area in df['Area'].unique():
+            area_data = df[df['Area'] == area]
+            for model in area_data['Model'].unique():
+                model_data = area_data[area_data['Model'] == model]
+                for dataset in ['Train', 'Test']:
+                    dataset_data = model_data[model_data['Dataset'] == dataset]
+                    if len(dataset_data) > 0:
+                        actual = dataset_data['Actual'].values
+                        predicted = dataset_data['Predicted'].values
+                        
+                        # Calculate metrics
+                        mae = np.mean(np.abs(actual - predicted))
+                        mse = np.mean((actual - predicted) ** 2)
+                        rmse = np.sqrt(mse)
+                        mape = np.mean(np.abs((actual - predicted) / actual)) * 100
+                        r2 = r2_score(actual, predicted)
+                        
+                        metrics.append({
+                            'Area': area,
+                            'Model': model,
+                            'Dataset': dataset,
+                            'MAE': mae,
+                            'MSE': mse,
+                            'RMSE': rmse,
+                            'MAPE': mape,
+                            'R2': r2
+                        })
+        return pd.DataFrame(metrics)
+    
+    metrics_df = calculate_metrics(scatter_df)
     
     # -----------------------------
     # Sidebar selection
@@ -135,9 +196,9 @@ if app_choice ==  "Previous models":
     selected_area = st.sidebar.selectbox("Select Area", area_list)
     
     # Filter for selected area
-    forecast_area = forecast_df[forecast_df['Area']==selected_area]
-    metrics_area = metrics_df[metrics_df['Area']==selected_area]
-    scatter_area = scatter_df[scatter_df['Area']==selected_area]
+    forecast_area = forecast_df[forecast_df['Area'] == selected_area]
+    metrics_area = metrics_df[metrics_df['Area'] == selected_area]
+    scatter_area = scatter_df[scatter_df['Area'] == selected_area]
     
     # Check if area data exists
     if forecast_area.empty:
@@ -160,30 +221,32 @@ if app_choice ==  "Previous models":
         ))
     
         models = forecast_area['Model'].unique()
-        colors = {'ARIMA':'green','SARIMA':'orange','Prophet':'blue'}
+        colors = {'ARIMA': 'green', 'SARIMA': 'orange', 'Prophet': 'blue'}
     
         for model in models:
-            df_model = forecast_area[forecast_area['Model']==model]
+            df_model = forecast_area[forecast_area['Model'] == model]
             
             # Fitted (Train)
-            df_train = df_model[df_model['Dataset']=='Train']
-            fig_line.add_trace(go.Scatter(
-                x=df_train['Date'],
-                y=df_train['Predicted'],
-                mode='lines',
-                name=f'{model} Fitted',
-                line=dict(color=colors.get(model,'gray'), dash='dash')
-            ))
+            df_train = df_model[df_model['Dataset'] == 'Train']
+            if not df_train.empty:
+                fig_line.add_trace(go.Scatter(
+                    x=df_train['Date'],
+                    y=df_train['Predicted'],
+                    mode='lines',
+                    name=f'{model} Fitted',
+                    line=dict(color=colors.get(model, 'gray'), dash='dash')
+                ))
             
             # Forecast (Test)
-            df_test = df_model[df_model['Dataset']=='Test']
-            fig_line.add_trace(go.Scatter(
-                x=df_test['Date'],
-                y=df_test['Predicted'],
-                mode='lines',
-                name=f'{model} Forecast',
-                line=dict(color=colors.get(model,'gray'))
-            ))
+            df_test = df_model[df_model['Dataset'] == 'Test']
+            if not df_test.empty:
+                fig_line.add_trace(go.Scatter(
+                    x=df_test['Date'],
+                    y=df_test['Predicted'],
+                    mode='lines',
+                    name=f'{model} Forecast',
+                    line=dict(color=colors.get(model, 'gray'))
+                ))
     
         fig_line.update_layout(
             xaxis_title='Date',
@@ -201,46 +264,71 @@ if app_choice ==  "Previous models":
         if metrics_area.empty:
             st.info("No metrics data available for this area.")
         else:
-            st.dataframe(metrics_area)
+            # Format metrics for better display
+            display_metrics = metrics_area.copy()
+            numeric_cols = ['MAE', 'MSE', 'RMSE', 'MAPE', 'R2']
+            for col in numeric_cols:
+                if col in display_metrics.columns:
+                    display_metrics[col] = display_metrics[col].round(4)
+            st.dataframe(display_metrics)
     
         # -----------------------------
         # Scatter plots: Actual vs Predicted
         # -----------------------------
         st.subheader("Actual vs Predicted — Scatter Plots with Linear Fit")
     
-        for dataset in ['Train','Test']:
+        for dataset in ['Train', 'Test']:
             st.markdown(f"**{dataset} Dataset**")
             fig_scatter = go.Figure()
+            
+            df_dataset = scatter_area[scatter_area['Dataset'] == dataset]
+            if df_dataset.empty:
+                st.info(f"No {dataset} data available for this area.")
+                continue
+                
             for model in models:
-                df_sc = scatter_area[(scatter_area['Model']==model) & (scatter_area['Dataset']==dataset)]
-                if len(df_sc)==0:
+                df_sc = df_dataset[df_dataset['Model'] == model]
+                if len(df_sc) == 0:
                     continue
+                    
+                # Remove any NaN values
+                df_sc = df_sc.dropna(subset=['Actual', 'Predicted'])
+                if len(df_sc) == 0:
+                    continue
+                    
                 x = df_sc['Actual'].values
                 y = df_sc['Predicted'].values
                 
                 # Scatter points
                 fig_scatter.add_trace(go.Scatter(
-                    x=x, y=y, mode='markers', name=model, marker=dict(color=colors.get(model,'gray'))
+                    x=x, y=y, mode='markers', name=model, 
+                    marker=dict(color=colors.get(model, 'gray'))
                 ))
                 
                 # Linear regression line
-                lr = LinearRegression()
-                lr.fit(x.reshape(-1,1), y.reshape(-1,1))
-                y_fit = lr.predict(x.reshape(-1,1)).ravel()
-                r2 = r2_score(y, y_fit)
-                fig_scatter.add_trace(go.Scatter(
-                    x=x, y=y_fit, mode='lines', name=f"{model} Fit (R²={r2:.3f})",
-                    line=dict(color=colors.get(model,'gray'), dash='dash')
-                ))
+                if len(x) > 1:  # Need at least 2 points for regression
+                    lr = LinearRegression()
+                    lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
+                    y_fit = lr.predict(x.reshape(-1, 1)).ravel()
+                    r2 = r2_score(y, y_fit)
+                    fig_scatter.add_trace(go.Scatter(
+                        x=x, y=y_fit, mode='lines', 
+                        name=f"{model} Fit (R²={r2:.3f})",
+                        line=dict(color=colors.get(model, 'gray'), dash='dash'),
+                        showlegend=True
+                    ))
             
             # y=x reference line
-            if not scatter_area.empty:
-                min_val = min(df_sc['Actual'].min(), df_sc['Predicted'].min())
-                max_val = max(df_sc['Actual'].max(), df_sc['Predicted'].max())
-                fig_scatter.add_trace(go.Scatter(
-                    x=[min_val,max_val], y=[min_val,max_val], mode='lines',
-                    name='y=x', line=dict(color='black', dash='dot')
-                ))
+            if not df_dataset.empty:
+                all_actual = df_dataset['Actual'].dropna()
+                all_predicted = df_dataset['Predicted'].dropna()
+                if len(all_actual) > 0 and len(all_predicted) > 0:
+                    min_val = min(all_actual.min(), all_predicted.min())
+                    max_val = max(all_actual.max(), all_predicted.max())
+                    fig_scatter.add_trace(go.Scatter(
+                        x=[min_val, max_val], y=[min_val, max_val], mode='lines',
+                        name='y=x', line=dict(color='black', dash='dot')
+                    ))
             
             fig_scatter.update_layout(
                 xaxis_title='Actual',
