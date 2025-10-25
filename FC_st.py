@@ -89,6 +89,54 @@ if app_choice ==  "Auto Arima with Lowess":
         )
         
         st.plotly_chart(fig_fc, use_container_width=True)
+    
+        st.subheader("Train/Test Metrics")
+        metrics_plot = area_metrics[['Train_MAE','Train_RMSE','Train_R2','Test_MAE','Test_RMSE','Test_R2']].T
+        metrics_plot.columns = ['Value']
+        metrics_plot.index.name = 'Metric'
+        metrics_plot.reset_index(inplace=True)
+        colors = ['red' if 'Train' in m else 'orange' for m in metrics_plot['Metric']]
+        fig_metrics = go.Figure(go.Bar(
+            x=metrics_plot['Metric'],
+            y=metrics_plot['Value'],
+            marker_color=colors,
+            text=metrics_plot['Value'].round(3),
+            textposition='auto'
+        ))
+        fig_metrics.update_layout(
+            title=f'{selected_area} - Train/Test Metrics',
+            yaxis_title='Metric Value',
+            template='plotly_white'
+        )
+        st.plotly_chart(fig_metrics, use_container_width=True)
+    
+        st.subheader("Actual vs Predicted Scatter Plots")
+        for phase in ['train','test']:
+            df_phase = area_forecast[area_forecast['phase']==phase].dropna()
+            X = df_phase['actual_smoothed'].values.reshape(-1,1)
+            y = df_phase['predicted'].values
+            r2 = r2_score(X, y)
+            lr = LinearRegression()
+            lr.fit(X, y)
+            y_line = lr.predict(X)
+            fig_scatter = go.Figure()
+            fig_scatter.add_trace(go.Scatter(x=X.flatten(), y=y, mode='markers', name='Data Points'))
+            fig_scatter.add_trace(go.Scatter(x=X.flatten(), y=y_line, mode='lines', 
+                                             name=f'Linear Fit (R²={r2:.3f})', line=dict(color='red', dash='dash')))
+            fig_scatter.update_layout(
+                title=f'{selected_area} - {phase.capitalize()} Scatter Plot',
+                xaxis_title='Actual (LOWESS)',
+                yaxis_title='Predicted',
+                template='plotly_white'
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+    
+    # ------------------------------
+    # TAB 2: Model Summary
+    # ------------------------------
+    with tab2:
+        st.subheader(f"SARIMA Model Summary for {selected_area}")
+        st.code(summary_text, language='text')  # keeps formatting and scrollable
 
 
 
