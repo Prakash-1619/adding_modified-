@@ -1,115 +1,84 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+import plotly.express as px
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 
 # -----------------------------
-# Load precomputed CSVs
+# Load data
 # -----------------------------
 forecast_df = pd.read_csv("all_areas_forecast.csv", parse_dates=['Date'])
 metrics_df = pd.read_csv("all_areas_metrics.csv")
-avp_df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
+scatter_df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
 
 # -----------------------------
-# Streamlit app
+# Sidebar selection
 # -----------------------------
-st.title("Real Estate Forecast Dashboard")
+area_list = forecast_df['Area'].unique()
+selected_area = st.sidebar.selectbox("Select Area", area_list)
 
-# Area selection
-areas = forecast_df['Area'].unique()
-selected_area = st.selectbox("Select Area", areas)
-
-# Filter data for selected area
-forecast_area = forecast_df[forecast_df['Area'] == selected_area].copy()
-metrics_area = metrics_df[metrics_df['Area'] == selected_area].copy()
-avp_area = avp_df[avp_df['Area'] == selected_area].copy()
+# Filter for selected area
+forecast_area = forecast_df[forecast_df['Area']==selected_area]
+metrics_area = metrics_df[metrics_df['Area']==selected_area]
+scatter_area = scatter_df[scatter_df['Area']==selected_area]
 
 # -----------------------------
-# Forecast plot: Actual + Models
+# Line plot: Actual + Fitted + Forecast
 # -----------------------------
-fig_forecast = go.Figure()
-colors = {'ARIMA':'green', 'SARIMA':'orange', 'Prophet':'blue'}
+st.subheader(f"Forecast Line Plot — {selected_area}")
 
-# Actual line
-fig_forecast.add_trace(go.Scatter(
-    x=forecast_area['Date'], y=forecast_area['Actual'],
-    mode='lines+markers', name='Actual', line=dict(color='black', width=2)
-))
+fig_line = px.line()
+fig_line.add_scatter(x=forecast_area['Date'], y=forecast_area['Actual'],
+                     mode='lines+markers', name='Actual', line=dict(color='black', width=2))
 
-# Plot models
-for model in ['ARIMA','SARIMA','Prophet']:
-    # Fitted: only non-NaN and within original series
-    fitted_mask = ~forecast_area[f'{model}_Fitted'].isna() & ~forecast_area['Actual'].isna()
-    fig_forecast.add_trace(go.Scatter(
-        x=forecast_area.loc[fitted_mask,'Date'],
-        y=forecast_area.loc[fitted_mask,f'{model}_Fitted'],
-        mode='lines', name=f'{model} Fitted', line=dict(color=colors[model], dash='dash')
-    ))
+models = forecast_area['Model'].unique()
+colors = {'ARIMA':'green','SARIMA':'orange','Prophet':'blue'}
 
-    # Forecast: only non-NaN points
-    forecast_mask = ~forecast_area[f'{model}_Forecast'].isna()
-    fig_forecast.add_trace(go.Scatter(
-        x=forecast_area.loc[forecast_mask,'Date'],
-        y=forecast_area.loc[forecast_mask,f'{model}_Forecast'],
-        mode='lines', name=f'{model} Forecast', line=dict(color=colors[model])
-    ))
+for model in models:
+    df_model = forecast_area[forecast_area['Model']==model]
+    # Fitted (train)
+    df_train = df_model[df_model['Dataset']=='Train']
+    fig_line.add_scatter(x=df_train['Date'], y=df_train['Predicted'],
+                         mode='lines', name=f'{model} Fitted', line=dict(color=colors[model], dash='dash'))
+    # Forecast (test + future)
+    df_test = df_model[df_model['Dataset']=='Test']
+    fig_line.add_scatter(x=df_test['Date'], y=df_test['Predicted'],
+                         mode='lines', name=f'{model} Forecast', line=dict(color=colors[model]))
 
-fig_forecast.update_layout(title=f"Actual vs Forecast — {selected_area}",
-                           xaxis_title="Date", yaxis_title="Median Price",
-                           template="plotly_white")
-st.plotly_chart(fig_forecast, use_container_width=True)
+st.plotly_chart(fig_line, use_container_width=True)
 
 # -----------------------------
-# Metrics bar chart
+# Metrics table
 # -----------------------------
-fig_metrics = go.Figure()
-metric_names = ['RMSE','MAE','MAPE']
+st.subheader("Metrics Table (Train/Test)")
 
-for model in ['ARIMA','SARIMA','Prophet']:
-    train_vals = metrics_area[(metrics_area['Model']==model)&(metrics_area['Dataset']=='Train')][metric_names].values.flatten()
-    test_vals = metrics_area[(metrics_area['Model']==model)&(metrics_area['Dataset']=='Test')][metric_names].values.flatten()
-    fig_metrics.add_trace(go.Bar(x=metric_names, y=train_vals, name=f"{model} Train", marker_color=colors[model]))
-    fig_metrics.add_trace(go.Bar(x=metric_names, y=test_vals, name=f"{model} Test", marker_color=colors[model], opacity=0.6))
-
-fig_metrics.update_layout(barmode='group', title=f"Metrics — {selected_area}",
-                          xaxis_title="Metric", yaxis_title="Value",
-                          template="plotly_white")
-st.plotly_chart(fig_metrics, use_container_width=True)
+st.dataframe(metrics_area)
 
 # -----------------------------
-# Scatter plots: Actual vs Predicted with linear fit and R²
+# Scatter plots: Actual vs Predicted
 # -----------------------------
-st.subheader("Scatter Plot: Actual vs Predicted")
+st.subheader("Actual vs Predicted — Scatter Plots with Linear Fit")
 
 for dataset in ['Train','Test']:
     st.markdown(f"**{dataset} Dataset**")
-    fig_scatter = go.Figure()
-    avp_ds = avp_area[avp_area['Dataset']==dataset]
-    for model in ['ARIMA','SARIMA','Prophet']:
-        avp_model = avp_ds[avp_ds['Model']==model]
-        x = avp_model['Actual'].values
-        y = avp_model['Predicted'].values
-        # Drop NaNs
-        mask = ~np.isnan(x) & ~np.isnan(y)
-        x, y = x[mask], y[mask]
-        if len(x) > 1:
-            # Linear fit
-            lr = LinearRegression().fit(x.reshape(-1,1), y.reshape(-1,1))
-            y_fit = lr.predict(x.reshape(-1,1)).ravel()
-            r2 = r2_score(x, y)
-            # Scatter points
-            fig_scatter.add_trace(go.Scatter(x=x, y=y, mode='markers', name=f"{model} (R²={r2:.3f})",
-                                             marker_color=colors[model]))
-            # Linear fit line
-            fig_scatter.add_trace(go.Scatter(x=x, y=y_fit, mode='lines', showlegend=True,
-                                             name=f"{model} Fit", line=dict(color=colors[model], dash='dash')))
-    # y=x reference line
-    y_min, y_max = avp_ds['Actual'].min(), avp_ds['Actual'].max()
-    fig_scatter.add_trace(go.Scatter(x=[y_min, y_max], y=[y_min, y_max], mode='lines', name='y=x',
-                                     line=dict(color='black', dash='dot')))
-    fig_scatter.update_layout(title=f"{dataset}: Actual vs Predicted",
-                              xaxis_title="Actual Median Price", yaxis_title="Predicted Median Price",
-                              template="plotly_white")
+    fig_scatter = px.scatter()
+    for model in models:
+        df_sc = scatter_area[(scatter_area['Model']==model) & (scatter_area['Dataset']==dataset)]
+        if len(df_sc)==0:
+            continue
+        x = df_sc['Actual'].values
+        y = df_sc['Predicted'].values
+        fig_scatter.add_scatter(x=x, y=y, mode='markers', name=model, marker=dict(color=colors[model]))
+        # Linear regression
+        lr = LinearRegression()
+        lr.fit(x.reshape(-1,1), y.reshape(-1,1))
+        y_fit = lr.predict(x.reshape(-1,1)).ravel()
+        r2 = r2_score(x, y)
+        fig_scatter.add_scatter(x=x, y=y_fit, mode='lines', name=f"{model} Fit (R²={r2:.3f})", line=dict(color=colors[model], dash='dash'))
+    # y=x reference
+    min_val = min(df_sc['Actual'].min(), df_sc['Predicted'].min())
+    max_val = max(df_sc['Actual'].max(), df_sc['Predicted'].max())
+    fig_scatter.add_scatter(x=[min_val,max_val], y=[min_val,max_val], mode='lines', name='y=x', line=dict(color='black', dash='dot'))
+    
     st.plotly_chart(fig_scatter, use_container_width=True)
