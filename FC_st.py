@@ -47,7 +47,7 @@ if app_choice ==  "Auto Arima with Lowess":
         # Actual (LOWESS)
         fig_fc.add_trace(go.Scatter(
             x=area_forecast['Month'],
-            y=area_forecast['Actual_smoothed'],
+            y=area_forecast['Actual_Smoothed'],
             mode='lines',
             name='Actual (LOWESS)',
             line=dict(color='blue', dash='dot')
