@@ -21,7 +21,7 @@ if app_choice ==  "Auto Arima with Lowess":
     st.title("Real Estate Forecast Analysis with Model Summary")
     
     # Area selection
-    areas = forecast_df['area'].unique()
+    areas = forecast_df['Area'].unique()
     selected_area = st.selectbox("Select Area", areas)
     
     # Filter data
