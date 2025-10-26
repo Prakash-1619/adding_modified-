@@ -4040,8 +4040,7 @@ if page == "FC":
                     type='line',
                     x0=train_end, x1=train_end,
                     y0=area_forecast['predicted'].min(),
-                    y1=area_forecast['p
-                    redicted'].max(),
+                    y1=area_forecast['predicted'].max(),
                     line=dict(color='gray', dash='dash'),
                     xref='x', yref='y'
                 )
