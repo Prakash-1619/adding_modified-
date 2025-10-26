@@ -4147,17 +4147,7 @@ if page == "FC":
         with tab2:
             st.subheader(f"SARIMA Model Summary for {selected_area}")
             st.code(summary_text, language='text')  # keeps formatting and scrollable
-    
-    
-    
-    
-        
-        # ------------------------------
-        # TAB 2: Model Summary
-        # ------------------------------
-        with tab2:
-            st.subheader(f"SARIMA Model Summary for {selected_area}")
-            st.code(summary_text, language='text')  # keeps formatting and scrollable
+
     
     if app_choice ==  "Previous models":
         import streamlit as st
