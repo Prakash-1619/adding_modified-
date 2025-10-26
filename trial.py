@@ -3213,72 +3213,72 @@ elif page == "V2.1":
 
     ###############################################################################################################################################################################################################################
 
-import pandas as pd
-import streamlit as st
-import pickle
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import numpy as np
-from datetime import datetime, timedelta
-import warnings
-warnings.filterwarnings('ignore')
-# =====================
-# TAB 3: Area-wise Prediction & Forecast
-# =====================
-if sidebar_option == "validation":
-    import streamlit as st
-    import plotly.graph_objects as go
     import pandas as pd
-
-    df_test_forcast = pd.read_csv('df_test_forcast.csv')
-    df_test_forcast['diff_%'] = (df_test_forcast['median_growth'] - df_test_forcast['actual_median']) / df_test_forcast['median_growth'] * 100
+    import streamlit as st
+    import pickle
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import numpy as np
+    from datetime import datetime, timedelta
+    import warnings
+    warnings.filterwarnings('ignore')
+    # =====================
+    # TAB 3: Area-wise Prediction & Forecast
+    # =====================
+    if sidebar_option == "validation":
+        import streamlit as st
+        import plotly.graph_objects as go
+        import pandas as pd
     
-    #st.title("📊 Predicted vs Actual Median Prices with Difference %")
-    
-    fig = go.Figure()
-    
-    # --- Bars (side by side) ---
-    fig.add_trace(go.Bar(
-        x=df_test_forcast["area_name_en"],
-        y=df_test_forcast["median_growth"],
-        name="Predicted Median Price"
-    ))
-    
-    fig.add_trace(go.Bar(
-        x=df_test_forcast["area_name_en"],
-        y=df_test_forcast["actual_median"],
-        name="Actual Median Price"
-    ))
-    
-    # --- Line on secondary y-axis ---
-    fig.add_trace(go.Scatter(
-        x=df_test_forcast["area_name_en"],
-        y=df_test_forcast["diff_%"],
-        name="Difference %",
-        mode="lines+markers",
-        yaxis="y2"
-    ))
-    
-    # --- Layout ---
-    fig.update_layout(
-        title="Predicted vs Actual Median Prices with Diff %",
-        xaxis=dict(title="area_name_en"),
-        yaxis=dict(title="Meter sale price"),
-        yaxis2=dict(
-            title="Difference %",
-            overlaying="y",
-            side="right",
-            zeroline=True,      # show zero line
-            zerolinecolor="red",
-            zerolinewidth=2
-        ),
-        barmode="group",
-        xaxis_tickangle=-45,
-        bargap=0.2,
-    )
-    
-    # --- Show in Streamlit ---
-    st.plotly_chart(fig, use_container_width=True)
+        df_test_forcast = pd.read_csv('df_test_forcast.csv')
+        df_test_forcast['diff_%'] = (df_test_forcast['median_growth'] - df_test_forcast['actual_median']) / df_test_forcast['median_growth'] * 100
+        
+        #st.title("📊 Predicted vs Actual Median Prices with Difference %")
+        
+        fig = go.Figure()
+        
+        # --- Bars (side by side) ---
+        fig.add_trace(go.Bar(
+            x=df_test_forcast["area_name_en"],
+            y=df_test_forcast["median_growth"],
+            name="Predicted Median Price"
+        ))
+        
+        fig.add_trace(go.Bar(
+            x=df_test_forcast["area_name_en"],
+            y=df_test_forcast["actual_median"],
+            name="Actual Median Price"
+        ))
+        
+        # --- Line on secondary y-axis ---
+        fig.add_trace(go.Scatter(
+            x=df_test_forcast["area_name_en"],
+            y=df_test_forcast["diff_%"],
+            name="Difference %",
+            mode="lines+markers",
+            yaxis="y2"
+        ))
+        
+        # --- Layout ---
+        fig.update_layout(
+            title="Predicted vs Actual Median Prices with Diff %",
+            xaxis=dict(title="area_name_en"),
+            yaxis=dict(title="Meter sale price"),
+            yaxis2=dict(
+                title="Difference %",
+                overlaying="y",
+                side="right",
+                zeroline=True,      # show zero line
+                zerolinecolor="red",
+                zerolinewidth=2
+            ),
+            barmode="group",
+            xaxis_tickangle=-45,
+            bargap=0.2,
+        )
+        
+        # --- Show in Streamlit ---
+        st.plotly_chart(fig, use_container_width=True)
 
 
 ###########################################################################################################################################################################################################################
