@@ -207,7 +207,7 @@ if app_choice ==  "Previous models":
     #forecast_df = pd.read_csv("all_areas_forecast.csv", parse_dates=['Date'])
     metrics_df = pd.read_csv("all_areas_metrics.csv")
     scatter_df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
-    
+    summary_df = pd.read_csv("all_model_summaries.csv")
     # Strip column names to remove any extra spaces
     #forecast_df.columns = forecast_df.columns.str.strip()
     metrics_df.columns = metrics_df.columns.str.strip()
@@ -276,7 +276,8 @@ if app_choice ==  "Previous models":
     forecast_area = forecast_df[forecast_df['Area'] == selected_area]
     metrics_area = metrics_df[metrics_df['Area'] == selected_area]
     scatter_area = scatter_df[scatter_df['Area'] == selected_area]
-    
+    area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
+    summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
     # Check if area data exists
     if forecast_area.empty:
         st.warning(f"No forecast data found for area: {selected_area}")
@@ -510,3 +511,6 @@ if app_choice ==  "Previous models":
             )
             
             st.plotly_chart(fig_scatter, use_container_width=True)
+        
+        st.subheader(f"SARIMA Model Summary for {selected_area}")
+        st.code(summary_text, language='text')  # keeps formatting and scrollable
