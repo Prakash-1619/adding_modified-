@@ -207,7 +207,7 @@ if app_choice ==  "Previous models":
     #forecast_df = pd.read_csv("all_areas_forecast.csv", parse_dates=['Date'])
     metrics_df = pd.read_csv("all_areas_metrics.csv")
     scatter_df = pd.read_csv("all_areas_actual_vs_predicted.csv", parse_dates=['Date'])
-    summary_df = pd.read_csv("all_model_summaries.csv")
+    summary_df1 = pd.read_csv("all_model_summaries.csv")
     # Strip column names to remove any extra spaces
     #forecast_df.columns = forecast_df.columns.str.strip()
     metrics_df.columns = metrics_df.columns.str.strip()
@@ -517,10 +517,13 @@ if app_choice ==  "Previous models":
     # -----------------------------
     # MODEL SUMMARIES — ARIMA and SARIMA (for selected area)
     # -----------------------------
+    # -----------------------------
+    # MODEL SUMMARIES — ARIMA and SARIMA (for selected area)
+    # -----------------------------
     st.subheader(f"ARIMA & SARIMA Model Summaries — {selected_area}")
     
     # Filter only the selected area
-    area_summaries = summary_df[summary_df['Area'].str.strip() == selected_area]
+    area_summaries = summary_df1[summary_df1['Area'].str.strip() == selected_area]
     
     if area_summaries.empty:
         st.info(f"No model summaries available for {selected_area}.")
