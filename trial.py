@@ -3989,7 +3989,7 @@ if page == "FC":
         summary_df = pd.read_csv("sarima_model_summary_all_areas.csv")  # contains 'Area' and 'SARIMA_Summary'
         
         # Area selection
-        areas = forecast_df['Area'].unique()
+        areas = forecast_df['area'].unique()
         selected_area = st.selectbox("Select Area", areas)
         
         # Filter data
