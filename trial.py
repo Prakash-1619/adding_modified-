@@ -3984,7 +3984,7 @@ if page == "FC":
         # ------------------------------
         
         
-        forecast_df = pd.read_csv("forecast_lowess_all_areas.csv", parse_dates=["Month"])
+        forecast_df = pd.read_csv("forecast_lowess_all_areas.csv", parse_dates=["month"])
         metrics_df = pd.read_csv("metrics_lowess_all_areas.csv")
         summary_df = pd.read_csv("sarima_model_summary_all_areas.csv")  # contains 'Area' and 'SARIMA_Summary'
         
@@ -3993,7 +3993,7 @@ if page == "FC":
         selected_area = st.selectbox("Select Area", areas)
         
         # Filter data
-        area_forecast = forecast_df[forecast_df['Area'] == selected_area].copy()
+        area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
         area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
         area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
         summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
@@ -4014,38 +4014,39 @@ if page == "FC":
             
             # Actual (LOWESS)
             fig_fc.add_trace(go.Scatter(
-                x=area_forecast['Month'],
-                y=area_forecast['Actual_Smoothed'],
+                x=area_forecast['month'],
+                y=area_forecast['actual_smoothed'],
                 mode='lines',
                 name='Actual (LOWESS)',
                 line=dict(color='blue', dash='dot')
             ))
             
             # Combine train, test, forecast into continuous line
-            area_forecast_sorted = area_forecast.sort_values('Month')
+            area_forecast_sorted = area_forecast.sort_values('month')
             df_predicted = area_forecast_sorted[area_forecast_sorted['Phase'].isin(['train', 'test', 'forecast'])]
             
             fig_fc.add_trace(go.Scatter(
-                x=df_predicted['Month'],
-                y=df_predicted['Predicted'],
+                x=df_predicted['month'],
+                y=df_predicted['predicted'],
                 mode='lines+markers',
                 name='Forecast',
                 line=dict(color='green', width=2)
             ))
             
             # Vertical line marking end of training period
-            train_end = area_forecast[area_forecast['Phase'] == 'train']['Month'].max()
+            train_end = area_forecast[area_forecast['Phase'] == 'train']['month'].max()
             if pd.notna(train_end):
                 fig_fc.add_shape(
                     type='line',
                     x0=train_end, x1=train_end,
-                    y0=area_forecast['Predicted'].min(),
-                    y1=area_forecast['Predicted'].max(),
+                    y0=area_forecast['predicted'].min(),
+                    y1=area_forecast['p
+                    redicted'].max(),
                     line=dict(color='gray', dash='dash'),
                     xref='x', yref='y'
                 )
                 fig_fc.add_annotation(
-                    x=train_end, y=area_forecast['Predicted'].max(),
+                    x=train_end, y=area_forecast['predicted'].max(),
                     text="Train End", showarrow=False, yshift=10, font=dict(size=12, color="gray")
                 )
             
@@ -4096,8 +4097,8 @@ if page == "FC":
                     st.warning(f"No data available for {phase.capitalize()} phase.")
                     continue
                 
-                X = df_phase['Actual_Smoothed'].values.reshape(-1, 1)
-                y = df_phase['Predicted'].values
+                X = df_phase['actual_smoothed'].values.reshape(-1, 1)
+                y = df_phase['predicted'].values
         
                 # Linear fit
                 lr = LinearRegression()
