@@ -3669,303 +3669,303 @@ if ohe is None or train_columns is None:
 # =========================
 # 🤖 MODEL INPUT / PREDICTION SECTION
 # =========================
-if sidebar_option == "🤖 Model Input / Prediction":
-    st.header("🤖 Property Price Prediction")
-    st.markdown("Predict property prices for specific area and features")
-    
-    # =========================
-    # USER INPUT FORM
-    # =========================
-    st.sidebar.subheader("🏠 Property Features")
-    
-    # Get available areas from the loaded models
-    available_areas = list(area_models.keys())
-    
-    # Area selection
-    selected_area = st.sidebar.selectbox(
-        "Select Area",
-        options=available_areas,
-        key="selected_area"
-    )
-    
-    # Property features input
-    st.sidebar.subheader("Property Features")
-    
-    rooms_options = ['1 B/R', 'Studio', '2 B/R', '3 B/R', 'PENTHOUSE', 'More than 3B/R']
-    floor_bin_options = ['1-10', '11-20', '41-50', '21-30', 'Below 1st floor', '31-40',
-                       '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
-                       '71-80', 'Duplex']
-    
-    col1, col2 = st.sidebar.columns(2)
-    
-    with col1:
-        rooms_en = st.selectbox("Number of Rooms", options=rooms_options, index=2)
-        floor_bin = st.selectbox("Floor Level", options=floor_bin_options, index=1)
-        swimming_pool = st.selectbox("Swimming Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        balcony = st.selectbox("Balcony", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-    
-    with col2:
-        elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
-        procedure_area = st.number_input("Area (sqMt)", min_value=2, max_value=350, value=120, step=1)
-    
-    # =========================
-    # PREPARE INPUT DATA FUNCTION
-    # =========================
-    def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
-        """Prepare user input for prediction"""
+    if sidebar_option == "🤖 Model Input / Prediction":
+        st.header("🤖 Property Price Prediction")
+        st.markdown("Predict property prices for specific area and features")
         
-        input_data = pd.DataFrame({
-            'rooms_en': [rooms],
-            'floor_bin': [floor],
-            'swimming_pool': [pool],
-            'balcony': [balcony_val],
-            'elevator': [elevator_val],
-            'metro': [metro_val],
-            'has_parking': [parking],
-            'area_name_en': [area],
-            'procedure_area': [area_size]
-        })
+        # =========================
+        # USER INPUT FORM
+        # =========================
+        st.sidebar.subheader("🏠 Property Features")
         
-        # Separate area name for later use
-        area_name = input_data['area_name_en'].iloc[0]
-        input_no_area = input_data.drop(columns=['area_name_en'])
+        # Get available areas from the loaded models
+        available_areas = list(area_models.keys())
         
-        # Apply one-hot encoding to categorical columns
-        cat_cols = ['rooms_en', 'floor_bin']
+        # Area selection
+        selected_area = st.sidebar.selectbox(
+            "Select Area",
+            options=available_areas,
+            key="selected_area"
+        )
         
-        try:
-            # Transform using the fitted OHE
-            X_cat = ohe.transform(input_no_area[cat_cols])
-            X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
+        # Property features input
+        st.sidebar.subheader("Property Features")
+        
+        rooms_options = ['1 B/R', 'Studio', '2 B/R', '3 B/R', 'PENTHOUSE', 'More than 3B/R']
+        floor_bin_options = ['1-10', '11-20', '41-50', '21-30', 'Below 1st floor', '31-40',
+                           '51-60', 'Other', '-9-0', '61-70', 'Top floor', '91-100', '81-90',
+                           '71-80', 'Duplex']
+        
+        col1, col2 = st.sidebar.columns(2)
+        
+        with col1:
+            rooms_en = st.selectbox("Number of Rooms", options=rooms_options, index=2)
+            floor_bin = st.selectbox("Floor Level", options=floor_bin_options, index=1)
+            swimming_pool = st.selectbox("Swimming Pool", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+            balcony = st.selectbox("Balcony", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        
+        with col2:
+            elevator = st.selectbox("Elevator", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+            metro = st.selectbox("Near Metro", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+            has_parking = st.selectbox("Parking", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+            procedure_area = st.number_input("Area (sqMt)", min_value=2, max_value=350, value=120, step=1)
+        
+        # =========================
+        # PREPARE INPUT DATA FUNCTION
+        # =========================
+        def prepare_input_data(area, rooms, floor, pool, balcony_val, elevator_val, metro_val, parking, area_size):
+            """Prepare user input for prediction"""
             
-            # Combine with numerical features
-            X_numerical = input_no_area.drop(columns=cat_cols)
-            X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
+            input_data = pd.DataFrame({
+                'rooms_en': [rooms],
+                'floor_bin': [floor],
+                'swimming_pool': [pool],
+                'balcony': [balcony_val],
+                'elevator': [elevator_val],
+                'metro': [metro_val],
+                'has_parking': [parking],
+                'area_name_en': [area],
+                'procedure_area': [area_size]
+            })
             
-        except Exception as e:
-            st.error(f"Error in encoding: {str(e)}")
-            return None, None, None
-        
-        # Ensure we have all training columns
-        for col in train_columns:
-            if col not in X_processed.columns:
-                X_processed[col] = 0
-        
-        # Select only the columns that were used during training
-        X_processed = X_processed[train_columns]
-        X_processed = X_processed.select_dtypes(include=[np.number])
-        
-        return X_processed, area_name, input_data
-
-    # =========================
-    # PREDICTION EXECUTION
-    # =========================
-    if st.sidebar.button("🚀 Predict Price", type="primary", key="predict_button"):
-        with st.spinner("Generating prediction..."):
-            # Prepare input data
-            X_input, area_name, original_input = prepare_input_data(
-                selected_area, rooms_en, floor_bin, swimming_pool, balcony, 
-                elevator, metro, has_parking, procedure_area
-            )
+            # Separate area name for later use
+            area_name = input_data['area_name_en'].iloc[0]
+            input_no_area = input_data.drop(columns=['area_name_en'])
             
-            if X_input is None:
-                st.error("❌ Failed to prepare input data")
-                st.stop()
+            # Apply one-hot encoding to categorical columns
+            cat_cols = ['rooms_en', 'floor_bin']
             
-            if area_name in area_models:
-                model = area_models[area_name]
+            try:
+                # Transform using the fitted OHE
+                X_cat = ohe.transform(input_no_area[cat_cols])
+                X_cat_df = pd.DataFrame(X_cat, columns=ohe.get_feature_names_out(cat_cols))
                 
-                try:
-                    # Make prediction
-                    predicted_price = model.predict(X_input)[0]
+                # Combine with numerical features
+                X_numerical = input_no_area.drop(columns=cat_cols)
+                X_processed = pd.concat([X_numerical, X_cat_df], axis=1)
+                
+            except Exception as e:
+                st.error(f"Error in encoding: {str(e)}")
+                return None, None, None
+            
+            # Ensure we have all training columns
+            for col in train_columns:
+                if col not in X_processed.columns:
+                    X_processed[col] = 0
+            
+            # Select only the columns that were used during training
+            X_processed = X_processed[train_columns]
+            X_processed = X_processed.select_dtypes(include=[np.number])
+            
+            return X_processed, area_name, input_data
+    
+        # =========================
+        # PREDICTION EXECUTION
+        # =========================
+        if st.sidebar.button("🚀 Predict Price", type="primary", key="predict_button"):
+            with st.spinner("Generating prediction..."):
+                # Prepare input data
+                X_input, area_name, original_input = prepare_input_data(
+                    selected_area, rooms_en, floor_bin, swimming_pool, balcony, 
+                    elevator, metro, has_parking, procedure_area
+                )
+                
+                if X_input is None:
+                    st.error("❌ Failed to prepare input data")
+                    st.stop()
+                
+                if area_name in area_models:
+                    model = area_models[area_name]
                     
-                    # =========================
-                    # FILTER TRAINING DATA BY EXACT SAME FEATURES
-                    # =========================
-                    selected_features = {
-                        'rooms_en': rooms_en,
-                        'floor_bin': floor_bin,
-                        'swimming_pool': swimming_pool,
-                        'balcony': balcony,
-                        'elevator': elevator,
-                        'metro': metro,
-                        'has_parking': has_parking,
-                        'procedure_area': procedure_area
-                    }
-                    
-                    exact_features_data = None
-                    if train_data is not None:
-                        exact_features_data = filter_training_data_by_exact_features(
-                            train_data, selected_features, area_name
+                    try:
+                        # Make prediction
+                        predicted_price = model.predict(X_input)[0]
+                        
+                        # =========================
+                        # FILTER TRAINING DATA BY EXACT SAME FEATURES
+                        # =========================
+                        selected_features = {
+                            'rooms_en': rooms_en,
+                            'floor_bin': floor_bin,
+                            'swimming_pool': swimming_pool,
+                            'balcony': balcony,
+                            'elevator': elevator,
+                            'metro': metro,
+                            'has_parking': has_parking,
+                            'procedure_area': procedure_area
+                        }
+                        
+                        exact_features_data = None
+                        if train_data is not None:
+                            exact_features_data = filter_training_data_by_exact_features(
+                                train_data, selected_features, area_name
+                            )
+                            
+                            st.subheader("📊 Historical Data with Exact Same Features")
+                            st.write(f"Found {len(exact_features_data)} historical properties with EXACT same features in {area_name}")
+                            
+                            if len(exact_features_data) > 0:
+                                # Show summary of the filtered data
+                                st.dataframe(exact_features_data[['instance_date', 'meter_sale_price', 'rooms_en', 'floor_bin', 'procedure_area']].head(10))
+                        
+                        # =========================
+                        # CALCULATE TREND FOR EXACT SAME FEATURES
+                        # =========================
+                        current_year = datetime.now().year
+                        trend_df = None
+                        historical_yearly = None
+                        
+                        if exact_features_data is not None and len(exact_features_data) > 0:
+                            trend_df, latest_trend, historical_yearly = calculate_trend_for_exact_features(
+                                exact_features_data, current_year
+                            )
+                        
+                        # =========================
+                        # PREPARE FORECAST DATA WITH ALL GROWTH FACTORS
+                        # =========================
+                        forecast_data = prepare_forecast_data(growth_pivot, area_name)
+                        
+                        # =========================
+                        # CREATE COMBINED PLOT WITH CONFIDENCE INTERVALS
+                        # =========================
+                        st.subheader("📈 Price Timeline: Historical Trend (Exact Features) + Forecast")
+                        
+                        combined_fig = create_combined_trend_forecast_plot(
+                            historical_yearly, 
+                            trend_df, 
+                            predicted_price, 
+                            forecast_data, 
+                            area_name,
+                            selected_features
                         )
                         
-                        st.subheader("📊 Historical Data with Exact Same Features")
-                        st.write(f"Found {len(exact_features_data)} historical properties with EXACT same features in {area_name}")
+                        st.plotly_chart(combined_fig, use_container_width=True)
                         
-                        if len(exact_features_data) > 0:
-                            # Show summary of the filtered data
-                            st.dataframe(exact_features_data[['instance_date', 'meter_sale_price', 'rooms_en', 'floor_bin', 'procedure_area']].head(10))
-                    
-                    # =========================
-                    # CALCULATE TREND FOR EXACT SAME FEATURES
-                    # =========================
-                    current_year = datetime.now().year
-                    trend_df = None
-                    historical_yearly = None
-                    
-                    if exact_features_data is not None and len(exact_features_data) > 0:
-                        trend_df, latest_trend, historical_yearly = calculate_trend_for_exact_features(
-                            exact_features_data, current_year
+                        # =========================
+                        # DISPLAY PREDICTION RESULTS
+                        # =========================
+                        st.success("✅ Prediction Generated!")
+                        
+                        # Display input summary
+                        st.subheader("📋 Selected Property Features")
+                        input_display = original_input.copy()
+                        input_display = input_display.T.reset_index()
+                        input_display.columns = ['Feature', 'Value']
+                        
+                        feature_display_map = {
+                            'rooms_en': 'Number of Rooms',
+                            'floor_bin': 'Floor Level',
+                            'swimming_pool': 'Swimming Pool',
+                            'balcony': 'Balcony',
+                            'elevator': 'Elevator',
+                            'metro': 'Near Metro',
+                            'has_parking': 'Parking',
+                            'area_name_en': 'Area',
+                            'procedure_area': 'Area (SqMt)'
+                        }
+                        
+                        input_display['Feature'] = input_display['Feature'].map(feature_display_map)
+                        input_display['Value'] = input_display['Value'].apply(
+                            lambda x: "Yes" if x == 1 else "No" if x == 0 else x
                         )
-                    
-                    # =========================
-                    # PREPARE FORECAST DATA WITH ALL GROWTH FACTORS
-                    # =========================
-                    forecast_data = prepare_forecast_data(growth_pivot, area_name)
-                    
-                    # =========================
-                    # CREATE COMBINED PLOT WITH CONFIDENCE INTERVALS
-                    # =========================
-                    st.subheader("📈 Price Timeline: Historical Trend (Exact Features) + Forecast")
-                    
-                    combined_fig = create_combined_trend_forecast_plot(
-                        historical_yearly, 
-                        trend_df, 
-                        predicted_price, 
-                        forecast_data, 
-                        area_name,
-                        selected_features
-                    )
-                    
-                    st.plotly_chart(combined_fig, use_container_width=True)
-                    
-                    # =========================
-                    # DISPLAY PREDICTION RESULTS
-                    # =========================
-                    st.success("✅ Prediction Generated!")
-                    
-                    # Display input summary
-                    st.subheader("📋 Selected Property Features")
-                    input_display = original_input.copy()
-                    input_display = input_display.T.reset_index()
-                    input_display.columns = ['Feature', 'Value']
-                    
-                    feature_display_map = {
-                        'rooms_en': 'Number of Rooms',
-                        'floor_bin': 'Floor Level',
-                        'swimming_pool': 'Swimming Pool',
-                        'balcony': 'Balcony',
-                        'elevator': 'Elevator',
-                        'metro': 'Near Metro',
-                        'has_parking': 'Parking',
-                        'area_name_en': 'Area',
-                        'procedure_area': 'Area (SqMt)'
-                    }
-                    
-                    input_display['Feature'] = input_display['Feature'].map(feature_display_map)
-                    input_display['Value'] = input_display['Value'].apply(
-                        lambda x: "Yes" if x == 1 else "No" if x == 0 else x
-                    )
-                    
-                    st.table(input_display)
-                    
-                    # Display prediction
-                    st.subheader("💰 Current Price Prediction")
-                    st.metric(
-                        label="Predicted Property Price",
-                        value=f"AED {predicted_price:,.0f}",
-                    )
-                    
-                    # =========================
-                    # DISPLAY FORECAST TABLE WITH ALL GROWTH FACTORS
-                    # =========================
-                    if forecast_data:
-                        st.subheader("🔮 Future Price Forecast with Confidence Intervals")
-                        st.write("Future prices calculated as: Prediction × Growth Factor")
                         
-                        forecast_table_data = []
-                        cumulative_price_main = predicted_price
-                        cumulative_price_upper = predicted_price
-                        cumulative_price_lower = predicted_price
+                        st.table(input_display)
                         
-                        # Sort periods chronologically
-                        sorted_periods = sorted(forecast_data.keys())
+                        # Display prediction
+                        st.subheader("💰 Current Price Prediction")
+                        st.metric(
+                            label="Predicted Property Price",
+                            value=f"AED {predicted_price:,.0f}",
+                        )
                         
-                        for period in sorted_periods:
-                            growth_factors = forecast_data[period]
+                        # =========================
+                        # DISPLAY FORECAST TABLE WITH ALL GROWTH FACTORS
+                        # =========================
+                        if forecast_data:
+                            st.subheader("🔮 Future Price Forecast with Confidence Intervals")
+                            st.write("Future prices calculated as: Prediction × Growth Factor")
                             
-                            cumulative_price_main = cumulative_price_main * growth_factors['main']
-                            cumulative_price_upper = cumulative_price_upper * growth_factors['upper']
-                            cumulative_price_lower = cumulative_price_lower * growth_factors['lower']
+                            forecast_table_data = []
+                            cumulative_price_main = predicted_price
+                            cumulative_price_upper = predicted_price
+                            cumulative_price_lower = predicted_price
                             
-                            forecast_table_data.append({
-                                'Period': period,
-                                'Main Growth Factor': f"{growth_factors['main']:.4f}",
-                                'Upper Growth Factor': f"{growth_factors['upper']:.4f}",
-                                'Lower Growth Factor': f"{growth_factors['lower']:.4f}",
-                                'Forecasted Price (Main)': f"AED {cumulative_price_main:,.0f}",
-                                'Forecasted Price (Upper)': f"AED {cumulative_price_upper:,.0f}",
-                                'Forecasted Price (Lower)': f"AED {cumulative_price_lower:,.0f}"
-                            })
+                            # Sort periods chronologically
+                            sorted_periods = sorted(forecast_data.keys())
+                            
+                            for period in sorted_periods:
+                                growth_factors = forecast_data[period]
+                                
+                                cumulative_price_main = cumulative_price_main * growth_factors['main']
+                                cumulative_price_upper = cumulative_price_upper * growth_factors['upper']
+                                cumulative_price_lower = cumulative_price_lower * growth_factors['lower']
+                                
+                                forecast_table_data.append({
+                                    'Period': period,
+                                    'Main Growth Factor': f"{growth_factors['main']:.4f}",
+                                    'Upper Growth Factor': f"{growth_factors['upper']:.4f}",
+                                    'Lower Growth Factor': f"{growth_factors['lower']:.4f}",
+                                    'Forecasted Price (Main)': f"AED {cumulative_price_main:,.0f}",
+                                    'Forecasted Price (Upper)': f"AED {cumulative_price_upper:,.0f}",
+                                    'Forecasted Price (Lower)': f"AED {cumulative_price_lower:,.0f}"
+                                })
+                            
+                            forecast_df = pd.DataFrame(forecast_table_data)
+                            st.table(forecast_df)
                         
-                        forecast_df = pd.DataFrame(forecast_table_data)
-                        st.table(forecast_df)
-                    
-                    # =========================
-                    # DISPLAY TREND ANALYSIS FOR EXACT FEATURES
-                    # =========================
-                    if trend_df is not None and latest_trend is not None:
-                        st.subheader("📊 Trend Analysis for Exact Features")
+                        # =========================
+                        # DISPLAY TREND ANALYSIS FOR EXACT FEATURES
+                        # =========================
+                        if trend_df is not None and latest_trend is not None:
+                            st.subheader("📊 Trend Analysis for Exact Features")
+                            
+                            # Calculate trend direction and percentage difference
+                            price_diff = predicted_price - latest_trend
+                            price_diff_percent = (price_diff / latest_trend) * 100
+                            
+                            if price_diff > 0:
+                                trend_direction = "increased"
+                                trend_color = "green"
+                            else:
+                                trend_direction = "decreased"
+                                trend_color = "red"
+                            
+                            st.info(f"""
+                            **Historical Trend Analysis:**
+                            - Based on **{len(exact_features_data)}** properties with **exact same features** in {area_name}
+                            - Historical trend shows similar properties were around **AED {latest_trend:,.0f}**
+                            - Current prediction shows a **{abs(price_diff_percent):.1f}% {trend_direction}** from historical trend
+                            - This indicates the market value for these specific features has **{trend_direction}** over time
+                            """)
                         
-                        # Calculate trend direction and percentage difference
-                        price_diff = predicted_price - latest_trend
-                        price_diff_percent = (price_diff / latest_trend) * 100
-                        
-                        if price_diff > 0:
-                            trend_direction = "increased"
-                            trend_color = "green"
+                        elif exact_features_data is not None and len(exact_features_data) > 0:
+                            st.warning(f"⚠️ Found {len(exact_features_data)} properties with similar features, but insufficient data for trend analysis.")
                         else:
-                            trend_direction = "decreased"
-                            trend_color = "red"
+                            st.warning("⚠️ No historical data found with exact same features. The prediction is based on the model training.")
                         
-                        st.info(f"""
-                        **Historical Trend Analysis:**
-                        - Based on **{len(exact_features_data)}** properties with **exact same features** in {area_name}
-                        - Historical trend shows similar properties were around **AED {latest_trend:,.0f}**
-                        - Current prediction shows a **{abs(price_diff_percent):.1f}% {trend_direction}** from historical trend
-                        - This indicates the market value for these specific features has **{trend_direction}** over time
-                        """)
+                    except Exception as e:
+                        st.error(f"❌ Prediction error: {str(e)}")
                     
-                    elif exact_features_data is not None and len(exact_features_data) > 0:
-                        st.warning(f"⚠️ Found {len(exact_features_data)} properties with similar features, but insufficient data for trend analysis.")
-                    else:
-                        st.warning("⚠️ No historical data found with exact same features. The prediction is based on the model training.")
-                    
-                except Exception as e:
-                    st.error(f"❌ Prediction error: {str(e)}")
-                
-            else:
-                st.error(f"❌ No model found for area: {area_name}")
+                else:
+                    st.error(f"❌ No model found for area: {area_name}")
+        
+        else:
+            st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
     
-    else:
-        st.info("👆 Enter property features in the sidebar and click 'Predict Price' to generate forecasts")
-
-# =========================
-# DEBUG INFORMATION
-# =========================
-if st.sidebar.checkbox("Show Debug Info"):
-    st.sidebar.subheader("Debug Information")
-    st.sidebar.write(f"Models loaded: {len(area_models)}")
-    st.sidebar.write(f"Available areas: {list(area_models.keys())}")
-    st.sidebar.write(f"OHE loaded: {ohe is not None}")
-    st.sidebar.write(f"Train columns: {len(train_columns) if train_columns else 0}")
-    st.sidebar.write(f"Training data loaded: {train_data is not None}")
-    if growth_pivot is not None:
-        st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
-
-
+    # =========================
+    # DEBUG INFORMATION
+    # =========================
+    if st.sidebar.checkbox("Show Debug Info"):
+        st.sidebar.subheader("Debug Information")
+        st.sidebar.write(f"Models loaded: {len(area_models)}")
+        st.sidebar.write(f"Available areas: {list(area_models.keys())}")
+        st.sidebar.write(f"OHE loaded: {ohe is not None}")
+        st.sidebar.write(f"Train columns: {len(train_columns) if train_columns else 0}")
+        st.sidebar.write(f"Training data loaded: {train_data is not None}")
+        if growth_pivot is not None:
+            st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
+    
+    
 
 
 
