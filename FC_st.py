@@ -513,17 +513,32 @@ if app_choice ==  "Previous models":
             
             st.plotly_chart(fig_scatter, use_container_width=True)
             
-    st.subheader(f"Model Summaries — {selected_area}")
 
+    # -----------------------------
+    # MODEL SUMMARIES — ARIMA and SARIMA
+    # -----------------------------
+    st.subheader(f"Model Summaries — {selected_area}")
+    
+    # Filter summaries for the selected area
     area_summaries = summary_df[summary_df['Area'] == selected_area]
     
     if area_summaries.empty:
         st.info("No model summaries available for this area.")
     else:
-        tabs = st.tabs(area_summaries['Model'].unique())
-        for i, model in enumerate(area_summaries['Model'].unique()):
-            with tabs[i]:
-                summary_text = area_summaries[area_summaries['Model'] == model]['Summary'].values[0]
-                st.markdown(f"### {model} Summary")
-                st.code(summary_text, language='text')
+        # --- ARIMA Summary ---
+        arima_summary = area_summaries[area_summaries['Model'].str.upper() == 'ARIMA']['Summary'].values
+        if len(arima_summary) > 0:
+            st.markdown("### ARIMA Model Summary")
+            st.code(arima_summary[0], language='text')
+        else:
+            st.info("ARIMA model summary not available for this area.")
+    
+        # --- SARIMA Summary ---
+        sarima_summary = area_summaries[area_summaries['Model'].str.upper() == 'SARIMA']['Summary'].values
+        if len(sarima_summary) > 0:
+            st.markdown("### SARIMA Model Summary")
+            st.code(sarima_summary[0], language='text')
+        else:
+            st.info("SARIMA model summary not available for this area.")
+
 
