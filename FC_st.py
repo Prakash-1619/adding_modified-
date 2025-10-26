@@ -275,10 +275,10 @@ if app_choice ==  "Previous models":
     # Filter for selected area
     forecast_area = forecast_df[forecast_df['Area'] == selected_area]
     metrics_area = metrics_df[metrics_df['Area'] == selected_area]
-    #scatter_area = scatter_df[scatter_df['Area'] == selected_area]
+    scatter_area = scatter_df[scatter_df['Area'] == selected_area]
     #area_summary = summary_df[summary_df['Area'] == selected_area]["Summary"].values
 
-    summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
+    #summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
     # Check if area data exists
     if forecast_area.empty:
         st.warning(f"No forecast data found for area: {selected_area}")
