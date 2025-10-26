@@ -3994,6 +3994,12 @@ if page == "FC":
         
         # Filter data
         area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
+        # ------------------------------
+        # LIMIT FORECAST TILL AUGUST 2025
+        # ------------------------------
+        cutoff_date = pd.Timestamp("2025-08-31")
+        area_forecast = area_forecast[area_forecast["month"] <= cutoff_date]
+
         area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
         area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
         summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
