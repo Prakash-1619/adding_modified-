@@ -4090,7 +4090,7 @@ if page == "FC":
             st.subheader("🔍 Actual vs Predicted Scatter Plots")
         
             for phase in ['train', 'test']:
-                df_phase = area_forecast[area_forecast['Phase'] == phase].dropna(subset=['Actual_Smoothed', 'Predicted'])
+                df_phase = area_forecast[area_forecast['phase'] == phase].dropna(subset=['Actual_Smoothed', 'Predicted'])
                 
                 if df_phase.empty:
                     st.warning(f"No data available for {phase.capitalize()} phase.")
