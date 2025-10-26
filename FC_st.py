@@ -515,30 +515,34 @@ if app_choice ==  "Previous models":
             
 
     # -----------------------------
-    # MODEL SUMMARIES — ARIMA and SARIMA
+    # MODEL SUMMARIES — ARIMA and SARIMA (for selected area)
     # -----------------------------
-    st.subheader(f"Model Summaries — {selected_area}")
+    st.subheader(f"ARIMA & SARIMA Model Summaries — {selected_area}")
     
-    # Filter summaries for the selected area
-    area_summaries = summary_df[summary_df['Area'] == selected_area]
+    # Filter only the selected area
+    area_summaries = summary_df[summary_df['Area'].str.strip() == selected_area]
     
     if area_summaries.empty:
-        st.info("No model summaries available for this area.")
+        st.info(f"No model summaries available for {selected_area}.")
     else:
-        # --- ARIMA Summary ---
-        arima_summary = area_summaries[area_summaries['Model'].str.upper() == 'ARIMA']['Summary'].values
-        if len(arima_summary) > 0:
-            st.markdown("### ARIMA Model Summary")
-            st.code(arima_summary[0], language='text')
-        else:
-            st.info("ARIMA model summary not available for this area.")
+        # Ensure consistent capitalization for matching
+        area_summaries['Model'] = area_summaries['Model'].str.strip().str.upper()
     
-        # --- SARIMA Summary ---
-        sarima_summary = area_summaries[area_summaries['Model'].str.upper() == 'SARIMA']['Summary'].values
-        if len(sarima_summary) > 0:
-            st.markdown("### SARIMA Model Summary")
-            st.code(sarima_summary[0], language='text')
+        # --- ARIMA ---
+        arima_row = area_summaries[area_summaries['Model'] == 'ARIMA']
+        if not arima_row.empty:
+            st.markdown("### ARIMA Model Summary")
+            st.code(arima_row['Summary'].values[0], language='text')
         else:
-            st.info("SARIMA model summary not available for this area.")
+            st.info("ARIMA summary not available for this area.")
+    
+        # --- SARIMA ---
+        sarima_row = area_summaries[area_summaries['Model'] == 'SARIMA']
+        if not sarima_row.empty:
+            st.markdown("### SARIMA Model Summary")
+            st.code(sarima_row['Summary'].values[0], language='text')
+        else:
+            st.info("SARIMA summary not available for this area.")
+
 
 
