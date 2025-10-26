@@ -4023,7 +4023,7 @@ if page == "FC":
             
             # Combine train, test, forecast into continuous line
             area_forecast_sorted = area_forecast.sort_values('month')
-            df_predicted = area_forecast_sorted[area_forecast_sorted['Phase'].isin(['train', 'test', 'forecast'])]
+            df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train', 'test', 'forecast'])]
             
             fig_fc.add_trace(go.Scatter(
                 x=df_predicted['month'],
@@ -4034,7 +4034,7 @@ if page == "FC":
             ))
             
             # Vertical line marking end of training period
-            train_end = area_forecast[area_forecast['Phase'] == 'train']['month'].max()
+            train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
             if pd.notna(train_end):
                 fig_fc.add_shape(
                     type='line',
