@@ -3984,9 +3984,9 @@ if page == "FC":
         # ------------------------------
         
         
-        forecast_df = pd.read_csv("forecast_lowess_all_areas.csv", parse_dates=["month"])
-        metrics_df = pd.read_csv("metrics_lowess_all_areas.csv")
-        summary_df = pd.read_csv("sarima_model_summary_all_areas.csv")  # contains 'Area' and 'SARIMA_Summary'
+        forecast_df = pd.read_csv("forecast_lowess_all_areas1.csv", parse_dates=["month"])
+        metrics_df = pd.read_csv("metrics_lowess_all_areas1.csv")
+        summary_df = pd.read_csv("sarima_model_summary_all_areas1.csv")  # contains 'Area' and 'SARIMA_Summary'
         
         # Area selection
         areas = forecast_df['area'].unique()
