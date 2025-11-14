@@ -1756,7 +1756,6 @@ elif page == "V2.1":
             if __name__ == "__main__":
                 main()
         with main_tabs[1]:
-            with main_tabs[0]:
             import streamlit as st
             import pandas as pd
             import plotly.graph_objects as go
