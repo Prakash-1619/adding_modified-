@@ -1547,7 +1547,7 @@ elif page == "V2.1":
     if sidebar_option == "📊 EDA & Feature Engineering":
         #st.header("📊 EDA & Feature Engineering")
         
-        main_tabs = st.tabs(["Price_trend_areawise", "Column-wise Analysis"])
+        main_tabs = st.tabs(["Price_trend_areawise", "Price_trend_columnwise","Column-wise Analysis"])
         with main_tabs[0]:
             import streamlit as st
             import pandas as pd
@@ -1755,8 +1755,405 @@ elif page == "V2.1":
             
             if __name__ == "__main__":
                 main()
+        with main_tabs[1]:
+            with main_tabs[0]:
+            import streamlit as st
+            import pandas as pd
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            import os
+            
+            # -------------------------
+            # 1️⃣ Time period helper
+            # -------------------------
+            def create_time_period_column(df, time_period):
+                df = df.copy()
+                df['instance_date'] = pd.to_datetime(df['instance_date'])
+                
+                if time_period == 'Daily':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
+                    df['sort_key'] = df['instance_date']
+                elif time_period == 'Weekly':
+                    df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
+                    df['sort_key'] = df['instance_date'] - pd.to_timedelta(df['instance_date'].dt.weekday, unit='d')  # Monday of week
+                elif time_period == 'Monthly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
+                    df['sort_key'] = df['instance_date'].values.astype('datetime64[M]')
+                elif time_period == 'Quarterly':
+                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    df['sort_key'] = pd.PeriodIndex(df['instance_date'], freq='Q').start_time
+                elif time_period == 'Half-Yearly':
+                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
+                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    # Sort key as first day of half-year
+                    df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-' + ((df['half_year']-1)*6 + 1).astype(str) + '-01')
+                elif time_period == 'Yearly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y')
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-01-01')
+                
+                return df
+            
+            # -------------------------
+            # 2️⃣ Create average trend plot function
+            # -------------------------
+            def create_avg_trend_plot(df, time_period, plot_title="Price Trend Analysis"):
+                df_processed = create_time_period_column(df, time_period)
+                
+                # Calculate average meter_sale_price by time period
+                trend_data = df_processed.groupby(['time_period', 'sort_key'], as_index=False)['meter_sale_price'].mean()
+                trend_data = trend_data.sort_values('sort_key')
+                
+                # Calculate record counts
+                count_data = df_processed.groupby(['time_period', 'sort_key'], as_index=False).size()
+                count_data = count_data.sort_values('sort_key')
+                
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                
+                # Average price line
+                fig.add_trace(go.Scatter(
+                    x=trend_data['time_period'],
+                    y=trend_data['meter_sale_price'],
+                    mode='lines+markers',
+                    name='Average Price',
+                    line=dict(color='#1f77b4', width=3),
+                    marker=dict(size=8, color='#1f77b4'),
+                    hovertemplate=(
+                        "<b>Period:</b> %{x}<br>" +
+                        "<b>Avg Price:</b> %{y:.2f}<br>" +
+                        "<extra></extra>"
+                    )
+                ), secondary_y=False)
+                
+                # Record count bars (secondary axis)
+                fig.add_trace(go.Bar(
+                    x=count_data['time_period'],
+                    y=count_data['size'],
+                    name='Record Count',
+                    marker_color='lightgray',
+                    opacity=0.5,
+                    hovertemplate=(
+                        "<b>Period:</b> %{x}<br>" +
+                        "<b>Records:</b> %{y}<br>" +
+                        "<extra></extra>"
+                    )
+                ), secondary_y=True)
+                
+                # Layout
+                fig.update_layout(
+                    title=plot_title,
+                    xaxis_title="Period",
+                    yaxis_title="Average Meter Sale Price",
+                    yaxis2_title="Number of Records",
+                    template="plotly_white",
+                    height=500,
+                    showlegend=True,
+                    legend=dict(x=0, y=1)
+                )
+                
+                # Rotate x-axis labels
+                fig.update_xaxes(tickangle=45)
+                
+                return fig, trend_data, count_data
+            
+            # -------------------------
+            # 3️⃣ Get available columns for variable analysis
+            # -------------------------
+            def get_available_columns(df):
+                # Get all columns excluding the specified ones
+                all_columns = df.columns.tolist()
+                excluded_columns = ['meter_sale_price', 'instance_date']
+                available_columns = [col for col in all_columns if col not in excluded_columns]
+                return available_columns
+            
+            # -------------------------
+            # 4️⃣ Create variable trend plot function
+            # -------------------------
+            def create_variable_trend_plot(df, selected_column, time_period, plot_title="Variable Trend Analysis"):
+                df_processed = create_time_period_column(df, time_period)
+                
+                # Check if selected column is numeric or categorical
+                is_numeric = pd.api.types.is_numeric_dtype(df[selected_column])
+                
+                if is_numeric:
+                    # For numeric columns: calculate average
+                    trend_data = df_processed.groupby(['time_period', 'sort_key'], as_index=False)[selected_column].mean()
+                    aggregation_type = "Average"
+                    value_column = selected_column
+                else:
+                    # For categorical columns: calculate count or frequency
+                    trend_data = df_processed.groupby(['time_period', 'sort_key'], as_index=False).size()
+                    trend_data = trend_data.rename(columns={'size': 'count'})
+                    aggregation_type = "Count"
+                    value_column = 'count'
+                
+                trend_data = trend_data.sort_values('sort_key')
+                
+                fig = go.Figure()
+                
+                # Main trend line
+                fig.add_trace(go.Scatter(
+                    x=trend_data['time_period'],
+                    y=trend_data[value_column],
+                    mode='lines+markers',
+                    name=f'{aggregation_type} {selected_column}' if is_numeric else f'Count of {selected_column}',
+                    line=dict(color='#1f77b4', width=3),
+                    marker=dict(size=8, color='#1f77b4')
+                ))
+                
+                # Update layout
+                if is_numeric:
+                    y_axis_title = f"Average {selected_column}"
+                else:
+                    y_axis_title = f"Count of Records"
+                
+                fig.update_layout(
+                    title=plot_title,
+                    xaxis_title=time_period,
+                    yaxis_title=y_axis_title,
+                    template="plotly_white",
+                    height=500,
+                    showlegend=True
+                )
+                
+                # Rotate x-axis labels for better readability
+                fig.update_xaxis(tickangle=45)
+                
+                return fig, trend_data, is_numeric, value_column
+            
+            # -------------------------
+            # 5️⃣ Main Streamlit App
+            # -------------------------
+            def main():
+                # Dataset selection
+                st.sidebar.header("Dataset Selection")
+                dataset_options = {
+                    "fore_cast_raw_data": "forcast_model_16_25.csv",
+                    "Actual_data": "over_all_dataset_og.csv",
+                    "Areas with 6000": "df_trained_dataset_6000.csv"
+                }
+                
+                selected_dataset = st.sidebar.selectbox("Choose Dataset", options=list(dataset_options.keys()))
+                file_path = dataset_options[selected_dataset]
+                
+                if not os.path.exists(file_path):
+                    st.error(f"File not found: {file_path}")
+                    return
+                
+                df = pd.read_csv(file_path)
+                required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
+                missing = [c for c in required_columns if c not in df.columns]
+                if missing:
+                    st.error(f"Missing required columns: {', '.join(missing)}")
+                    return
+                
+                # Create tabs
+                tabs = st.tabs(["📈 Meter Sale Price Trends", "📊 Other Variables Analysis"])
+                
+                # Meter Sale Price Trends Tab
+                with tabs[0]:
+                    st.header("Meter Sale Price Trend Analysis")
+                    
+                    col1, col2 = st.columns([1, 3])
+                    
+                    with col1:
+                        time_period_whole = st.selectbox(
+                            "Select Time Period", 
+                            ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'], 
+                            index=2, 
+                            key="whole_time_period"
+                        )
+                        
+                        areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
+                        selected_area = st.selectbox("Select Area", areas_all, index=0, key="area_select")
+                        
+                        if selected_area != "All Areas":
+                            df_filtered = df[df['area_name_en'] == selected_area]
+                            title = f"{selected_area} - Meter Sale Price Trend"
+                        else:
+                            df_filtered = df.copy()
+                            title = "All Areas - Meter Sale Price Trend"
+                    
+                    with col2:
+                        # Create and display the plot
+                        fig, trend_data, count_data = create_avg_trend_plot(df_filtered, time_period_whole, title)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Display summary statistics
+                    st.subheader("Summary Statistics")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        current_avg = trend_data['meter_sale_price'].iloc[-1]
+                        st.metric(
+                            label=f"Current {time_period_whole} Average",
+                            value=f"₹{current_avg:,.2f}"
+                        )
+                    
+                    with col2:
+                        if len(trend_data) > 1:
+                            previous_avg = trend_data['meter_sale_price'].iloc[-2]
+                            change_pct = ((current_avg - previous_avg) / previous_avg * 100) if previous_avg != 0 else 0
+                            st.metric(
+                                label=f"Change from Previous {time_period_whole}",
+                                value=f"₹{current_avg:,.2f}",
+                                delta=f"{change_pct:+.1f}%"
+                            )
+                        else:
+                            st.metric(
+                                label=f"Change from Previous {time_period_whole}",
+                                value="N/A",
+                                delta=None
+                            )
+                    
+                    with col3:
+                        highest_avg = trend_data['meter_sale_price'].max()
+                        st.metric(
+                            label=f"Highest {time_period_whole} Average",
+                            value=f"₹{highest_avg:,.2f}"
+                        )
+                    
+                    with col4:
+                        lowest_avg = trend_data['meter_sale_price'].min()
+                        st.metric(
+                            label=f"Lowest {time_period_whole} Average",
+                            value=f"₹{lowest_avg:,.2f}"
+                        )
+                    
+                    # Data table
+                    with st.expander("View Trend Data"):
+                        display_df = trend_data[['time_period', 'meter_sale_price']].copy()
+                        display_df['meter_sale_price'] = display_df['meter_sale_price'].round(2)
+                        display_df = display_df.rename(columns={
+                            'time_period': 'Period',
+                            'meter_sale_price': 'Average Price (₹)'
+                        })
+                        st.dataframe(display_df, use_container_width=True)
+                
+                # Other Variables Analysis Tab
+                with tabs[1]:
+                    st.header("Other Variables Trend Analysis")
+                    
+                    available_columns = get_available_columns(df)
+                    
+                    if not available_columns:
+                        st.warning("No additional columns found for analysis (excluding meter_sale_price and instance_date)")
+                    else:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            selected_column = st.selectbox(
+                                "Select Variable for Analysis",
+                                options=available_columns,
+                                help="Choose which variable to analyze"
+                            )
+                        
+                        with col2:
+                            time_period_var = st.selectbox(
+                                "Select Time Period",
+                                options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
+                                index=2,
+                                key="var_time_period"
+                            )
+                        
+                        # Create and display variable trend plot
+                        fig_var, trend_data_var, is_numeric, value_column = create_variable_trend_plot(
+                            df, selected_column, time_period_var, f"{selected_column} - {time_period_var} Trend"
+                        )
+                        st.plotly_chart(fig_var, use_container_width=True)
+                        
+                        # Summary statistics for variable
+                        st.subheader("Summary Statistics")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            current_value = trend_data_var[value_column].iloc[-1]
+                            if is_numeric:
+                                st.metric(
+                                    label=f"Current {time_period_var} Average",
+                                    value=f"{current_value:,.2f}"
+                                )
+                            else:
+                                st.metric(
+                                    label=f"Current {time_period_var} Count",
+                                    value=f"{current_value:,.0f}"
+                                )
+                        
+                        with col2:
+                            if len(trend_data_var) > 1:
+                                previous_value = trend_data_var[value_column].iloc[-2]
+                                change_pct = ((current_value - previous_value) / previous_value * 100) if previous_value != 0 else 0
+                                
+                                if is_numeric:
+                                    st.metric(
+                                        label=f"Change from Previous {time_period_var}",
+                                        value=f"{current_value:,.2f}",
+                                        delta=f"{change_pct:+.1f}%"
+                                    )
+                                else:
+                                    st.metric(
+                                        label=f"Change from Previous {time_period_var}",
+                                        value=f"{current_value:,.0f}",
+                                        delta=f"{change_pct:+.1f}%"
+                                    )
+                            else:
+                                st.metric(
+                                    label=f"Change from Previous {time_period_var}",
+                                    value="N/A",
+                                    delta=None
+                                )
+                        
+                        with col3:
+                            max_value = trend_data_var[value_column].max()
+                            if is_numeric:
+                                st.metric(
+                                    label=f"Highest {time_period_var}",
+                                    value=f"{max_value:,.2f}"
+                                )
+                            else:
+                                st.metric(
+                                    label=f"Highest {time_period_var}",
+                                    value=f"{max_value:,.0f}"
+                                )
+                        
+                        with col4:
+                            min_value = trend_data_var[value_column].min()
+                            if is_numeric:
+                                st.metric(
+                                    label=f"Lowest {time_period_var}",
+                                    value=f"{min_value:,.2f}"
+                                )
+                            else:
+                                st.metric(
+                                    label=f"Lowest {time_period_var}",
+                                    value=f"{min_value:,.0f}"
+                                )
+                        
+                        # Data table for variable
+                        with st.expander("View Variable Trend Data"):
+                            if is_numeric:
+                                display_df_var = trend_data_var[['time_period', value_column]].copy()
+                                display_df_var[value_column] = display_df_var[value_column].round(2)
+                                display_df_var = display_df_var.rename(columns={
+                                    'time_period': 'Period',
+                                    value_column: f'Average {selected_column}'
+                                })
+                            else:
+                                display_df_var = trend_data_var[['time_period', value_column]].copy()
+                                display_df_var = display_df_var.rename(columns={
+                                    'time_period': 'Period',
+                                    value_column: f'Record Count'
+                                })
+                            
+                            st.dataframe(display_df_var, use_container_width=True)
+            
+            if __name__ == "__main__":
+                main()
 
-        with main_tabs[1]:            
+            
+        with main_tabs[2]:            
             import streamlit as st
             import pandas as pd
             import plotly.express as px
