@@ -1919,239 +1919,244 @@ elif page == "V2.1":
                 fig.update_xaxis(tickangle=45)
                 
                 return fig, trend_data, is_numeric, value_column
+        
+            # -------------------------
+            # 5️⃣ Dataset selection and main app
+            # -------------------------
             
-            # -------------------------
-            # 5️⃣ Main Streamlit App
-            # -------------------------
-            def main():
-                # Dataset selection
-                st.sidebar.header("Dataset Selection")
-                dataset_options = {
-                    "fore_cast_raw_data": "forcast_model_16_25.csv",
-                    "Actual_data": "over_all_dataset_og.csv",
-                    "Areas with 6000": "df_trained_dataset_6000.csv"
-                }
+            # Dataset selection
+            st.sidebar.header("Dataset Selection")
+            dataset_options = {
+                "fore_cast_raw_data": "forcast_model_16_25.csv",
+                "Actual_data": "over_all_dataset_og.csv",
+                "Areas with 6000": "df_trained_dataset_6000.csv"
+            }
+            
+            selected_dataset = st.sidebar.selectbox(
+                "Choose Dataset", 
+                options=list(dataset_options.keys()),
+                key="dataset_select_unique"
+            )
+            file_path = dataset_options[selected_dataset]
+            
+            if not os.path.exists(file_path):
+                st.error(f"File not found: {file_path}")
+                st.stop()
+            
+            df = pd.read_csv(file_path)
+            required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
+            missing = [c for c in required_columns if c not in df.columns]
+            if missing:
+                st.error(f"Missing required columns: {', '.join(missing)}")
+                st.stop()
+            
+            # Create tabs
+            tabs = st.tabs(["📈 Meter Sale Price Trends", "📊 Other Variables Analysis"])
+            
+            # Meter Sale Price Trends Tab
+            with tabs[0]:
+                st.header("Meter Sale Price Trend Analysis")
                 
-                selected_dataset = st.sidebar.selectbox("Choose Dataset", options=list(dataset_options.keys()))
-                file_path = dataset_options[selected_dataset]
+                col1, col2 = st.columns([1, 3])
                 
-                if not os.path.exists(file_path):
-                    st.error(f"File not found: {file_path}")
-                    return
-                
-                df = pd.read_csv(file_path)
-                required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
-                missing = [c for c in required_columns if c not in df.columns]
-                if missing:
-                    st.error(f"Missing required columns: {', '.join(missing)}")
-                    return
-                
-                # Create tabs
-                tabs = st.tabs(["📈 Meter Sale Price Trends", "📊 Other Variables Analysis"])
-                
-                # Meter Sale Price Trends Tab
-                with tabs[0]:
-                    st.header("Meter Sale Price Trend Analysis")
+                with col1:
+                    time_period_whole = st.selectbox(
+                        "Select Time Period", 
+                        ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'], 
+                        index=2, 
+                        key="price_time_period_unique"
+                    )
                     
-                    col1, col2 = st.columns([1, 3])
+                    areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
+                    selected_area = st.selectbox(
+                        "Select Area", 
+                        areas_all, 
+                        index=0, 
+                        key="price_area_select_unique"
+                    )
+                    
+                    if selected_area != "All Areas":
+                        df_filtered = df[df['area_name_en'] == selected_area]
+                        title = f"{selected_area} - Meter Sale Price Trend"
+                    else:
+                        df_filtered = df.copy()
+                        title = "All Areas - Meter Sale Price Trend"
+                
+                with col2:
+                    # Create and display the plot
+                    fig, trend_data, count_data = create_avg_trend_plot(df_filtered, time_period_whole, title)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Display summary statistics
+                st.subheader("Summary Statistics")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    current_avg = trend_data['meter_sale_price'].iloc[-1]
+                    st.metric(
+                        label=f"Current {time_period_whole} Average",
+                        value=f"₹{current_avg:,.2f}"
+                    )
+                
+                with col2:
+                    if len(trend_data) > 1:
+                        previous_avg = trend_data['meter_sale_price'].iloc[-2]
+                        change_pct = ((current_avg - previous_avg) / previous_avg * 100) if previous_avg != 0 else 0
+                        st.metric(
+                            label=f"Change from Previous {time_period_whole}",
+                            value=f"₹{current_avg:,.2f}",
+                            delta=f"{change_pct:+.1f}%"
+                        )
+                    else:
+                        st.metric(
+                            label=f"Change from Previous {time_period_whole}",
+                            value="N/A",
+                            delta=None
+                        )
+                
+                with col3:
+                    highest_avg = trend_data['meter_sale_price'].max()
+                    st.metric(
+                        label=f"Highest {time_period_whole} Average",
+                        value=f"₹{highest_avg:,.2f}"
+                    )
+                
+                with col4:
+                    lowest_avg = trend_data['meter_sale_price'].min()
+                    st.metric(
+                        label=f"Lowest {time_period_whole} Average",
+                        value=f"₹{lowest_avg:,.2f}"
+                    )
+                
+                # Data table
+                with st.expander("View Trend Data"):
+                    display_df = trend_data[['time_period', 'meter_sale_price']].copy()
+                    display_df['meter_sale_price'] = display_df['meter_sale_price'].round(2)
+                    display_df = display_df.rename(columns={
+                        'time_period': 'Period',
+                        'meter_sale_price': 'Average Price (₹)'
+                    })
+                    st.dataframe(display_df, use_container_width=True)
+            
+            # Other Variables Analysis Tab
+            with tabs[1]:
+                st.header("Other Variables Trend Analysis")
+                
+                available_columns = get_available_columns(df)
+                
+                if not available_columns:
+                    st.warning("No additional columns found for analysis (excluding meter_sale_price and instance_date)")
+                else:
+                    col1, col2 = st.columns(2)
                     
                     with col1:
-                        time_period_whole = st.selectbox(
-                            "Select Time Period", 
-                            ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'], 
-                            index=2, 
-                            key="whole_time_period"
+                        selected_column = st.selectbox(
+                            "Select Variable for Analysis",
+                            options=available_columns,
+                            help="Choose which variable to analyze",
+                            key="variable_select_unique"
                         )
-                        
-                        areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
-                        selected_area = st.selectbox("Select Area", areas_all, index=0, key="area_select")
-                        
-                        if selected_area != "All Areas":
-                            df_filtered = df[df['area_name_en'] == selected_area]
-                            title = f"{selected_area} - Meter Sale Price Trend"
-                        else:
-                            df_filtered = df.copy()
-                            title = "All Areas - Meter Sale Price Trend"
                     
                     with col2:
-                        # Create and display the plot
-                        fig, trend_data, count_data = create_avg_trend_plot(df_filtered, time_period_whole, title)
-                        st.plotly_chart(fig, use_container_width=True)
+                        time_period_var = st.selectbox(
+                            "Select Time Period",
+                            options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
+                            index=2,
+                            key="variable_time_period_unique"
+                        )
                     
-                    # Display summary statistics
+                    # Create and display variable trend plot
+                    fig_var, trend_data_var, is_numeric, value_column = create_variable_trend_plot(
+                        df, selected_column, time_period_var, f"{selected_column} - {time_period_var} Trend"
+                    )
+                    st.plotly_chart(fig_var, use_container_width=True)
+                    
+                    # Summary statistics for variable
                     st.subheader("Summary Statistics")
                     
                     col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
-                        current_avg = trend_data['meter_sale_price'].iloc[-1]
-                        st.metric(
-                            label=f"Current {time_period_whole} Average",
-                            value=f"₹{current_avg:,.2f}"
-                        )
-                    
-                    with col2:
-                        if len(trend_data) > 1:
-                            previous_avg = trend_data['meter_sale_price'].iloc[-2]
-                            change_pct = ((current_avg - previous_avg) / previous_avg * 100) if previous_avg != 0 else 0
+                        current_value = trend_data_var[value_column].iloc[-1]
+                        if is_numeric:
                             st.metric(
-                                label=f"Change from Previous {time_period_whole}",
-                                value=f"₹{current_avg:,.2f}",
-                                delta=f"{change_pct:+.1f}%"
+                                label=f"Current {time_period_var} Average",
+                                value=f"{current_value:,.2f}"
                             )
                         else:
                             st.metric(
-                                label=f"Change from Previous {time_period_whole}",
+                                label=f"Current {time_period_var} Count",
+                                value=f"{current_value:,.0f}"
+                            )
+                    
+                    with col2:
+                        if len(trend_data_var) > 1:
+                            previous_value = trend_data_var[value_column].iloc[-2]
+                            change_pct = ((current_value - previous_value) / previous_value * 100) if previous_value != 0 else 0
+                            
+                            if is_numeric:
+                                st.metric(
+                                    label=f"Change from Previous {time_period_var}",
+                                    value=f"{current_value:,.2f}",
+                                    delta=f"{change_pct:+.1f}%"
+                                )
+                            else:
+                                st.metric(
+                                    label=f"Change from Previous {time_period_var}",
+                                    value=f"{current_value:,.0f}",
+                                    delta=f"{change_pct:+.1f}%"
+                                )
+                        else:
+                            st.metric(
+                                label=f"Change from Previous {time_period_var}",
                                 value="N/A",
                                 delta=None
                             )
                     
                     with col3:
-                        highest_avg = trend_data['meter_sale_price'].max()
-                        st.metric(
-                            label=f"Highest {time_period_whole} Average",
-                            value=f"₹{highest_avg:,.2f}"
-                        )
+                        max_value = trend_data_var[value_column].max()
+                        if is_numeric:
+                            st.metric(
+                                label=f"Highest {time_period_var}",
+                                value=f"{max_value:,.2f}"
+                            )
+                        else:
+                            st.metric(
+                                label=f"Highest {time_period_var}",
+                                value=f"{max_value:,.0f}"
+                            )
                     
                     with col4:
-                        lowest_avg = trend_data['meter_sale_price'].min()
-                        st.metric(
-                            label=f"Lowest {time_period_whole} Average",
-                            value=f"₹{lowest_avg:,.2f}"
-                        )
-                    
-                    # Data table
-                    with st.expander("View Trend Data"):
-                        display_df = trend_data[['time_period', 'meter_sale_price']].copy()
-                        display_df['meter_sale_price'] = display_df['meter_sale_price'].round(2)
-                        display_df = display_df.rename(columns={
-                            'time_period': 'Period',
-                            'meter_sale_price': 'Average Price (₹)'
-                        })
-                        st.dataframe(display_df, use_container_width=True)
-                
-                # Other Variables Analysis Tab
-                with tabs[1]:
-                    st.header("Other Variables Trend Analysis")
-                    
-                    available_columns = get_available_columns(df)
-                    
-                    if not available_columns:
-                        st.warning("No additional columns found for analysis (excluding meter_sale_price and instance_date)")
-                    else:
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            selected_column = st.selectbox(
-                                "Select Variable for Analysis",
-                                options=available_columns,
-                                help="Choose which variable to analyze"
+                        min_value = trend_data_var[value_column].min()
+                        if is_numeric:
+                            st.metric(
+                                label=f"Lowest {time_period_var}",
+                                value=f"{min_value:,.2f}"
                             )
-                        
-                        with col2:
-                            time_period_var = st.selectbox(
-                                "Select Time Period",
-                                options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
-                                index=2,
-                                key="var_time_period"
+                        else:
+                            st.metric(
+                                label=f"Lowest {time_period_var}",
+                                value=f"{min_value:,.0f}"
                             )
+                    
+                    # Data table for variable
+                    with st.expander("View Variable Trend Data"):
+                        if is_numeric:
+                            display_df_var = trend_data_var[['time_period', value_column]].copy()
+                            display_df_var[value_column] = display_df_var[value_column].round(2)
+                            display_df_var = display_df_var.rename(columns={
+                                'time_period': 'Period',
+                                value_column: f'Average {selected_column}'
+                            })
+                        else:
+                            display_df_var = trend_data_var[['time_period', value_column]].copy()
+                            display_df_var = display_df_var.rename(columns={
+                                'time_period': 'Period',
+                                value_column: f'Record Count'
+                            })
                         
-                        # Create and display variable trend plot
-                        fig_var, trend_data_var, is_numeric, value_column = create_variable_trend_plot(
-                            df, selected_column, time_period_var, f"{selected_column} - {time_period_var} Trend"
-                        )
-                        st.plotly_chart(fig_var, use_container_width=True)
-                        
-                        # Summary statistics for variable
-                        st.subheader("Summary Statistics")
-                        
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        with col1:
-                            current_value = trend_data_var[value_column].iloc[-1]
-                            if is_numeric:
-                                st.metric(
-                                    label=f"Current {time_period_var} Average",
-                                    value=f"{current_value:,.2f}"
-                                )
-                            else:
-                                st.metric(
-                                    label=f"Current {time_period_var} Count",
-                                    value=f"{current_value:,.0f}"
-                                )
-                        
-                        with col2:
-                            if len(trend_data_var) > 1:
-                                previous_value = trend_data_var[value_column].iloc[-2]
-                                change_pct = ((current_value - previous_value) / previous_value * 100) if previous_value != 0 else 0
-                                
-                                if is_numeric:
-                                    st.metric(
-                                        label=f"Change from Previous {time_period_var}",
-                                        value=f"{current_value:,.2f}",
-                                        delta=f"{change_pct:+.1f}%"
-                                    )
-                                else:
-                                    st.metric(
-                                        label=f"Change from Previous {time_period_var}",
-                                        value=f"{current_value:,.0f}",
-                                        delta=f"{change_pct:+.1f}%"
-                                    )
-                            else:
-                                st.metric(
-                                    label=f"Change from Previous {time_period_var}",
-                                    value="N/A",
-                                    delta=None
-                                )
-                        
-                        with col3:
-                            max_value = trend_data_var[value_column].max()
-                            if is_numeric:
-                                st.metric(
-                                    label=f"Highest {time_period_var}",
-                                    value=f"{max_value:,.2f}"
-                                )
-                            else:
-                                st.metric(
-                                    label=f"Highest {time_period_var}",
-                                    value=f"{max_value:,.0f}"
-                                )
-                        
-                        with col4:
-                            min_value = trend_data_var[value_column].min()
-                            if is_numeric:
-                                st.metric(
-                                    label=f"Lowest {time_period_var}",
-                                    value=f"{min_value:,.2f}"
-                                )
-                            else:
-                                st.metric(
-                                    label=f"Lowest {time_period_var}",
-                                    value=f"{min_value:,.0f}"
-                                )
-                        
-                        # Data table for variable
-                        with st.expander("View Variable Trend Data"):
-                            if is_numeric:
-                                display_df_var = trend_data_var[['time_period', value_column]].copy()
-                                display_df_var[value_column] = display_df_var[value_column].round(2)
-                                display_df_var = display_df_var.rename(columns={
-                                    'time_period': 'Period',
-                                    value_column: f'Average {selected_column}'
-                                })
-                            else:
-                                display_df_var = trend_data_var[['time_period', value_column]].copy()
-                                display_df_var = display_df_var.rename(columns={
-                                    'time_period': 'Period',
-                                    value_column: f'Record Count'
-                                })
-                            
-                            st.dataframe(display_df_var, use_container_width=True)
-            
-            if __name__ == "__main__":
-                main()
-
-            
+                        st.dataframe(display_df_var, use_container_width=True)            
         with main_tabs[2]:            
             import streamlit as st
             import pandas as pd
