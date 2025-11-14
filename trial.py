@@ -1755,7 +1755,290 @@ elif page == "V2.1":
             
             if __name__ == "__main__":
                 main()
-
+        with main_tabs[1]:
+            import streamlit as st
+            import pandas as pd
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            import os
+        
+            # -------------------------
+            # 1️⃣ Time period helper
+            # -------------------------
+            def create_time_period_column(df, time_period):
+                df = df.copy()
+                df['instance_date'] = pd.to_datetime(df['instance_date'])
+                
+                if time_period == 'Daily':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y-%m-%d')
+                    df['sort_key'] = df['instance_date']
+                elif time_period == 'Weekly':
+                    df['time_period'] = df['instance_date'].dt.strftime('W%U %Y')
+                    df['sort_key'] = df['instance_date'] - pd.to_timedelta(df['instance_date'].dt.weekday, unit='d')  # Monday of week
+                elif time_period == 'Monthly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%b %Y')
+                    df['sort_key'] = df['instance_date'].values.astype('datetime64[M]')
+                elif time_period == 'Quarterly':
+                    df['time_period'] = 'Q' + df['instance_date'].dt.quarter.astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    df['sort_key'] = pd.PeriodIndex(df['instance_date'], freq='Q').start_time
+                elif time_period == 'Half-Yearly':
+                    df['half_year'] = ((df['instance_date'].dt.month - 1) // 6) + 1
+                    df['time_period'] = 'H' + df['half_year'].astype(str) + ' ' + df['instance_date'].dt.year.astype(str)
+                    # Sort key as first day of half-year
+                    df['sort_key'] = df['instance_date'].dt.year.astype(str) + '-' + df['half_year'].astype(str)
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-' + ((df['half_year']-1)*6 + 1).astype(str) + '-01')
+                elif time_period == 'Yearly':
+                    df['time_period'] = df['instance_date'].dt.strftime('%Y')
+                    df['sort_key'] = pd.to_datetime(df['instance_date'].dt.year.astype(str) + '-01-01')
+                
+                return df
+            
+            # -------------------------
+            # 2️⃣ Create categorical trend plot function - FIXED VERSION
+            # -------------------------
+            def create_categorical_trend_plot(df, selected_column, time_period, area_name="Area"):
+                try:
+                    df_processed = create_time_period_column(df, time_period)
+                    
+                    # Convert numerical columns to categorical bins if needed
+                    if pd.api.types.is_numeric_dtype(df_processed[selected_column]):
+                        # Create bins for numerical columns
+                        if df_processed[selected_column].nunique() > 10:
+                            # For numerical columns with many unique values, create bins
+                            df_processed[selected_column] = pd.cut(df_processed[selected_column], bins=5, duplicates='drop')
+                        else:
+                            # For numerical columns with few unique values, keep as is but convert to string
+                            df_processed[selected_column] = df_processed[selected_column].astype(str)
+                    
+                    # Group by time period and selected column, calculate average meter_sale_price
+                    trend_data = df_processed.groupby(['time_period', 'sort_key', selected_column])['meter_sale_price'].mean().reset_index()
+                    
+                    # Sort by sort_key to ensure chronological order
+                    trend_data = trend_data.sort_values('sort_key')
+                    
+                    # Get unique categories for legend
+                    categories = trend_data[selected_column].unique()
+                    
+                    fig = go.Figure()
+                    
+                    # Add a line for each category
+                    for category in categories:
+                        category_data = trend_data[trend_data[selected_column] == category]
+                        
+                        # Ensure the category data is also sorted by sort_key
+                        category_data = category_data.sort_values('sort_key')
+                        
+                        fig.add_trace(go.Scatter(
+                            x=category_data['time_period'],  # Use the string labels for display
+                            y=category_data['meter_sale_price'],
+                            mode='lines+markers',
+                            name=str(category),
+                            hovertemplate=(
+                                f"<b>Period:</b> %{{x}}<br>" +
+                                f"<b>{selected_column}:</b> {category}<br>" +
+                                f"<b>Avg Price:</b> %{{y:.2f}}<br>" +
+                                "<extra></extra>"
+                            )
+                        ))
+                    
+                    # Update layout
+                    fig.update_layout(
+                        title=f"{area_name} - {selected_column} Analysis",
+                        xaxis_title=time_period,
+                        yaxis_title="Average Meter Sale Price",
+                        template="plotly_white",
+                        height=500,
+                        showlegend=True,
+                        legend=dict(
+                            title=selected_column,
+                            yanchor="top",
+                            y=0.99,
+                            xanchor="left",
+                            x=1.02
+                        )
+                    )
+                    
+                    # Set up x-axis to maintain chronological order
+                    # Get unique time periods in sorted order
+                    unique_periods = trend_data[['time_period', 'sort_key']].drop_duplicates().sort_values('sort_key')
+                    
+                    fig.update_xaxes(
+                        categoryorder='array',
+                        categoryarray=unique_periods['time_period'].tolist(),
+                        tickangle=45
+                    )
+                    
+                    return fig, trend_data
+                    
+                except Exception as e:
+                    st.error(f"Error creating trend plot: {str(e)}")
+                    return go.Figure(), pd.DataFrame()
+            
+            # -------------------------
+            # 3️⃣ Get available columns (excluding specified columns)
+            # -------------------------
+            def get_available_columns(df):
+                # Columns to exclude
+                excluded_columns = [
+                    'instance_date', 'area_name_en', 'meter_sale_price', 
+                    'procedure_area', 'Unnamed: 0'
+                ]
+                
+                # Get all columns except the excluded ones
+                available_columns = [col for col in df.columns if col not in excluded_columns]
+                
+                return available_columns
+            
+            # -------------------------
+            # 4️⃣ Dataset selection and main app
+            # -------------------------
+            
+            # Dataset selection
+            st.sidebar.header("Dataset Selection - Price Trend Columnwise")
+            dataset_options = {
+                "Actual_data": "over_all_dataset_og.csv"
+            }
+            
+            selected_dataset = st.sidebar.selectbox(
+                "Choose Dataset", 
+                options=list(dataset_options.keys()),
+                key="dataset_select_columnwise"
+            )
+            file_path = dataset_options[selected_dataset]
+            
+            if not os.path.exists(file_path):
+                st.error(f"File not found: {file_path}")
+                st.stop()
+            
+            try:
+                df = pd.read_csv(file_path)
+                required_columns = ['instance_date', 'area_name_en', 'meter_sale_price']
+                missing = [c for c in required_columns if c not in df.columns]
+                if missing:
+                    st.error(f"Missing required columns: {', '.join(missing)}")
+                    st.stop()
+            except Exception as e:
+                st.error(f"Error loading dataset: {str(e)}")
+                st.stop()
+            
+            # Create tabs
+            tabs = st.tabs(["📈 Whole Data Analysis", "🏘️ Area-wise Analysis"])
+            
+            # Whole Data Analysis Tab
+            with tabs[0]:
+                st.header("Whole Dataset Analysis")
+                
+                col1, col2 = st.columns([1, 3])
+                
+                with col1:
+                    time_period_whole = st.selectbox(
+                        "Select Time Period", 
+                        ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'], 
+                        index=2, 
+                        key="whole_time_period_columnwise"
+                    )
+                    
+                    # Get available columns for analysis
+                    available_columns_whole = get_available_columns(df)
+                    if available_columns_whole:
+                        selected_column_whole = st.selectbox(
+                            "Select Column for Analysis",
+                            options=available_columns_whole,
+                            help="Choose any column to analyze price trends by category",
+                            key="whole_column_select_columnwise"
+                        )
+                        
+                        # Show column info
+                        col_info = f"Data Type: {df[selected_column_whole].dtype} | Unique Values: {df[selected_column_whole].nunique()}"
+                        st.caption(col_info)
+                        
+                    else:
+                        st.warning("No available columns found in the dataset")
+                        selected_column_whole = None
+                
+                with col2:
+                    if selected_column_whole:
+                        # Create and display the plot for whole data with column breakdown
+                        fig_whole, trend_data_whole = create_categorical_trend_plot(
+                            df, selected_column_whole, time_period_whole, "Whole Dataset"
+                        )
+                        st.plotly_chart(fig_whole, use_container_width=True)
+                    else:
+                        st.info("Please select a column to view the analysis")
+                
+            
+            # Area-wise Analysis Tab
+            with tabs[1]:
+                st.header("Area-wise Analysis")
+                
+                # Flow: Area → Column → Time Period
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    areas_all = ["All Areas"] + sorted(list(df['area_name_en'].unique()))
+                    selected_area = st.selectbox(
+                        "Select Area", 
+                        areas_all, 
+                        index=0, 
+                        key="area_select_columnwise"
+                    )
+                    
+                    if selected_area != "All Areas":
+                        df_area = df[df['area_name_en'] == selected_area]
+                        area_title = selected_area
+                    else:
+                        df_area = df.copy()
+                        area_title = "All Areas"
+                
+                with col2:
+                    # Get available columns for the selected area
+                    available_columns_area = get_available_columns(df_area)
+                    if available_columns_area:
+                        selected_column_area = st.selectbox(
+                            "Select Column for Analysis",
+                            options=available_columns_area,
+                            help="Choose any column to analyze price trends by category",
+                            key="area_column_select_columnwise"
+                        )
+                        
+                        # Show column info
+                        if selected_column_area in df_area.columns:
+                            col_info = f"Data Type: {df_area[selected_column_area].dtype} | Unique Values: {df_area[selected_column_area].nunique()}"
+                            st.caption(col_info)
+                    else:
+                        st.warning("No available columns found for selected area")
+                        selected_column_area = None
+                
+                with col3:
+                    time_period_area = st.selectbox(
+                        "Select Time Period",
+                        options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
+                        index=2,
+                        key="area_time_period_columnwise"
+                    )
+                
+                # Create and display the plot for area-wise data with column breakdown
+                if selected_column_area:
+                    fig_area, trend_data_area = create_categorical_trend_plot(
+                        df_area, selected_column_area, time_period_area, area_title
+                    )
+                    st.plotly_chart(fig_area, use_container_width=True)
+                else:
+                    st.info("Please select a column to view the analysis")
+        
+                    
+                    # Data table
+                    with st.expander("View Detailed Data"):
+                        display_df = trend_data_area[['time_period', selected_column_area, 'meter_sale_price', 'sort_key']].copy()
+                        display_df = display_df.sort_values('sort_key')  # Sort by chronological order
+                        display_df['meter_sale_price'] = display_df['meter_sale_price'].round(2)
+                        display_df = display_df.rename(columns={
+                            'time_period': 'Period',
+                            selected_column_area: 'Category',
+                            'meter_sale_price': 'Average Price (₹)'
+                        })
+                        display_df = display_df.drop('sort_key', axis=1)  # Remove sort_key from display
+                        st.dataframe(display_df, use_container_width=True)
         with main_tabs[2]:            
             import streamlit as st
             import pandas as pd
