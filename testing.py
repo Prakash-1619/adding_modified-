@@ -478,32 +478,48 @@ if sidebar_option == "📊 EDA & Feature Engineering":
             return df
         
         # -------------------------
-        # 2️⃣ Create categorical trend plot function
+        # 2️⃣ Create categorical trend plot function - FIXED VERSION
         # -------------------------
-        def create_categorical_trend_plot(df, categorical_column, time_period, area_name="Area"):
+        def create_categorical_trend_plot(df, selected_column, time_period, area_name="Area"):
             try:
                 df_processed = create_time_period_column(df, time_period)
                 
-                # Group by time period and categorical column, calculate average meter_sale_price
-                trend_data = df_processed.groupby(['time_period', 'sort_key', categorical_column])['meter_sale_price'].mean().reset_index()
+                # Convert numerical columns to categorical bins if needed
+                if pd.api.types.is_numeric_dtype(df_processed[selected_column]):
+                    # Create bins for numerical columns
+                    if df_processed[selected_column].nunique() > 10:
+                        # For numerical columns with many unique values, create bins
+                        df_processed[selected_column] = pd.cut(df_processed[selected_column], bins=5, duplicates='drop')
+                    else:
+                        # For numerical columns with few unique values, keep as is but convert to string
+                        df_processed[selected_column] = df_processed[selected_column].astype(str)
+                
+                # Group by time period and selected column, calculate average meter_sale_price
+                trend_data = df_processed.groupby(['time_period', 'sort_key', selected_column])['meter_sale_price'].mean().reset_index()
+                
+                # Sort by sort_key to ensure chronological order
                 trend_data = trend_data.sort_values('sort_key')
                 
                 # Get unique categories for legend
-                categories = trend_data[categorical_column].unique()
+                categories = trend_data[selected_column].unique()
                 
                 fig = go.Figure()
                 
                 # Add a line for each category
                 for category in categories:
-                    category_data = trend_data[trend_data[categorical_column] == category]
+                    category_data = trend_data[trend_data[selected_column] == category]
+                    
+                    # Ensure the category data is also sorted by sort_key
+                    category_data = category_data.sort_values('sort_key')
+                    
                     fig.add_trace(go.Scatter(
-                        x=category_data['time_period'],
+                        x=category_data['time_period'],  # Use the string labels for display
                         y=category_data['meter_sale_price'],
                         mode='lines+markers',
                         name=str(category),
                         hovertemplate=(
                             f"<b>Period:</b> %{{x}}<br>" +
-                            f"<b>Category:</b> {category}<br>" +
+                            f"<b>{selected_column}:</b> {category}<br>" +
                             f"<b>Avg Price:</b> %{{y:.2f}}<br>" +
                             "<extra></extra>"
                         )
@@ -511,14 +527,14 @@ if sidebar_option == "📊 EDA & Feature Engineering":
                 
                 # Update layout
                 fig.update_layout(
-                    title=f"{area_name} - {categorical_column} Analysis",
+                    title=f"{area_name} - {selected_column} Analysis",
                     xaxis_title=time_period,
                     yaxis_title="Average Meter Sale Price",
                     template="plotly_white",
                     height=500,
                     showlegend=True,
                     legend=dict(
-                        title=categorical_column,
+                        title=selected_column,
                         yanchor="top",
                         y=0.99,
                         xanchor="left",
@@ -526,25 +542,36 @@ if sidebar_option == "📊 EDA & Feature Engineering":
                     )
                 )
                 
-                # Rotate x-axis labels - FIXED: using update_xaxes instead of update_xaxis
-                fig.update_xaxes(tickangle=45)
+                # Set up x-axis to maintain chronological order
+                # Get unique time periods in sorted order
+                unique_periods = trend_data[['time_period', 'sort_key']].drop_duplicates().sort_values('sort_key')
+                
+                fig.update_xaxes(
+                    categoryorder='array',
+                    categoryarray=unique_periods['time_period'].tolist(),
+                    tickangle=45
+                )
                 
                 return fig, trend_data
                 
             except Exception as e:
-                st.error(f"Error creating categorical trend plot: {str(e)}")
+                st.error(f"Error creating trend plot: {str(e)}")
                 return go.Figure(), pd.DataFrame()
         
         # -------------------------
-        # 3️⃣ Get categorical columns
+        # 3️⃣ Get available columns (excluding specified columns)
         # -------------------------
-        def get_categorical_columns(df):
-            # Get categorical columns (object type or category type)
-            categorical_columns = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            # Remove instance_date and area_name_en if they exist
-            excluded_columns = ['instance_date', 'area_name_en']
-            available_categorical = [col for col in categorical_columns if col not in excluded_columns]
-            return available_categorical
+        def get_available_columns(df):
+            # Columns to exclude
+            excluded_columns = [
+                'instance_date', 'area_name_en', 'meter_sale_price', 
+                'procedure_area', 'Unnamed: 0'
+            ]
+            
+            # Get all columns except the excluded ones
+            available_columns = [col for col in df.columns if col not in excluded_columns]
+            
+            return available_columns
         
         # -------------------------
         # 4️⃣ Dataset selection and main app
@@ -561,7 +588,7 @@ if sidebar_option == "📊 EDA & Feature Engineering":
         selected_dataset = st.sidebar.selectbox(
             "Choose Dataset", 
             options=list(dataset_options.keys()),
-            key="dataset_select_columnwise"  # Unique key
+            key="dataset_select_columnwise"
         )
         file_path = dataset_options[selected_dataset]
         
@@ -594,87 +621,43 @@ if sidebar_option == "📊 EDA & Feature Engineering":
                     "Select Time Period", 
                     ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'], 
                     index=2, 
-                    key="whole_time_period_columnwise"  # Unique key
+                    key="whole_time_period_columnwise"
                 )
                 
-                # Get categorical columns for whole data analysis
-                categorical_columns_whole = get_categorical_columns(df)
-                if categorical_columns_whole:
-                    selected_categorical_whole = st.selectbox(
-                        "Select Categorical Column",
-                        options=categorical_columns_whole,
-                        help="Choose categorical column for analysis",
-                        key="whole_categorical_select_columnwise"  # Unique key
+                # Get available columns for analysis
+                available_columns_whole = get_available_columns(df)
+                if available_columns_whole:
+                    selected_column_whole = st.selectbox(
+                        "Select Column for Analysis",
+                        options=available_columns_whole,
+                        help="Choose any column to analyze price trends by category",
+                        key="whole_column_select_columnwise"
                     )
+                    
+                    # Show column info
+                    col_info = f"Data Type: {df[selected_column_whole].dtype} | Unique Values: {df[selected_column_whole].nunique()}"
+                    st.caption(col_info)
+                    
                 else:
-                    st.warning("No categorical columns found in the dataset")
-                    selected_categorical_whole = None
+                    st.warning("No available columns found in the dataset")
+                    selected_column_whole = None
             
             with col2:
-                if selected_categorical_whole:
-                    # Create and display the plot for whole data with categorical breakdown
+                if selected_column_whole:
+                    # Create and display the plot for whole data with column breakdown
                     fig_whole, trend_data_whole = create_categorical_trend_plot(
-                        df, selected_categorical_whole, time_period_whole, "Whole Dataset"
+                        df, selected_column_whole, time_period_whole, "Whole Dataset"
                     )
                     st.plotly_chart(fig_whole, use_container_width=True)
                 else:
-                    st.info("Please select a categorical column to view the analysis")
+                    st.info("Please select a column to view the analysis")
             
-            # Display summary statistics for whole data
-            if selected_categorical_whole and not trend_data_whole.empty:
-                st.subheader("Summary Statistics")
-                
-                # Show statistics for each category
-                categories = trend_data_whole[selected_categorical_whole].unique()
-                
-                for i, category in enumerate(categories):
-                    st.write(f"**{selected_categorical_whole}: {category}**")
-                    category_data = trend_data_whole[trend_data_whole[selected_categorical_whole] == category]
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        current_avg = category_data['meter_sale_price'].iloc[-1]
-                        st.metric(
-                            label=f"Current {time_period_whole} Average",
-                            value=f"₹{current_avg:,.2f}"
-                        )
-                    
-                    with col2:
-                        if len(category_data) > 1:
-                            previous_avg = category_data['meter_sale_price'].iloc[-2]
-                            change_pct = ((current_avg - previous_avg) / previous_avg * 100) if previous_avg != 0 else 0
-                            st.metric(
-                                label=f"Change from Previous",
-                                value=f"₹{current_avg:,.2f}",
-                                delta=f"{change_pct:+.1f}%"
-                            )
-                        else:
-                            st.metric(
-                                label=f"Change from Previous",
-                                value="N/A",
-                                delta=None
-                            )
-                    
-                    with col3:
-                        highest_avg = category_data['meter_sale_price'].max()
-                        st.metric(
-                            label=f"Highest {time_period_whole}",
-                            value=f"₹{highest_avg:,.2f}"
-                        )
-                    
-                    with col4:
-                        lowest_avg = category_data['meter_sale_price'].min()
-                        st.metric(
-                            label=f"Lowest {time_period_whole}",
-                            value=f"₹{lowest_avg:,.2f}"
-                        )
         
         # Area-wise Analysis Tab
         with tabs[1]:
             st.header("Area-wise Analysis")
             
-            # Flow: Area → Categorical Column → Time Period
+            # Flow: Area → Column → Time Period
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -683,7 +666,7 @@ if sidebar_option == "📊 EDA & Feature Engineering":
                     "Select Area", 
                     areas_all, 
                     index=0, 
-                    key="area_select_columnwise"  # Unique key
+                    key="area_select_columnwise"
                 )
                 
                 if selected_area != "All Areas":
@@ -694,93 +677,51 @@ if sidebar_option == "📊 EDA & Feature Engineering":
                     area_title = "All Areas"
             
             with col2:
-                # Get categorical columns for the selected area
-                categorical_columns_area = get_categorical_columns(df_area)
-                if categorical_columns_area:
-                    selected_categorical_area = st.selectbox(
-                        "Select Categorical Column",
-                        options=categorical_columns_area,
-                        help="Choose categorical column for analysis",
-                        key="area_categorical_select_columnwise"  # Unique key
+                # Get available columns for the selected area
+                available_columns_area = get_available_columns(df_area)
+                if available_columns_area:
+                    selected_column_area = st.selectbox(
+                        "Select Column for Analysis",
+                        options=available_columns_area,
+                        help="Choose any column to analyze price trends by category",
+                        key="area_column_select_columnwise"
                     )
+                    
+                    # Show column info
+                    if selected_column_area in df_area.columns:
+                        col_info = f"Data Type: {df_area[selected_column_area].dtype} | Unique Values: {df_area[selected_column_area].nunique()}"
+                        st.caption(col_info)
                 else:
-                    st.warning("No categorical columns found for selected area")
-                    selected_categorical_area = None
+                    st.warning("No available columns found for selected area")
+                    selected_column_area = None
             
             with col3:
                 time_period_area = st.selectbox(
                     "Select Time Period",
                     options=['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly'],
                     index=2,
-                    key="area_time_period_columnwise"  # Unique key
+                    key="area_time_period_columnwise"
                 )
             
-            # Create and display the plot for area-wise data with categorical breakdown
-            if selected_categorical_area:
+            # Create and display the plot for area-wise data with column breakdown
+            if selected_column_area:
                 fig_area, trend_data_area = create_categorical_trend_plot(
-                    df_area, selected_categorical_area, time_period_area, area_title
+                    df_area, selected_column_area, time_period_area, area_title
                 )
                 st.plotly_chart(fig_area, use_container_width=True)
             else:
-                st.info("Please select a categorical column to view the analysis")
-            
-            # Display summary statistics for area-wise data
-            if selected_categorical_area and not trend_data_area.empty:
-                st.subheader("Summary Statistics")
-                
-                # Show statistics for each category in the selected area
-                categories = trend_data_area[selected_categorical_area].unique()
-                
-                for i, category in enumerate(categories):
-                    st.write(f"**{selected_categorical_area}: {category}**")
-                    category_data = trend_data_area[trend_data_area[selected_categorical_area] == category]
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        current_avg = category_data['meter_sale_price'].iloc[-1]
-                        st.metric(
-                            label=f"Current {time_period_area} Average",
-                            value=f"₹{current_avg:,.2f}"
-                        )
-                    
-                    with col2:
-                        if len(category_data) > 1:
-                            previous_avg = category_data['meter_sale_price'].iloc[-2]
-                            change_pct = ((current_avg - previous_avg) / previous_avg * 100) if previous_avg != 0 else 0
-                            st.metric(
-                                label=f"Change from Previous",
-                                value=f"₹{current_avg:,.2f}",
-                                delta=f"{change_pct:+.1f}%"
-                            )
-                        else:
-                            st.metric(
-                                label=f"Change from Previous",
-                                value="N/A",
-                                delta=None
-                            )
-                    
-                    with col3:
-                        highest_avg = category_data['meter_sale_price'].max()
-                        st.metric(
-                            label=f"Highest {time_period_area}",
-                            value=f"₹{highest_avg:,.2f}"
-                        )
-                    
-                    with col4:
-                        lowest_avg = category_data['meter_sale_price'].min()
-                        st.metric(
-                            label=f"Lowest {time_period_area}",
-                            value=f"₹{lowest_avg:,.2f}"
-                        )
+                st.info("Please select a column to view the analysis")
+    
                 
                 # Data table
                 with st.expander("View Detailed Data"):
-                    display_df = trend_data_area[['time_period', selected_categorical_area, 'meter_sale_price']].copy()
+                    display_df = trend_data_area[['time_period', selected_column_area, 'meter_sale_price', 'sort_key']].copy()
+                    display_df = display_df.sort_values('sort_key')  # Sort by chronological order
                     display_df['meter_sale_price'] = display_df['meter_sale_price'].round(2)
                     display_df = display_df.rename(columns={
                         'time_period': 'Period',
-                        selected_categorical_area: 'Category',
+                        selected_column_area: 'Category',
                         'meter_sale_price': 'Average Price (₹)'
                     })
+                    display_df = display_df.drop('sort_key', axis=1)  # Remove sort_key from display
                     st.dataframe(display_df, use_container_width=True)
