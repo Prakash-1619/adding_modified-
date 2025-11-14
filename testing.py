@@ -1,5 +1,10 @@
-
-st.sidebar.title("🔍 FlipOse-RE-Analytics-V2.1")
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import os
+    
+st.title("🔍 FlipOse-RE-Analytics-V2.1")
 
 # Sidebar navigation
 sidebar_option = st.sidebar.radio("Choose Section", [
