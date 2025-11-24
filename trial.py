@@ -4744,7 +4744,20 @@ if page == "FC":
 #######################################################################################################################################################################################################################
 if page == "area_combination":
     st.subheader("Dubai Area-wise Bubble Map")
+    st.sidebar.text(
+    """
+    Proxy with more than 1 area:
 
+    
+    1. Al Merkadh, Al Barsha South Third
+    2. Nadd Hessa
+    3. Bukadra, Madinat Dubai Almelaheyah
+    4. Burj Khalifa, Business Bay
+    5. Jabal Ali First, Me'Aisem First
+    6. Palm Jumeirah, Marsa Dubai
+    7. Al Warsan First
+    """
+    )
     # Load your two datasets
     df1 = pd.read_csv("df_plot_p1.csv")
     df2 = pd.read_csv("df_plot_p2.csv")    # or your second file
