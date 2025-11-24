@@ -30,7 +30,7 @@ st.markdown("""
 ###
 
 # Sidebar navigation
-page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "FC"])
+page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "FC","area_combination"])
 
 if page == "V1":
     # Sidebar
@@ -4738,3 +4738,64 @@ if page == "FC":
     
         with col2:
             display_area_section("With Macro", scatter_df_w, metrics_df_w, summary_df_w)
+
+#######################################################################################################################################################################################################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@************************************************************************************************************
+#######################################################################################################################################################################################################################
+if page == "area_combination":
+    st.subheader("Dubai Area-wise Bubble Map")
+
+    # Load your two datasets
+    df1 = pd.read_csv("df_plot_p1.csv")
+    df2 = pd.read_csv("df_plot_p2.csv")    # or your second file
+    
+    # Step 1: Choose dataset
+    dataset_choice = st.radio(
+        "Select Dataset",
+        ("Proxy_1", "Proxy_2")
+    )
+    
+    # Step 2: Assign the selected dataframe
+    if dataset_choice == "Model Data":
+        df = df1
+    else:
+        df = df2
+    
+    # Step 3: Select Proxy_2 from chosen dataset
+    proxy_list = df["Proxy"].dropna().unique()
+    selected_proxy = st.selectbox("Select Proxy", proxy_list)
+    
+    # Step 4: Filter for the selected Proxy_2
+    filtered_df = df[df["Proxy"] == selected_proxy]
+    
+    # Display the map
+    tab1, = st.tabs(["Average Meter Sale Price"])
+    
+    with tab1:
+    
+        fig = px.scatter_mapbox(
+            filtered_df,
+            lat='area_lat',
+            lon='area_lon',
+            size='nRecords',
+            color='Average Meter Sale Price',
+            hover_name='area_name_en',
+            hover_data={
+                'nRecords': True,
+                'Average Meter Sale Price': ':.2f',
+                'area_lat': False,
+                'area_lon': False
+            },
+            color_continuous_scale='Hot',
+            size_max=30,
+            zoom=9,
+            title=f"{dataset_choice}: Areas Under {selected_proxy}"
+        )
+    
+        fig.update_layout(
+            mapbox_style='open-street-map',
+            margin={"r": 0, "t": 40, "l": 0, "b": 0}
+        )
+    
+        st.plotly_chart(fig, use_container_width=True)
+
