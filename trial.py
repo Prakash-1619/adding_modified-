@@ -4756,7 +4756,7 @@ if page == "area_combination":
     )
     
     # Step 2: Assign the selected dataframe
-    if dataset_choice == "Model Data":
+    if dataset_choice == "Proxy_1":
         df = df1
     else:
         df = df2
