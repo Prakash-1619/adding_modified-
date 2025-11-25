@@ -4761,18 +4761,21 @@ if page == "area_combination":
     # Load your two datasets
     df1 = pd.read_csv("df_plot_p1.csv")
     df2 = pd.read_csv("df_plot_p2.csv")    # or your second file
-    
+    df3 = pd.read_csv("df_plot_p.csv")
     # Step 1: Choose dataset
     dataset_choice = st.radio(
         "Select Dataset",
-        ("Proxy_1", "Proxy_2")
+        ("Proxy_1", "Proxy_2", "Modified")
     )
     
     # Step 2: Assign the selected dataframe
     if dataset_choice == "Proxy_1":
         df = df1
+    elif dataset_choice == "Proxy_2":
+        df = df2 
     else:
-        df = df2
+        df = df3
+        
     
     # Step 3: Select Proxy_2 from chosen dataset
     proxy_list = df["Proxy"].dropna().unique()
