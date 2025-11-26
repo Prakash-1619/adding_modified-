@@ -4776,12 +4776,20 @@ if page == "area_combination":
     )
     
     # Step 2: Assign the selected dataframe
-    if dataset_choice == "Proxy_1":
+    if dataset_choice == "Proxy_1_original":
         df = df1
-    elif dataset_choice == "Proxy_2":
+    elif dataset_choice == "Proxy_2_original":
         df = df2 
-    else:
+    elif dataset_choice == "Proxy_1":
         df = df3
+    elif dataset_choice == "Proxy_2":
+        df = df4
+    elif dataset_choice == "Modified":
+        df = df5 
+    elif dataset_choice == "Proxy_1_2021":
+        df = df6
+    else:
+        df = df7
         
     
     # Step 3: Select Proxy_2 from chosen dataset
