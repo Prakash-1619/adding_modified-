@@ -4748,24 +4748,31 @@ if page == "area_combination":
     """
     Proxy with more than 1 area:
 
-    
-    1. Al Merkadh, Al Barsha South Third
-    2. Nadd Hessa
-    3. Bukadra, Madinat Dubai Almelaheyah
-    4. Burj Khalifa, Business Bay
-    5. Jabal Ali First, Me'Aisem First
-    6. Palm Jumeirah, Marsa Dubai
-    7. Al Warsan First
+    0 Al Merkadh, Al Barsha South Third
+    1                             Nadd Hessa
+    2     Bukadra, Madinat Dubai Almelaheyah
+    3             Burj Khalifa, Business Bay
+    4        Jabal Ali First, Me'Aisem First
+    5             Palm Jumeirah, Marsa Dubai
+    6                        Al Warsan First
+    7                             Al Merkadh
+    8                           Burj Khalifa
+    9                           Business Bay
+    10                     Madinat Al Mataar
     """
     )
     # Load your two datasets
-    df1 = pd.read_csv("df_plot_p1.csv")
-    df2 = pd.read_csv("df_plot_p2.csv")    # or your second file
-    df3 = pd.read_csv("df_plot_p.csv")
+    df1 = pd.read_csv("df_plot_p1_og.csv")
+    df2 = pd.read_csv("df_plot_p2_og.csv")
+    df3 = pd.read_csv("df_plot_p1.csv")
+    df4 = pd.read_csv("df_plot_p2.csv")    # or your second file
+    df5 = pd.read_csv("df_plot_p.csv")
+    df6 = pd.read_csv("df_plot_p1_21.csv")
+    df7 = pd.read_csv("df_plot_p2_21.csv")
     # Step 1: Choose dataset
     dataset_choice = st.radio(
         "Select Dataset",
-        ("Proxy_1", "Proxy_2", "Modified")
+        ("Proxy_1_original", "Proxy_2_original","Proxy_1", "Proxy_2", "Modified", "Proxy_1_2021", "Proxy_2_21",)
     )
     
     # Step 2: Assign the selected dataframe
