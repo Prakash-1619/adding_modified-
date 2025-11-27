@@ -4769,10 +4769,11 @@ if page == "area_combination":
     df5 = pd.read_csv("df_plot_p.csv")
     df6 = pd.read_csv("df_plot_p1_21.csv")
     df7 = pd.read_csv("df_plot_p2_21.csv")
+    df8 = pd.read_csv("df_plot_p2_m_21.csv")
     # Step 1: Choose dataset
     dataset_choice = st.radio(
         "Select Dataset",
-        ("Proxy_1_original", "Proxy_2_original","Proxy_1", "Proxy_2", "Modified", "Proxy_1_2021", "Proxy_2_21",)
+        ("Proxy_1_original", "Proxy_2_original","Proxy_1", "Proxy_2", "Modified", "Proxy_1_2021", "Proxy_2_21","Proxy_21_modified_proxy")
     )
     
     # Step 2: Assign the selected dataframe
@@ -4788,8 +4789,10 @@ if page == "area_combination":
         df = df5 
     elif dataset_choice == "Proxy_1_2021":
         df = df6
-    else:
+    elif dataset_choice == "Proxy_2_2021":
         df = df7
+    else:
+        df = df8
         
     
     # Step 3: Select Proxy_2 from chosen dataset
