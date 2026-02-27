@@ -30,7 +30,7 @@ st.markdown("""
 ###
 
 # Sidebar navigation
-page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "FC","area_combination"])
+page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "related_info","V_2.2"])
 
 if page == "V1":
     # Sidebar
@@ -4260,587 +4260,597 @@ if ohe is None or train_columns is None:
             st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
     
     
+if page == "related_info":
 
-
-
-if page == "FC":
-    import streamlit as st
-    import pandas as pd
-    import plotly.graph_objects as go
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import r2_score
-    
-    app_choice = st.sidebar.selectbox("tab", ["Auto Arima with Lowess", "Previous models"])
-    
-    if app_choice ==  "Auto Arima with Lowess":
-        # ------------------------------
-        # LOAD DATA
-        # ------------------------------
-        
-        
-        forecast_df = pd.read_csv("forecast_lowess_all_areas1.csv", parse_dates=["month"])
-        metrics_df = pd.read_csv("metrics_lowess_all_areas1.csv")
-        summary_df = pd.read_csv("sarima_model_summary_all_areas1.csv")  # contains 'Area' and 'SARIMA_Summary'
-        
-        # Area selection
-        areas = forecast_df['area'].unique()
-        selected_area = st.selectbox("Select Area", areas)
-        
-        # Filter data
-        area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
-        # ------------------------------
-        # LIMIT FORECAST TILL AUGUST 2025
-        # ------------------------------
-        cutoff_date = pd.Timestamp("2025-08-31")
-        area_forecast = area_forecast[area_forecast["month"] <= cutoff_date]
-
-        area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
-        area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
-        summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
-        
-        # ------------------------------
-        # TABS
-        # ------------------------------
-        tab1, tab2 = st.tabs(["📈 Forecast & Metrics", "🧠 Model Summary"])
-        
-        # ------------------------------
-        # TAB 1: Forecast & Metrics
-        # ------------------------------
-        with tab1:
-            # ------------------------------
-            # FORECAST PLOT (continuous line)
-            # ------------------------------
-            fig_fc = go.Figure()
-            
-            # Actual (LOWESS)
-            fig_fc.add_trace(go.Scatter(
-                x=area_forecast['month'],
-                y=area_forecast['actual_smoothed'],
-                mode='lines',
-                name='Actual (LOWESS)',
-                line=dict(color='blue', dash='dot')
-            ))
-            
-            # Combine train, test, forecast into continuous line
-            area_forecast_sorted = area_forecast.sort_values('month')
-            df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train', 'test', 'forecast'])]
-            
-            fig_fc.add_trace(go.Scatter(
-                x=df_predicted['month'],
-                y=df_predicted['predicted'],
-                mode='lines+markers',
-                name='Forecast',
-                line=dict(color='green', width=2)
-            ))
-            
-            # Vertical line marking end of training period
-            train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
-            if pd.notna(train_end):
-                fig_fc.add_shape(
-                    type='line',
-                    x0=train_end, x1=train_end,
-                    y0=area_forecast['predicted'].min(),
-                    y1=area_forecast['predicted'].max(),
-                    line=dict(color='gray', dash='dash'),
-                    xref='x', yref='y'
-                )
-                fig_fc.add_annotation(
-                    x=train_end, y=area_forecast['predicted'].max(),
-                    text="Train End", showarrow=False, yshift=10, font=dict(size=12, color="gray")
-                )
-            
-            fig_fc.update_layout(
-                xaxis_title='Month',
-                yaxis_title='Median Price',
-                title=f'{selected_area} - Forecast',
-                template='plotly_white'
-            )
-            
-            st.plotly_chart(fig_fc, use_container_width=True)
-            
-            # ------------------------------
-            # METRICS BAR PLOT
-            # ------------------------------
-            st.subheader("📊 Train/Test Metrics")
-            metrics_plot = area_metrics[['Train_MAE', 'Train_RMSE', 'Train_R2', 'Test_MAE', 'Test_RMSE', 'Test_R2']].T
-            metrics_plot.columns = ['Value']
-            metrics_plot.index.name = 'Metric'
-            metrics_plot.reset_index(inplace=True)
-            colors = ['red' if 'Train' in m else 'orange' for m in metrics_plot['Metric']]
-            
-            fig_metrics = go.Figure(go.Bar(
-                x=metrics_plot['Metric'],
-                y=metrics_plot['Value'],
-                marker_color=colors,
-                text=metrics_plot['Value'].round(3),
-                textposition='auto'
-            ))
-            
-            fig_metrics.update_layout(
-                title=f'{selected_area} - Train/Test Metrics',
-                yaxis_title='Metric Value',
-                template='plotly_white'
-            )
-            
-            st.plotly_chart(fig_metrics, use_container_width=True)
-            
-            # ------------------------------
-            # SCATTER PLOTS WITH LINEAR FIT & R²
-            # ------------------------------
-            st.subheader("🔍 Actual vs Predicted Scatter Plots")
-        
-            for phase in ['train', 'test']:
-                df_phase = area_forecast[area_forecast['phase'] == phase].dropna(subset=['actual_smoothed', 'predicted'])
-                
-                if df_phase.empty:
-                    st.warning(f"No data available for {phase.capitalize()} phase.")
-                    continue
-                
-                X = df_phase['actual_smoothed'].values.reshape(-1, 1)
-                y = df_phase['predicted'].values
-        
-                # Linear fit
-                lr = LinearRegression()
-                lr.fit(X, y)
-                y_line = lr.predict(X)
-                r2 = r2_score(y, y_line)
-        
-                # Scatter plot
-                fig_scatter = go.Figure()
-                fig_scatter.add_trace(go.Scatter(
-                    x=X.flatten(), y=y, mode='markers',
-                    name='Data Points',
-                    marker=dict(color='blue', size=6, opacity=0.7)
-                ))
-                fig_scatter.add_trace(go.Scatter(
-                    x=X.flatten(), y=y_line, mode='lines',
-                    name=f'Linear Fit (R²={r2:.3f})',
-                    line=dict(color='red', dash='dash', width=2)
-                ))
-        
-                # Optional: perfect prediction line y=x
-                min_val, max_val = min(X.min(), y.min()), max(X.max(), y.max())
-                fig_scatter.add_trace(go.Scatter(
-                    x=[min_val, max_val], y=[min_val, max_val],
-                    mode='lines', name='Perfect Fit (y=x)',
-                    line=dict(color='gray', dash='dot')
-                ))
-        
-                fig_scatter.update_layout(
-                    title=f'{selected_area} - {phase.capitalize()} Scatter Plot',
-                    xaxis_title='Actual (LOWESS)',
-                    yaxis_title='Predicted',
-                    template='plotly_white'
-                )
-        
-                st.plotly_chart(fig_scatter, use_container_width=True)
-        
-        # ------------------------------
-        # TAB 2: Model Summary
-        # ------------------------------
-        with tab2:
-            st.subheader(f"SARIMA Model Summary for {selected_area}")
-            st.code(summary_text, language='text')  # keeps formatting and scrollable
-
-        
-    if app_choice == "Previous models":
-    
+    sidebar_option_3 = st.sidebar.radio("Choose Section", [
+        "FC","area_combination"
+    ])
+   if sidebar_option_3 == "FC":
+       
         import streamlit as st
         import pandas as pd
-        import numpy as np
         import plotly.graph_objects as go
         from sklearn.linear_model import LinearRegression
         from sklearn.metrics import r2_score
+        
+        app_choice = st.sidebar.selectbox("tab", ["Auto Arima with Lowess", "Previous models"])
+        
+        if app_choice ==  "Auto Arima with Lowess":
+            # ------------------------------
+            # LOAD DATA
+            # ------------------------------
+            
+            
+            forecast_df = pd.read_csv("forecast_lowess_all_areas1.csv", parse_dates=["month"])
+            metrics_df = pd.read_csv("metrics_lowess_all_areas1.csv")
+            summary_df = pd.read_csv("sarima_model_summary_all_areas1.csv")  # contains 'Area' and 'SARIMA_Summary'
+            
+            # Area selection
+            areas = forecast_df['area'].unique()
+            selected_area = st.selectbox("Select Area", areas)
+            
+            # Filter data
+            area_forecast = forecast_df[forecast_df['area'] == selected_area].copy()
+            # ------------------------------
+            # LIMIT FORECAST TILL AUGUST 2025
+            # ------------------------------
+            cutoff_date = pd.Timestamp("2025-08-31")
+            area_forecast = area_forecast[area_forecast["month"] <= cutoff_date]
     
-        st.title("Model Comparison — Without Macro vs With Macro")
-    
-        # ============================================================
-        # HELPER FUNCTION
-        # ============================================================
-        def load_and_prepare_data(forecast_file, metrics_file, summary_file):
-            scatter_df = pd.read_csv(forecast_file, parse_dates=['Date'])
-            metrics_df = pd.read_csv(metrics_file)
-            summary_df = pd.read_csv(summary_file)
-    
-            scatter_df.columns = scatter_df.columns.str.strip()
-            metrics_df.columns = metrics_df.columns.str.strip()
-            summary_df.columns = summary_df.columns.str.strip()
-    
-            # Recalculate metrics in case metrics file is not updated
-            def calculate_metrics(df):
-                metrics = []
-                for area in df['Area'].unique():
-                    area_data = df[df['Area'] == area]
-                    for model in area_data['Model'].unique():
-                        model_data = area_data[area_data['Model'] == model]
-                        for dataset in ['Train', 'Test']:
-                            dataset_data = model_data[model_data['Dataset'] == dataset]
-                            if len(dataset_data) > 0:
-                                actual = dataset_data['Actual'].values
-                                predicted = dataset_data['Predicted'].values
-                                mae = np.mean(np.abs(actual - predicted))
-                                mse = np.mean((actual - predicted) ** 2)
-                                rmse = np.sqrt(mse)
-                                mape = np.mean(np.abs((actual - predicted) / actual)) * 100
-                                r2 = r2_score(actual, predicted)
-                                metrics.append({
-                                    'Area': area,
-                                    'Model': model,
-                                    'Dataset': dataset,
-                                    'MAE': mae,
-                                    'MSE': mse,
-                                    'RMSE': rmse,
-                                    'MAPE': mape,
-                                    'R2': r2
-                                })
-                return pd.DataFrame(metrics)
-    
-            metrics_df = calculate_metrics(scatter_df)
-            return scatter_df, metrics_df, summary_df
-    
-        # ============================================================
-        # LOAD BOTH VERSIONS
-        # ============================================================
-        without_macro_files = (
-            "all_areas_actual_vs_predicted.csv",
-            "all_areas_metrics.csv",
-            "all_model_summaries.csv"
-        )
-    
-        with_macro_files = (
-            "combined_model_forecast.csv",
-            "combined_metrics.csv",
-            "all_model_summaries.csv"  # summaries are same format
-        )
-    
-        scatter_df_wo, metrics_df_wo, summary_df_wo = load_and_prepare_data(*without_macro_files)
-        scatter_df_w, metrics_df_w, summary_df_w = load_and_prepare_data(*with_macro_files)
-    
-        # ============================================================
-        # AREA SELECTION
-        # ============================================================
-        area_list = scatter_df_wo['Area'].unique()
-        selected_area = st.sidebar.selectbox("Select Area", area_list)
-    
-        # ============================================================
-        # DEFINE FUNCTION TO DISPLAY ONE SIDE
-        # ============================================================
-        def display_area_section(title, scatter_df, metrics_df, summary_df):
-            st.markdown(f"## {title}")
-    
-            forecast_df = scatter_df.copy()
-            forecast_area = forecast_df[forecast_df['Area'] == selected_area]
-            metrics_area = metrics_df[metrics_df['Area'] == selected_area]
-            scatter_area = scatter_df[scatter_df['Area'] == selected_area]
-    
-            if forecast_area.empty:
-                st.warning(f"No data found for area: {selected_area}")
-                return
-    
-            colors = {'ARIMA': 'green', 'SARIMA': 'orange', 'Prophet': 'blue'}
-    
-            # ---------------------------------------------------------
-            # LINE PLOT: Actual + Fitted + Forecast
-            # ---------------------------------------------------------
-            st.subheader("Forecast Line Plot")
-    
-            fig_line = go.Figure()
-            fig_line.add_trace(go.Scatter(
-                x=forecast_area['Date'],
-                y=forecast_area['Actual'],
-                mode='lines+markers',
-                name='Actual',
-                line=dict(color='black', width=2)
-            ))
-    
-            for model in forecast_area['Model'].unique():
-                df_model = forecast_area[forecast_area['Model'] == model]
-                df_train = df_model[df_model['Dataset'] == 'Train']
-                df_test = df_model[df_model['Dataset'] == 'Test']
-    
-                if not df_train.empty:
-                    fig_line.add_trace(go.Scatter(
-                        x=df_train['Date'],
-                        y=df_train['Predicted'],
-                        mode='lines',
-                        name=f'{model} Fitted',
-                        line=dict(color=colors.get(model, 'gray'), dash='dash')
-                    ))
-                if not df_test.empty:
-                    fig_line.add_trace(go.Scatter(
-                        x=df_test['Date'],
-                        y=df_test['Predicted'],
-                        mode='lines',
-                        name=f'{model} Forecast',
-                        line=dict(color=colors.get(model, 'gray'))
-                    ))
-    
-            fig_line.update_layout(
-                xaxis_title='Date',
-                yaxis_title='Price',
-                template='plotly_white'
-            )
-            st.plotly_chart(fig_line, use_container_width=True)
-    
-            # ---------------------------------------------------------
-            # METRICS PLOTS
-            # ---------------------------------------------------------
-            st.subheader("Model Performance Metrics")
-    
-            if metrics_area.empty:
-                st.info("No metrics data available for this area.")
-            else:
-                col1, col2 = st.columns(2)
-    
-                # --- MAE ---
-                with col1:
-                    fig_mae = go.Figure()
-                    for model in metrics_area['Model'].unique():
-                        for dataset in ['Train', 'Test']:
-                            d = metrics_area[
-                                (metrics_area['Model'] == model) &
-                                (metrics_area['Dataset'] == dataset)
-                            ]
-                            if not d.empty:
-                                fig_mae.add_trace(go.Bar(
-                                    name=f'{model} {dataset}',
-                                    x=[f'{model} {dataset}'],
-                                    y=[d['MAE'].values[0]],
-                                    marker_color=colors.get(model, 'gray')
-                                ))
-                    fig_mae.update_layout(title='MAE', template='plotly_white')
-                    st.plotly_chart(fig_mae, use_container_width=True)
-    
-                    # --- RMSE ---
-                    fig_rmse = go.Figure()
-                    for model in metrics_area['Model'].unique():
-                        for dataset in ['Train', 'Test']:
-                            d = metrics_area[
-                                (metrics_area['Model'] == model) &
-                                (metrics_area['Dataset'] == dataset)
-                            ]
-                            if not d.empty:
-                                fig_rmse.add_trace(go.Bar(
-                                    name=f'{model} {dataset}',
-                                    x=[f'{model} {dataset}'],
-                                    y=[d['RMSE'].values[0]],
-                                    marker_color=colors.get(model, 'gray')
-                                ))
-                    fig_rmse.update_layout(title='RMSE', template='plotly_white')
-                    st.plotly_chart(fig_rmse, use_container_width=True)
-    
-                # --- MAPE & R2 ---
-                with col2:
-                    fig_mape = go.Figure()
-                    for model in metrics_area['Model'].unique():
-                        for dataset in ['Train', 'Test']:
-                            d = metrics_area[
-                                (metrics_area['Model'] == model) &
-                                (metrics_area['Dataset'] == dataset)
-                            ]
-                            if not d.empty:
-                                fig_mape.add_trace(go.Bar(
-                                    name=f'{model} {dataset}',
-                                    x=[f'{model} {dataset}'],
-                                    y=[d['MAPE'].values[0]],
-                                    marker_color=colors.get(model, 'gray')
-                                ))
-                    fig_mape.update_layout(title='MAPE (%)', template='plotly_white')
-                    st.plotly_chart(fig_mape, use_container_width=True)
-    
-                    fig_r2 = go.Figure()
-                    for model in metrics_area['Model'].unique():
-                        for dataset in ['Train', 'Test']:
-                            d = metrics_area[
-                                (metrics_area['Model'] == model) &
-                                (metrics_area['Dataset'] == dataset)
-                            ]
-                            if not d.empty:
-                                fig_r2.add_trace(go.Bar(
-                                    name=f'{model} {dataset}',
-                                    x=[f'{model} {dataset}'],
-                                    y=[d['R2'].values[0]],
-                                    marker_color=colors.get(model, 'gray')
-                                ))
-                    fig_r2.update_layout(title='R²', template='plotly_white')
-                    st.plotly_chart(fig_r2, use_container_width=True)
-    
-            # ---------------------------------------------------------
-            # SCATTER: ACTUAL vs PREDICTED
-            # ---------------------------------------------------------
-            st.subheader("Actual vs Predicted — Scatter Plot")
-    
-            for dataset in ['Train', 'Test']:
-                st.markdown(f"**{dataset} Dataset**")
-                fig_scatter = go.Figure()
-                df_dataset = scatter_area[scatter_area['Dataset'] == dataset]
-    
-                if df_dataset.empty:
-                    st.info(f"No {dataset} data available.")
-                    continue
-    
-                for model in df_dataset['Model'].unique():
-                    df_sc = df_dataset[df_dataset['Model'] == model].dropna(subset=['Actual', 'Predicted'])
-                    if df_sc.empty:
+            area_metrics = metrics_df[metrics_df['Area'] == selected_area].copy()
+            area_summary = summary_df[summary_df['Area'] == selected_area]["SARIMA_Summary"].values
+            summary_text = area_summary[0] if len(area_summary) > 0 else "Model summary not available"
+            
+            # ------------------------------
+            # TABS
+            # ------------------------------
+            tab1, tab2 = st.tabs(["📈 Forecast & Metrics", "🧠 Model Summary"])
+            
+            # ------------------------------
+            # TAB 1: Forecast & Metrics
+            # ------------------------------
+            with tab1:
+                # ------------------------------
+                # FORECAST PLOT (continuous line)
+                # ------------------------------
+                fig_fc = go.Figure()
+                
+                # Actual (LOWESS)
+                fig_fc.add_trace(go.Scatter(
+                    x=area_forecast['month'],
+                    y=area_forecast['actual_smoothed'],
+                    mode='lines',
+                    name='Actual (LOWESS)',
+                    line=dict(color='blue', dash='dot')
+                ))
+                
+                # Combine train, test, forecast into continuous line
+                area_forecast_sorted = area_forecast.sort_values('month')
+                df_predicted = area_forecast_sorted[area_forecast_sorted['phase'].isin(['train', 'test', 'forecast'])]
+                
+                fig_fc.add_trace(go.Scatter(
+                    x=df_predicted['month'],
+                    y=df_predicted['predicted'],
+                    mode='lines+markers',
+                    name='Forecast',
+                    line=dict(color='green', width=2)
+                ))
+                
+                # Vertical line marking end of training period
+                train_end = area_forecast[area_forecast['phase'] == 'train']['month'].max()
+                if pd.notna(train_end):
+                    fig_fc.add_shape(
+                        type='line',
+                        x0=train_end, x1=train_end,
+                        y0=area_forecast['predicted'].min(),
+                        y1=area_forecast['predicted'].max(),
+                        line=dict(color='gray', dash='dash'),
+                        xref='x', yref='y'
+                    )
+                    fig_fc.add_annotation(
+                        x=train_end, y=area_forecast['predicted'].max(),
+                        text="Train End", showarrow=False, yshift=10, font=dict(size=12, color="gray")
+                    )
+                
+                fig_fc.update_layout(
+                    xaxis_title='Month',
+                    yaxis_title='Median Price',
+                    title=f'{selected_area} - Forecast',
+                    template='plotly_white'
+                )
+                
+                st.plotly_chart(fig_fc, use_container_width=True)
+                
+                # ------------------------------
+                # METRICS BAR PLOT
+                # ------------------------------
+                st.subheader("📊 Train/Test Metrics")
+                metrics_plot = area_metrics[['Train_MAE', 'Train_RMSE', 'Train_R2', 'Test_MAE', 'Test_RMSE', 'Test_R2']].T
+                metrics_plot.columns = ['Value']
+                metrics_plot.index.name = 'Metric'
+                metrics_plot.reset_index(inplace=True)
+                colors = ['red' if 'Train' in m else 'orange' for m in metrics_plot['Metric']]
+                
+                fig_metrics = go.Figure(go.Bar(
+                    x=metrics_plot['Metric'],
+                    y=metrics_plot['Value'],
+                    marker_color=colors,
+                    text=metrics_plot['Value'].round(3),
+                    textposition='auto'
+                ))
+                
+                fig_metrics.update_layout(
+                    title=f'{selected_area} - Train/Test Metrics',
+                    yaxis_title='Metric Value',
+                    template='plotly_white'
+                )
+                
+                st.plotly_chart(fig_metrics, use_container_width=True)
+                
+                # ------------------------------
+                # SCATTER PLOTS WITH LINEAR FIT & R²
+                # ------------------------------
+                st.subheader("🔍 Actual vs Predicted Scatter Plots")
+            
+                for phase in ['train', 'test']:
+                    df_phase = area_forecast[area_forecast['phase'] == phase].dropna(subset=['actual_smoothed', 'predicted'])
+                    
+                    if df_phase.empty:
+                        st.warning(f"No data available for {phase.capitalize()} phase.")
                         continue
-    
-                    x, y = df_sc['Actual'].values, df_sc['Predicted'].values
+                    
+                    X = df_phase['actual_smoothed'].values.reshape(-1, 1)
+                    y = df_phase['predicted'].values
+            
+                    # Linear fit
+                    lr = LinearRegression()
+                    lr.fit(X, y)
+                    y_line = lr.predict(X)
+                    r2 = r2_score(y, y_line)
+            
+                    # Scatter plot
+                    fig_scatter = go.Figure()
                     fig_scatter.add_trace(go.Scatter(
-                        x=x, y=y, mode='markers', name=model,
-                        marker=dict(color=colors.get(model, 'gray'))
+                        x=X.flatten(), y=y, mode='markers',
+                        name='Data Points',
+                        marker=dict(color='blue', size=6, opacity=0.7)
                     ))
+                    fig_scatter.add_trace(go.Scatter(
+                        x=X.flatten(), y=y_line, mode='lines',
+                        name=f'Linear Fit (R²={r2:.3f})',
+                        line=dict(color='red', dash='dash', width=2)
+                    ))
+            
+                    # Optional: perfect prediction line y=x
+                    min_val, max_val = min(X.min(), y.min()), max(X.max(), y.max())
+                    fig_scatter.add_trace(go.Scatter(
+                        x=[min_val, max_val], y=[min_val, max_val],
+                        mode='lines', name='Perfect Fit (y=x)',
+                        line=dict(color='gray', dash='dot')
+                    ))
+            
+                    fig_scatter.update_layout(
+                        title=f'{selected_area} - {phase.capitalize()} Scatter Plot',
+                        xaxis_title='Actual (LOWESS)',
+                        yaxis_title='Predicted',
+                        template='plotly_white'
+                    )
+            
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # ------------------------------
+            # TAB 2: Model Summary
+            # ------------------------------
+            with tab2:
+                st.subheader(f"SARIMA Model Summary for {selected_area}")
+                st.code(summary_text, language='text')  # keeps formatting and scrollable
     
-                    if len(x) > 1:
-                        lr = LinearRegression()
-                        lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
-                        y_fit = lr.predict(x.reshape(-1, 1)).ravel()
-                        r2 = r2_score(y, y_fit)
-                        fig_scatter.add_trace(go.Scatter(
-                            x=x, y=y_fit, mode='lines',
-                            name=f"{model} Fit (R²={r2:.3f})",
+            
+        if app_choice == "Previous models":
+        
+            import streamlit as st
+            import pandas as pd
+            import numpy as np
+            import plotly.graph_objects as go
+            from sklearn.linear_model import LinearRegression
+            from sklearn.metrics import r2_score
+        
+            st.title("Model Comparison — Without Macro vs With Macro")
+        
+            # ============================================================
+            # HELPER FUNCTION
+            # ============================================================
+            def load_and_prepare_data(forecast_file, metrics_file, summary_file):
+                scatter_df = pd.read_csv(forecast_file, parse_dates=['Date'])
+                metrics_df = pd.read_csv(metrics_file)
+                summary_df = pd.read_csv(summary_file)
+        
+                scatter_df.columns = scatter_df.columns.str.strip()
+                metrics_df.columns = metrics_df.columns.str.strip()
+                summary_df.columns = summary_df.columns.str.strip()
+        
+                # Recalculate metrics in case metrics file is not updated
+                def calculate_metrics(df):
+                    metrics = []
+                    for area in df['Area'].unique():
+                        area_data = df[df['Area'] == area]
+                        for model in area_data['Model'].unique():
+                            model_data = area_data[area_data['Model'] == model]
+                            for dataset in ['Train', 'Test']:
+                                dataset_data = model_data[model_data['Dataset'] == dataset]
+                                if len(dataset_data) > 0:
+                                    actual = dataset_data['Actual'].values
+                                    predicted = dataset_data['Predicted'].values
+                                    mae = np.mean(np.abs(actual - predicted))
+                                    mse = np.mean((actual - predicted) ** 2)
+                                    rmse = np.sqrt(mse)
+                                    mape = np.mean(np.abs((actual - predicted) / actual)) * 100
+                                    r2 = r2_score(actual, predicted)
+                                    metrics.append({
+                                        'Area': area,
+                                        'Model': model,
+                                        'Dataset': dataset,
+                                        'MAE': mae,
+                                        'MSE': mse,
+                                        'RMSE': rmse,
+                                        'MAPE': mape,
+                                        'R2': r2
+                                    })
+                    return pd.DataFrame(metrics)
+        
+                metrics_df = calculate_metrics(scatter_df)
+                return scatter_df, metrics_df, summary_df
+        
+            # ============================================================
+            # LOAD BOTH VERSIONS
+            # ============================================================
+            without_macro_files = (
+                "all_areas_actual_vs_predicted.csv",
+                "all_areas_metrics.csv",
+                "all_model_summaries.csv"
+            )
+        
+            with_macro_files = (
+                "combined_model_forecast.csv",
+                "combined_metrics.csv",
+                "all_model_summaries.csv"  # summaries are same format
+            )
+        
+            scatter_df_wo, metrics_df_wo, summary_df_wo = load_and_prepare_data(*without_macro_files)
+            scatter_df_w, metrics_df_w, summary_df_w = load_and_prepare_data(*with_macro_files)
+        
+            # ============================================================
+            # AREA SELECTION
+            # ============================================================
+            area_list = scatter_df_wo['Area'].unique()
+            selected_area = st.sidebar.selectbox("Select Area", area_list)
+        
+            # ============================================================
+            # DEFINE FUNCTION TO DISPLAY ONE SIDE
+            # ============================================================
+            def display_area_section(title, scatter_df, metrics_df, summary_df):
+                st.markdown(f"## {title}")
+        
+                forecast_df = scatter_df.copy()
+                forecast_area = forecast_df[forecast_df['Area'] == selected_area]
+                metrics_area = metrics_df[metrics_df['Area'] == selected_area]
+                scatter_area = scatter_df[scatter_df['Area'] == selected_area]
+        
+                if forecast_area.empty:
+                    st.warning(f"No data found for area: {selected_area}")
+                    return
+        
+                colors = {'ARIMA': 'green', 'SARIMA': 'orange', 'Prophet': 'blue'}
+        
+                # ---------------------------------------------------------
+                # LINE PLOT: Actual + Fitted + Forecast
+                # ---------------------------------------------------------
+                st.subheader("Forecast Line Plot")
+        
+                fig_line = go.Figure()
+                fig_line.add_trace(go.Scatter(
+                    x=forecast_area['Date'],
+                    y=forecast_area['Actual'],
+                    mode='lines+markers',
+                    name='Actual',
+                    line=dict(color='black', width=2)
+                ))
+        
+                for model in forecast_area['Model'].unique():
+                    df_model = forecast_area[forecast_area['Model'] == model]
+                    df_train = df_model[df_model['Dataset'] == 'Train']
+                    df_test = df_model[df_model['Dataset'] == 'Test']
+        
+                    if not df_train.empty:
+                        fig_line.add_trace(go.Scatter(
+                            x=df_train['Date'],
+                            y=df_train['Predicted'],
+                            mode='lines',
+                            name=f'{model} Fitted',
                             line=dict(color=colors.get(model, 'gray'), dash='dash')
                         ))
-    
-                # Add y=x line
-                min_val, max_val = df_dataset[['Actual', 'Predicted']].min().min(), df_dataset[['Actual', 'Predicted']].max().max()
-                fig_scatter.add_trace(go.Scatter(
-                    x=[min_val, max_val], y=[min_val, max_val],
-                    mode='lines', name='y=x', line=dict(color='black', dash='dot')
-                ))
-    
-                fig_scatter.update_layout(template='plotly_white', xaxis_title='Actual', yaxis_title='Predicted')
-                st.plotly_chart(fig_scatter, use_container_width=True)
-    
-            # ---------------------------------------------------------
-            # MODEL SUMMARIES
-            # ---------------------------------------------------------
-            st.subheader("ARIMA & SARIMA Model Summaries")
-    
-            area_summaries = summary_df[summary_df['Area'].str.strip() == selected_area]
-            if area_summaries.empty:
-                st.info("No summaries available.")
-                return
-    
-            area_summaries['Model'] = area_summaries['Model'].str.strip().str.upper()
-    
-            # ARIMA
-            arima_row = area_summaries[area_summaries['Model'] == 'ARIMA']
-            if not arima_row.empty:
-                st.markdown("### ARIMA Model Summary")
-                st.code(arima_row['Summary'].values[0], language='text')
-            else:
-                st.info("ARIMA summary not available.")
-    
-            # SARIMA
-            sarima_row = area_summaries[area_summaries['Model'] == 'SARIMA']
-            if not sarima_row.empty:
-                st.markdown("### SARIMA Model Summary")
-                st.code(sarima_row['Summary'].values[0], language='text')
-            else:
-                st.info("SARIMA summary not available.")
-    
-        # ============================================================
-        # DISPLAY SIDE BY SIDE
-        # ============================================================
-        col1, col2 = st.columns(2)
-    
-        with col1:
-            display_area_section("Without Macro", scatter_df_wo, metrics_df_wo, summary_df_wo)
-    
-        with col2:
-            display_area_section("With Macro", scatter_df_w, metrics_df_w, summary_df_w)
-
-#######################################################################################################################################################################################################################
-
-#######################################################################################################################################################################################################################
-if page == "area_combination":
-    st.subheader("Dubai Area-wise Bubble Map")
-    st.sidebar.text(
-    """
-    Proxy with more than 1 area:
-
-    0 Al Merkadh, Al Barsha South Third
-    1                             Nadd Hessa
-    2     Bukadra, Madinat Dubai Almelaheyah
-    3             Burj Khalifa, Business Bay
-    4        Jabal Ali First, Me'Aisem First
-    5             Palm Jumeirah, Marsa Dubai
-    6                        Al Warsan First
-    7                             Al Merkadh
-    8                           Burj Khalifa
-    9                           Business Bay
-    10                     Madinat Al Mataar
-    """
-    )
-    # Load your two datasets
-    df1 = pd.read_csv("df_plot_p1_og.csv")
-    df2 = pd.read_csv("df_plot_p2_og.csv")
-    df3 = pd.read_csv("df_plot_p1.csv")
-    df4 = pd.read_csv("df_plot_p2.csv")    # or your second file
-    df5 = pd.read_csv("df_plot_p.csv")
-    df6 = pd.read_csv("df_plot_p1_21.csv")
-    df7 = pd.read_csv("df_plot_p2_21.csv")
-    df8 = pd.read_csv("df_plot_p_m_21.csv")
-    # Step 1: Choose dataset
-    dataset_choice = st.radio(
-        "Select Dataset",
-        ("Proxy_1_original", "Proxy_2_original","Proxy_1", "Proxy_2", "Modified", "Proxy_1_2021", "Proxy_2_21","Proxy_21_modified_proxy")
-    )
-    
-    # Step 2: Assign the selected dataframe
-    if dataset_choice == "Proxy_1_original":
-        df = df1
-    elif dataset_choice == "Proxy_2_original":
-        df = df2 
-    elif dataset_choice == "Proxy_1":
-        df = df3
-    elif dataset_choice == "Proxy_2":
-        df = df4
-    elif dataset_choice == "Modified":
-        df = df5 
-    elif dataset_choice == "Proxy_1_2021":
-        df = df6
-    elif dataset_choice == "Proxy_2_2021":
-        df = df7
-    else:
-        df = df8
+                    if not df_test.empty:
+                        fig_line.add_trace(go.Scatter(
+                            x=df_test['Date'],
+                            y=df_test['Predicted'],
+                            mode='lines',
+                            name=f'{model} Forecast',
+                            line=dict(color=colors.get(model, 'gray'))
+                        ))
         
+                fig_line.update_layout(
+                    xaxis_title='Date',
+                    yaxis_title='Price',
+                    template='plotly_white'
+                )
+                st.plotly_chart(fig_line, use_container_width=True)
+        
+                # ---------------------------------------------------------
+                # METRICS PLOTS
+                # ---------------------------------------------------------
+                st.subheader("Model Performance Metrics")
+        
+                if metrics_area.empty:
+                    st.info("No metrics data available for this area.")
+                else:
+                    col1, col2 = st.columns(2)
+        
+                    # --- MAE ---
+                    with col1:
+                        fig_mae = go.Figure()
+                        for model in metrics_area['Model'].unique():
+                            for dataset in ['Train', 'Test']:
+                                d = metrics_area[
+                                    (metrics_area['Model'] == model) &
+                                    (metrics_area['Dataset'] == dataset)
+                                ]
+                                if not d.empty:
+                                    fig_mae.add_trace(go.Bar(
+                                        name=f'{model} {dataset}',
+                                        x=[f'{model} {dataset}'],
+                                        y=[d['MAE'].values[0]],
+                                        marker_color=colors.get(model, 'gray')
+                                    ))
+                        fig_mae.update_layout(title='MAE', template='plotly_white')
+                        st.plotly_chart(fig_mae, use_container_width=True)
+        
+                        # --- RMSE ---
+                        fig_rmse = go.Figure()
+                        for model in metrics_area['Model'].unique():
+                            for dataset in ['Train', 'Test']:
+                                d = metrics_area[
+                                    (metrics_area['Model'] == model) &
+                                    (metrics_area['Dataset'] == dataset)
+                                ]
+                                if not d.empty:
+                                    fig_rmse.add_trace(go.Bar(
+                                        name=f'{model} {dataset}',
+                                        x=[f'{model} {dataset}'],
+                                        y=[d['RMSE'].values[0]],
+                                        marker_color=colors.get(model, 'gray')
+                                    ))
+                        fig_rmse.update_layout(title='RMSE', template='plotly_white')
+                        st.plotly_chart(fig_rmse, use_container_width=True)
+        
+                    # --- MAPE & R2 ---
+                    with col2:
+                        fig_mape = go.Figure()
+                        for model in metrics_area['Model'].unique():
+                            for dataset in ['Train', 'Test']:
+                                d = metrics_area[
+                                    (metrics_area['Model'] == model) &
+                                    (metrics_area['Dataset'] == dataset)
+                                ]
+                                if not d.empty:
+                                    fig_mape.add_trace(go.Bar(
+                                        name=f'{model} {dataset}',
+                                        x=[f'{model} {dataset}'],
+                                        y=[d['MAPE'].values[0]],
+                                        marker_color=colors.get(model, 'gray')
+                                    ))
+                        fig_mape.update_layout(title='MAPE (%)', template='plotly_white')
+                        st.plotly_chart(fig_mape, use_container_width=True)
+        
+                        fig_r2 = go.Figure()
+                        for model in metrics_area['Model'].unique():
+                            for dataset in ['Train', 'Test']:
+                                d = metrics_area[
+                                    (metrics_area['Model'] == model) &
+                                    (metrics_area['Dataset'] == dataset)
+                                ]
+                                if not d.empty:
+                                    fig_r2.add_trace(go.Bar(
+                                        name=f'{model} {dataset}',
+                                        x=[f'{model} {dataset}'],
+                                        y=[d['R2'].values[0]],
+                                        marker_color=colors.get(model, 'gray')
+                                    ))
+                        fig_r2.update_layout(title='R²', template='plotly_white')
+                        st.plotly_chart(fig_r2, use_container_width=True)
+        
+                # ---------------------------------------------------------
+                # SCATTER: ACTUAL vs PREDICTED
+                # ---------------------------------------------------------
+                st.subheader("Actual vs Predicted — Scatter Plot")
+        
+                for dataset in ['Train', 'Test']:
+                    st.markdown(f"**{dataset} Dataset**")
+                    fig_scatter = go.Figure()
+                    df_dataset = scatter_area[scatter_area['Dataset'] == dataset]
+        
+                    if df_dataset.empty:
+                        st.info(f"No {dataset} data available.")
+                        continue
+        
+                    for model in df_dataset['Model'].unique():
+                        df_sc = df_dataset[df_dataset['Model'] == model].dropna(subset=['Actual', 'Predicted'])
+                        if df_sc.empty:
+                            continue
+        
+                        x, y = df_sc['Actual'].values, df_sc['Predicted'].values
+                        fig_scatter.add_trace(go.Scatter(
+                            x=x, y=y, mode='markers', name=model,
+                            marker=dict(color=colors.get(model, 'gray'))
+                        ))
+        
+                        if len(x) > 1:
+                            lr = LinearRegression()
+                            lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
+                            y_fit = lr.predict(x.reshape(-1, 1)).ravel()
+                            r2 = r2_score(y, y_fit)
+                            fig_scatter.add_trace(go.Scatter(
+                                x=x, y=y_fit, mode='lines',
+                                name=f"{model} Fit (R²={r2:.3f})",
+                                line=dict(color=colors.get(model, 'gray'), dash='dash')
+                            ))
+        
+                    # Add y=x line
+                    min_val, max_val = df_dataset[['Actual', 'Predicted']].min().min(), df_dataset[['Actual', 'Predicted']].max().max()
+                    fig_scatter.add_trace(go.Scatter(
+                        x=[min_val, max_val], y=[min_val, max_val],
+                        mode='lines', name='y=x', line=dict(color='black', dash='dot')
+                    ))
+        
+                    fig_scatter.update_layout(template='plotly_white', xaxis_title='Actual', yaxis_title='Predicted')
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+        
+                # ---------------------------------------------------------
+                # MODEL SUMMARIES
+                # ---------------------------------------------------------
+                st.subheader("ARIMA & SARIMA Model Summaries")
+        
+                area_summaries = summary_df[summary_df['Area'].str.strip() == selected_area]
+                if area_summaries.empty:
+                    st.info("No summaries available.")
+                    return
+        
+                area_summaries['Model'] = area_summaries['Model'].str.strip().str.upper()
+        
+                # ARIMA
+                arima_row = area_summaries[area_summaries['Model'] == 'ARIMA']
+                if not arima_row.empty:
+                    st.markdown("### ARIMA Model Summary")
+                    st.code(arima_row['Summary'].values[0], language='text')
+                else:
+                    st.info("ARIMA summary not available.")
+        
+                # SARIMA
+                sarima_row = area_summaries[area_summaries['Model'] == 'SARIMA']
+                if not sarima_row.empty:
+                    st.markdown("### SARIMA Model Summary")
+                    st.code(sarima_row['Summary'].values[0], language='text')
+                else:
+                    st.info("SARIMA summary not available.")
+        
+            # ============================================================
+            # DISPLAY SIDE BY SIDE
+            # ============================================================
+            col1, col2 = st.columns(2)
+        
+            with col1:
+                display_area_section("Without Macro", scatter_df_wo, metrics_df_wo, summary_df_wo)
+        
+            with col2:
+                display_area_section("With Macro", scatter_df_w, metrics_df_w, summary_df_w)
     
-    # Step 3: Select Proxy_2 from chosen dataset
-    proxy_list = df["Proxy"].dropna().unique()
-    selected_proxy = st.selectbox("Select Proxy", proxy_list)
+    #######################################################################################################################################################################################################################
     
-    # Step 4: Filter for the selected Proxy_2
-    filtered_df = df[df["Proxy"] == selected_proxy]
+    #######################################################################################################################################################################################################################
+    if sidebar_option_3 ==  "area_combination":
+        st.subheader("Dubai Area-wise Bubble Map")
+        st.sidebar.text(
+        """
+        Proxy with more than 1 area:
     
-    # Display the map
-    tab1, = st.tabs(["Average Meter Sale Price"])
-    
-    with tab1:
-    
-        fig = px.scatter_mapbox(
-            filtered_df,
-            lat='area_lat',
-            lon='area_lon',
-            size='nRecords',
-            color='Average Meter Sale Price',
-            hover_name='area_name_en',
-            hover_data={
-                'nRecords': True,
-                'Average Meter Sale Price': ':.2f',
-                'area_lat': False,
-                'area_lon': False
-            },
-            color_continuous_scale='Hot',
-            size_max=30,
-            zoom=9,
-            title=f"{dataset_choice}: Areas Under {selected_proxy}"
+        0 Al Merkadh, Al Barsha South Third
+        1                             Nadd Hessa
+        2     Bukadra, Madinat Dubai Almelaheyah
+        3             Burj Khalifa, Business Bay
+        4        Jabal Ali First, Me'Aisem First
+        5             Palm Jumeirah, Marsa Dubai
+        6                        Al Warsan First
+        7                             Al Merkadh
+        8                           Burj Khalifa
+        9                           Business Bay
+        10                     Madinat Al Mataar
+        """
         )
-    
-        fig.update_layout(
-            mapbox_style='open-street-map',
-            margin={"r": 0, "t": 40, "l": 0, "b": 0}
+        # Load your two datasets
+        df1 = pd.read_csv("df_plot_p1_og.csv")
+        df2 = pd.read_csv("df_plot_p2_og.csv")
+        df3 = pd.read_csv("df_plot_p1.csv")
+        df4 = pd.read_csv("df_plot_p2.csv")    # or your second file
+        df5 = pd.read_csv("df_plot_p.csv")
+        df6 = pd.read_csv("df_plot_p1_21.csv")
+        df7 = pd.read_csv("df_plot_p2_21.csv")
+        df8 = pd.read_csv("df_plot_p_m_21.csv")
+        # Step 1: Choose dataset
+        dataset_choice = st.radio(
+            "Select Dataset",
+            ("Proxy_1_original", "Proxy_2_original","Proxy_1", "Proxy_2", "Modified", "Proxy_1_2021", "Proxy_2_21","Proxy_21_modified_proxy")
         )
-    
-        st.plotly_chart(fig, use_container_width=True)
+        
+        # Step 2: Assign the selected dataframe
+        if dataset_choice == "Proxy_1_original":
+            df = df1
+        elif dataset_choice == "Proxy_2_original":
+            df = df2 
+        elif dataset_choice == "Proxy_1":
+            df = df3
+        elif dataset_choice == "Proxy_2":
+            df = df4
+        elif dataset_choice == "Modified":
+            df = df5 
+        elif dataset_choice == "Proxy_1_2021":
+            df = df6
+        elif dataset_choice == "Proxy_2_2021":
+            df = df7
+        else:
+            df = df8
+            
+        
+        # Step 3: Select Proxy_2 from chosen dataset
+        proxy_list = df["Proxy"].dropna().unique()
+        selected_proxy = st.selectbox("Select Proxy", proxy_list)
+        
+        # Step 4: Filter for the selected Proxy_2
+        filtered_df = df[df["Proxy"] == selected_proxy]
+        
+        # Display the map
+        tab1, = st.tabs(["Average Meter Sale Price"])
+        
+        with tab1:
+        
+            fig = px.scatter_mapbox(
+                filtered_df,
+                lat='area_lat',
+                lon='area_lon',
+                size='nRecords',
+                color='Average Meter Sale Price',
+                hover_name='area_name_en',
+                hover_data={
+                    'nRecords': True,
+                    'Average Meter Sale Price': ':.2f',
+                    'area_lat': False,
+                    'area_lon': False
+                },
+                color_continuous_scale='Hot',
+                size_max=30,
+                zoom=9,
+                title=f"{dataset_choice}: Areas Under {selected_proxy}"
+            )
+        
+            fig.update_layout(
+                mapbox_style='open-street-map',
+                margin={"r": 0, "t": 40, "l": 0, "b": 0}
+            )
+        
+            st.plotly_chart(fig, use_container_width=True)
 
+#######################################################################################################################################################################################################################
+if page == "V_2.2":
+        st.title("V_2.2: prediction dashboard")
+        
+        # This will display the external app in a box on your dashboard
+        st.link_button("Go to Price Predictor", "https://flipose-re-price-prediction.streamlit.app/")
+    
