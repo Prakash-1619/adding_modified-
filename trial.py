@@ -3586,7 +3586,7 @@ if sidebar_option == "🤖 Model Input / Prediction":
     st.title("V_2.1: prediction dashboard")
     
     # This will display the external app in a box on your dashboard
-    st.components.v1.iframe("https://flipose-re-price-prediction.streamlit.app/", height=600, scrolling=True)
+    st.link_button("Go to Price Predictor", "https://flipose-re-price-prediction.streamlit.app/")
 # =========================
 # INITIALIZATION & MODEL LOADING
 # =========================
