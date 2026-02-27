@@ -30,7 +30,7 @@ st.markdown("""
 ###
 
 # Sidebar navigation
-page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "related_info","V_2.2"])
+page = st.sidebar.radio("Versions", ["V1", "V2","V2.1", "FC","area_combination","V_2.2"])
 
 if page == "V1":
     # Sidebar
@@ -4260,12 +4260,13 @@ if ohe is None or train_columns is None:
             st.sidebar.write(f"Growth data columns: {list(growth_pivot.columns)}")
     
     
-if page == "related_info":
+#if page == "related_info":
 
-    sidebar_option_3 = st.sidebar.radio("Choose Section", [
-        "FC","area_combination"
-    ])
-   if sidebar_option_3 == "FC":
+    #sidebar_option_3 = st.sidebar.radio("Choose Section", [
+     #   "FC",
+     #   "area_combination"
+     # ])
+if page  == "FC":
        
         import streamlit as st
         import pandas as pd
@@ -4756,7 +4757,7 @@ if page == "related_info":
     #######################################################################################################################################################################################################################
     
     #######################################################################################################################################################################################################################
-    if sidebar_option_3 ==  "area_combination":
+if page  ==  "area_combination":
         st.subheader("Dubai Area-wise Bubble Map")
         st.sidebar.text(
         """
