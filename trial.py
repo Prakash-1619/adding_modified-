@@ -3561,7 +3561,18 @@ elif page == "V2.1":
         )
         
         # --- Show in Streamlit ---
+        
         st.plotly_chart(fig, use_container_width=True)
+
+
+    
+    if sidebar_option == "🤖 Model Input / Prediction":
+    
+    
+        st.title("V_2.1: prediction dashboard")
+        
+        # This will display the external app in a box on your dashboard
+        st.link_button("Go to Price Predictor", "https://flipose-re-price-prediction.streamlit.app/")
 
 
 ###########################################################################################################################################################################################################################
@@ -3580,13 +3591,7 @@ import pickle
 import os
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from datetime import datetime, timedelta
-    if sidebar_option == "🤖 Model Input / Prediction":
-    
-    
-        st.title("V_2.1: prediction dashboard")
-        
-        # This will display the external app in a box on your dashboard
-        st.link_button("Go to Price Predictor", "https://flipose-re-price-prediction.streamlit.app/")
+
 # =========================
 # INITIALIZATION & MODEL LOADING
 # =========================
